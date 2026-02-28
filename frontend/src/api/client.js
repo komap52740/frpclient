@@ -106,6 +106,10 @@ export const authApi = {
     const response = await api.get("/me/");
     return response.data;
   },
+  async dashboardSummary() {
+    const response = await api.get("/dashboard/");
+    return response.data;
+  },
 };
 
 export const appointmentsApi = {
@@ -117,6 +121,9 @@ export const appointmentsApi = {
   },
   detail(id) {
     return api.get(`/appointments/${id}/`);
+  },
+  events(id) {
+    return api.get(`/appointments/${id}/events/`);
   },
   newList() {
     return api.get("/appointments/new/");

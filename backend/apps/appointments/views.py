@@ -15,6 +15,7 @@ from .models import Appointment, AppointmentEventType, AppointmentStatusChoices
 from .serializers import (
     AdminManualStatusSerializer,
     AppointmentCreateSerializer,
+    AppointmentEventSerializer,
     AppointmentSerializer,
     MarkPaidSerializer,
     SetPriceSerializer,
@@ -56,6 +57,16 @@ class AppointmentDetailView(APIView):
     def get(self, request, appointment_id: int):
         appointment = get_appointment_for_user(request.user, appointment_id)
         data = AppointmentSerializer(appointment, context={"request": request}).data
+        return Response(data)
+
+
+class AppointmentEventsView(APIView):
+    permission_classes = (permissions.IsAuthenticated,)
+
+    def get(self, request, appointment_id: int):
+        appointment = get_appointment_for_user(request.user, appointment_id)
+        queryset = appointment.events.select_related("actor").all()[:100]
+        data = AppointmentEventSerializer(queryset, many=True).data
         return Response(data)
 
 

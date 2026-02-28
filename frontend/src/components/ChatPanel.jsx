@@ -1,5 +1,5 @@
-﻿import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
-import AttachFileIcon from "@mui/icons-material/AttachFile";
+﻿import AttachFileIcon from "@mui/icons-material/AttachFile";
+import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import SendIcon from "@mui/icons-material/Send";
 import {
   Alert,
@@ -11,9 +11,13 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
+import dayjs from "dayjs";
+import "dayjs/locale/ru";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { chatApi } from "../api/client";
+
+dayjs.locale("ru");
 
 export default function ChatPanel({ appointmentId, currentUser }) {
   const [messages, setMessages] = useState([]);
@@ -38,7 +42,7 @@ export default function ChatPanel({ appointmentId, currentUser }) {
             return Array.from(dedup.values()).sort((a, b) => a.id - b.id);
           });
         }
-      } catch (e) {
+      } catch {
         setError("Не удалось загрузить сообщения");
       }
     },
@@ -76,7 +80,7 @@ export default function ChatPanel({ appointmentId, currentUser }) {
       setFile(null);
       setError("");
     } catch {
-      setError("Не удалось отправить сообщение")
+      setError("Не удалось отправить сообщение");
     }
   };
 
@@ -90,7 +94,7 @@ export default function ChatPanel({ appointmentId, currentUser }) {
   };
 
   return (
-    <Paper sx={{ p: 2 }}>
+    <Paper sx={{ p: 2, borderRadius: 3 }}>
       <Typography variant="h6" mb={2}>Чат по заявке</Typography>
 
       {error && <Alert severity="error" sx={{ mb: 1 }}>{error}</Alert>}
@@ -112,6 +116,9 @@ export default function ChatPanel({ appointmentId, currentUser }) {
             >
               <Typography variant="caption" color="text.secondary">
                 {m.sender_username}
+              </Typography>
+              <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
+                {dayjs(m.created_at).format("DD.MM.YYYY HH:mm")}
               </Typography>
               <Typography variant="body2">
                 {m.is_deleted ? "Сообщение удалено" : m.text}
@@ -138,6 +145,13 @@ export default function ChatPanel({ appointmentId, currentUser }) {
           minRows={2}
           value={text}
           onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+              e.preventDefault();
+              onSend();
+            }
+          }}
+          helperText="Ctrl+Enter для быстрой отправки"
         />
         <Stack direction="row" spacing={1} alignItems="center">
           <Button component="label" variant="outlined" startIcon={<AttachFileIcon />}>

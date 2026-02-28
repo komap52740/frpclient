@@ -5,6 +5,7 @@ from .views import (
     BootstrapCreateAdminView,
     BootstrapStatusView,
     CookieTokenRefreshView,
+    DashboardSummaryView,
     MeView,
     PasswordLoginView,
     TelegramAuthView,
@@ -18,4 +19,5 @@ urlpatterns = [
     path("auth/logout/", AuthLogoutView.as_view(), name="auth-logout"),
     path("auth/refresh/", CookieTokenRefreshView.as_view(), name="auth-refresh"),
     path("me/", MeView.as_view(), name="me"),
+    path("dashboard/", DashboardSummaryView.as_view(), name="dashboard-summary"),
 ]

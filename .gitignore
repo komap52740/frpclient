@@ -4,3 +4,12 @@ backend/media/
 backend/staticfiles/
 backend/db.sqlite3
 frontend/dist/
+frontend/node_modules/
+**/__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.DS_Store
+Thumbs.db

@@ -315,3 +315,56 @@ def test_admin_can_change_user_role(admin_user, client_user):
     client_user.refresh_from_db()
     assert client_user.role == RoleChoices.MASTER
     assert client_user.is_master_active is True
+
+
+@pytest.mark.django_db
+def test_api_health_endpoint(api_client):
+    response = api_client.get("/api/health/")
+    assert response.status_code == 200
+    assert response.data["status"] == "ok"
+    assert response.data["database"]["connected"] is True
+
+
+@pytest.mark.django_db
+def test_dashboard_summary_for_client(client_user):
+    appointment = Appointment.objects.create(
+        client=client_user,
+        brand="Samsung",
+        model="A50",
+        lock_type="PIN",
+        has_pc=True,
+        description="desc",
+        status=AppointmentStatusChoices.AWAITING_PAYMENT,
+    )
+    Message.objects.create(appointment=appointment, sender=client_user, text="self")
+    response = auth_as(client_user).get("/api/dashboard/")
+    assert response.status_code == 200
+    assert response.data["role"] == RoleChoices.CLIENT
+    assert response.data["counts"]["appointments_total"] >= 1
+    assert response.data["counts"]["awaiting_payment"] >= 1
+
+
+@pytest.mark.django_db
+def test_dashboard_summary_for_admin(admin_user):
+    response = auth_as(admin_user).get("/api/dashboard/")
+    assert response.status_code == 200
+    assert response.data["role"] == "admin"
+    assert "users_total" in response.data["counts"]
+
+
+@pytest.mark.django_db
+def test_appointment_events_endpoint(client_user, master_user):
+    appointment = Appointment.objects.create(
+        client=client_user,
+        brand="Samsung",
+        model="A50",
+        lock_type="PIN",
+        has_pc=True,
+        description="desc",
+    )
+    take_response = auth_as(master_user).post(f"/api/appointments/{appointment.id}/take/")
+    assert take_response.status_code == 200
+
+    events_response = auth_as(client_user).get(f"/api/appointments/{appointment.id}/events/")
+    assert events_response.status_code == 200
+    assert len(events_response.data) >= 1

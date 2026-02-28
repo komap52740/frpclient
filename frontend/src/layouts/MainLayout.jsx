@@ -3,16 +3,18 @@ import {
   AppBar,
   Box,
   Button,
+  Chip,
   Container,
   Drawer,
   IconButton,
   List,
   ListItemButton,
   ListItemText,
+  Stack,
   Toolbar,
   Typography,
 } from "@mui/material";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Link as RouterLink, useNavigate } from "react-router-dom";
 
 import { useAuth } from "../auth/AuthContext";
@@ -44,11 +46,20 @@ function buildMenu(role) {
   return [];
 }
 
+function getRoleLabel(role) {
+  if (role === "client") return "Клиент";
+  if (role === "master") return "Мастер";
+  if (role === "admin") return "Администратор";
+  return "Пользователь";
+}
+
 export default function MainLayout({ children }) {
   const { user, logout } = useAuth();
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
   const menuItems = buildMenu(user?.role);
+
+  const roleLabel = useMemo(() => getRoleLabel(user?.role), [user?.role]);
 
   const onLogout = async () => {
     await logout();
@@ -56,13 +67,16 @@ export default function MainLayout({ children }) {
   };
 
   return (
-    <Box sx={{ minHeight: "100vh", background: "linear-gradient(180deg, #f8f6f2 0%, #eef5f4 100%)" }}>
-      <AppBar position="sticky" color="primary">
+    <Box sx={{ minHeight: "100vh" }}>
+      <AppBar position="sticky" color="primary" sx={{ backdropFilter: "blur(8px)" }}>
         <Toolbar>
           <IconButton color="inherit" edge="start" onClick={() => setOpen(true)} sx={{ mr: 1 }}>
             <MenuIcon />
           </IconButton>
-          <Typography sx={{ flexGrow: 1, fontWeight: 700 }}>FRP Клиент</Typography>
+          <Stack direction="row" spacing={1} alignItems="center" sx={{ flexGrow: 1 }}>
+            <Typography sx={{ fontWeight: 800 }}>FRP Клиент</Typography>
+            <Chip size="small" label={roleLabel} sx={{ bgcolor: "rgba(255,255,255,0.2)", color: "#fff" }} />
+          </Stack>
           <Typography sx={{ mr: 2, display: { xs: "none", sm: "block" } }}>{user?.username}</Typography>
           <Button color="inherit" onClick={onLogout}>
             Выйти
@@ -71,7 +85,11 @@ export default function MainLayout({ children }) {
       </AppBar>
 
       <Drawer open={open} onClose={() => setOpen(false)}>
-        <Box sx={{ width: 260 }} role="presentation" onClick={() => setOpen(false)}>
+        <Box sx={{ width: 280 }} role="presentation" onClick={() => setOpen(false)}>
+          <Box sx={{ p: 2, borderBottom: "1px solid #eceff1" }}>
+            <Typography variant="subtitle2" color="text.secondary">Навигация</Typography>
+            <Typography variant="h6" sx={{ mt: 0.5 }}>Рабочее место</Typography>
+          </Box>
           <List>
             {menuItems.map((item) => (
               <ListItemButton component={RouterLink} to={item.to} key={item.to}>

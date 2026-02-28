@@ -1,6 +1,6 @@
 ﻿import os
-from pathlib import Path
 from datetime import timedelta
+from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -87,6 +87,14 @@ USE_TZ = True
 
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
+
+try:  # pragma: no cover - depends on environment packages
+    import whitenoise  # noqa: F401
+
+    MIDDLEWARE.insert(1, "whitenoise.middleware.WhiteNoiseMiddleware")
+    STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
+except ImportError:
+    STATICFILES_STORAGE = "django.contrib.staticfiles.storage.StaticFilesStorage"
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"

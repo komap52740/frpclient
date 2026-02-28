@@ -2,6 +2,7 @@
 import {
   Alert,
   Button,
+  Grid,
   MenuItem,
   Paper,
   Stack,
@@ -16,20 +17,26 @@ import {
 import { useEffect, useState } from "react";
 import { Link as RouterLink } from "react-router-dom";
 
-import { adminApi } from "../../api/client";
+import { adminApi, authApi } from "../../api/client";
+import KpiCard from "../../components/KpiCard";
 import StatusChip from "../../components/StatusChip";
 import { APPOINTMENT_STATUS_OPTIONS, getStatusLabel } from "../../constants/labels";
 
 export default function AdminAppointmentsPage() {
   const [rows, setRows] = useState([]);
+  const [summary, setSummary] = useState(null);
   const [filters, setFilters] = useState({ status: "", master: "", client: "", date_from: "", date_to: "" });
   const [error, setError] = useState("");
 
   const load = async () => {
     try {
       const params = Object.fromEntries(Object.entries(filters).filter(([, v]) => v !== ""));
-      const response = await adminApi.appointments(params);
-      setRows(response.data);
+      const [appointmentsResponse, summaryData] = await Promise.all([
+        adminApi.appointments(params),
+        authApi.dashboardSummary(),
+      ]);
+      setRows(appointmentsResponse.data || []);
+      setSummary(summaryData.counts || {});
       setError("");
     } catch {
       setError("Не удалось загрузить список заявок");
@@ -44,6 +51,21 @@ export default function AdminAppointmentsPage() {
   return (
     <Stack spacing={2}>
       <Typography variant="h5">Админ: заявки</Typography>
+
+      <Grid container spacing={2}>
+        <Grid item xs={12} sm={6} md={3}>
+          <KpiCard title="Всего заявок" value={summary?.appointments_total ?? "-"} />
+        </Grid>
+        <Grid item xs={12} sm={6} md={3}>
+          <KpiCard title="Новые" value={summary?.appointments_new ?? "-"} accent="#15616d" />
+        </Grid>
+        <Grid item xs={12} sm={6} md={3}>
+          <KpiCard title="Активные" value={summary?.appointments_active ?? "-"} accent="#2e8a66" />
+        </Grid>
+        <Grid item xs={12} sm={6} md={3}>
+          <KpiCard title="Ждут подтверждение" value={summary?.payments_waiting_confirmation ?? "-"} accent="#bf4342" />
+        </Grid>
+      </Grid>
 
       <Paper sx={{ p: 2 }}>
         <Stack spacing={1} direction={{ xs: "column", md: "row" }}>
@@ -87,10 +109,10 @@ export default function AdminAppointmentsPage() {
             {rows.map((row) => (
               <TableRow key={row.id}>
                 <TableCell>{row.id}</TableCell>
-                <TableCell>{row.client}</TableCell>
-                <TableCell>{row.assigned_master || "-"}</TableCell>
+                <TableCell>{row.client_username || row.client}</TableCell>
+                <TableCell>{row.master_username || row.assigned_master || "-"}</TableCell>
                 <TableCell><StatusChip status={row.status} /></TableCell>
-                <TableCell>{row.total_price || "-"}</TableCell>
+                <TableCell>{row.total_price ? `${row.total_price} ₽` : "-"}</TableCell>
                 <TableCell>
                   <Button component={RouterLink} to={`/appointments/${row.id}`} size="small">
                     Открыть

@@ -11,6 +11,8 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenRefreshView
 
 from .models import RoleChoices, SiteSettings, User
+from apps.appointments.models import Appointment, AppointmentStatusChoices
+from apps.chat.models import ReadState
 from .serializers import (
     BootstrapAdminSerializer,
     MeSerializer,
@@ -194,3 +196,92 @@ class MeView(APIView):
             },
         }
         return Response(payload, status=status.HTTP_200_OK)
+
+
+def calculate_unread_total(appointments_queryset, user: User) -> int:
+    appointment_ids = list(appointments_queryset.values_list("id", flat=True))
+    if not appointment_ids:
+        return 0
+
+    states = ReadState.objects.filter(user=user, appointment_id__in=appointment_ids).values("appointment_id", "last_read_message_id")
+    last_read_map = {row["appointment_id"]: row["last_read_message_id"] for row in states}
+
+    unread_total = 0
+    for appointment in appointments_queryset:
+        last_read_id = last_read_map.get(appointment.id, 0)
+        unread_total += appointment.messages.filter(id__gt=last_read_id, is_deleted=False).exclude(sender=user).count()
+    return unread_total
+
+
+class DashboardSummaryView(APIView):
+    permission_classes = (permissions.IsAuthenticated,)
+
+    def get(self, request):
+        user = request.user
+        active_statuses = (
+            AppointmentStatusChoices.NEW,
+            AppointmentStatusChoices.IN_REVIEW,
+            AppointmentStatusChoices.AWAITING_PAYMENT,
+            AppointmentStatusChoices.PAYMENT_PROOF_UPLOADED,
+            AppointmentStatusChoices.PAID,
+            AppointmentStatusChoices.IN_PROGRESS,
+        )
+
+        if user.role == RoleChoices.CLIENT:
+            queryset = Appointment.objects.filter(client=user)
+            payload = {
+                "role": user.role,
+                "counts": {
+                    "appointments_total": queryset.count(),
+                    "appointments_active": queryset.filter(status__in=active_statuses).count(),
+                    "awaiting_payment": queryset.filter(status=AppointmentStatusChoices.AWAITING_PAYMENT).count(),
+                    "completed": queryset.filter(status=AppointmentStatusChoices.COMPLETED).count(),
+                    "declined": queryset.filter(status=AppointmentStatusChoices.DECLINED_BY_MASTER).count(),
+                    "unread_total": calculate_unread_total(queryset, user),
+                },
+            }
+            return Response(payload, status=status.HTTP_200_OK)
+
+        if user.role == RoleChoices.MASTER:
+            new_available_queryset = Appointment.objects.filter(
+                status=AppointmentStatusChoices.NEW,
+                assigned_master__isnull=True,
+            )
+            own_queryset = Appointment.objects.filter(assigned_master=user)
+            own_active_queryset = own_queryset.filter(status__in=active_statuses)
+            payload = {
+                "role": user.role,
+                "counts": {
+                    "new_available": new_available_queryset.count(),
+                    "active_total": own_active_queryset.count(),
+                    "awaiting_client_payment": own_queryset.filter(status=AppointmentStatusChoices.AWAITING_PAYMENT).count(),
+                    "awaiting_payment_confirmation": own_queryset.filter(status=AppointmentStatusChoices.PAYMENT_PROOF_UPLOADED).count(),
+                    "in_progress": own_queryset.filter(status=AppointmentStatusChoices.IN_PROGRESS).count(),
+                    "completed_total": own_queryset.filter(status=AppointmentStatusChoices.COMPLETED).count(),
+                    "unread_total": calculate_unread_total(own_active_queryset, user),
+                },
+            }
+            return Response(payload, status=status.HTTP_200_OK)
+
+        is_admin = user.role == RoleChoices.ADMIN or user.is_superuser
+        if is_admin:
+            admin_accounts_count = User.objects.filter(role=RoleChoices.ADMIN).count() + User.objects.filter(is_superuser=True).exclude(role=RoleChoices.ADMIN).count()
+            appointments_queryset = Appointment.objects.all()
+            payload = {
+                "role": "admin",
+                "counts": {
+                    "users_total": User.objects.count(),
+                    "clients_total": User.objects.filter(role=RoleChoices.CLIENT).count(),
+                    "masters_total": User.objects.filter(role=RoleChoices.MASTER).count(),
+                    "admins_total": admin_accounts_count,
+                    "appointments_total": appointments_queryset.count(),
+                    "appointments_new": appointments_queryset.filter(status=AppointmentStatusChoices.NEW).count(),
+                    "appointments_active": appointments_queryset.filter(status__in=active_statuses).count(),
+                    "payments_waiting_confirmation": appointments_queryset.filter(status=AppointmentStatusChoices.PAYMENT_PROOF_UPLOADED).count(),
+                    "appointments_completed": appointments_queryset.filter(status=AppointmentStatusChoices.COMPLETED).count(),
+                },
+            }
+            return Response(payload, status=status.HTTP_200_OK)
+
+        # Defensive fallback for unknown role values.
+        return Response({"role": user.role, "counts": {}}, status=status.HTTP_200_OK)

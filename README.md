@@ -1,32 +1,101 @@
-# FRP Client
+﻿# FRP Client
 
-Веб‑система для работы с заявками FRP, ролями пользователей и администрированием без обязательной ручной работы в консоли.
+Полноценная русскоязычная веб-платформа для удаленной разблокировки устройств:
+- роли `клиент`, `мастер`, `администратор`;
+- управление заявками, оплатами и чатом;
+- система событий по каждой заявке;
+- первичная настройка через веб-интерфейс без консоли;
+- прод-контур для деплоя на VPS.
 
-## Что уже можно делать через сайт
+## Ключевые возможности
 
-- первичная настройка: создание первого администратора на странице входа;
-- вход по логину и паролю;
-- вход через Telegram (если настроен бот);
-- управление заявками, статусами, оплатами и чатом;
-- управление ролями пользователей (клиент, мастер, администратор);
-- включение/отключение мастеров;
-- блокировка/разблокировка клиентов;
-- настройка реквизитов оплаты и инструкции для клиента;
-- системные действия администратора (`check`, `migrate`, `collectstatic`, `clearsessions`).
+- Вход через Telegram и логин/пароль.
+- Первичное создание первого администратора на странице входа.
+- Дашборды по ролям с KPI и быстрыми действиями.
+- Таймлайн событий по заявке (`кто / что / когда`).
+- Админ-инструменты: роли пользователей, блокировки, системные действия, реквизиты оплаты.
+- Health endpoints для мониторинга:
+  - `GET /healthz`
+  - `GET /api/health/`
 
-## Быстрый запуск
+## Режимы запуска
 
-1. Подготовить переменные окружения:
-   - `backend/.env` (можно взять за основу `backend/.env.example`);
-   - `frontend/.env` (можно взять за основу `frontend/.env.example`).
-2. Запустить контейнеры:
-   - `docker compose up --build`
-3. Открыть интерфейс:
-   - `http://localhost:5173`
-4. При первом запуске:
-   - на странице входа создать первого администратора в блоке «Первичная настройка».
+### 1) Обычный (dev-like) через `docker-compose.yml`
 
-## Проверка
+```bash
+docker compose up -d --build
+```
 
-- Backend тесты: `pytest -q` (в локальной среде можно использовать `DB_ENGINE=sqlite`);
-- Frontend сборка: `npm run build`.
+Порты:
+- `5173` frontend
+- `8000` backend
+- `5432` postgres
+
+### 2) Production через `docker-compose.prod.yml`
+
+Production-контур включает:
+- backend (gunicorn + migrate + collectstatic);
+- frontend (Nginx + статическая сборка Vite + reverse-proxy на backend);
+- healthchecks сервисов.
+
+```bash
+docker compose -f docker-compose.prod.yml up -d --build
+```
+
+Порт:
+- `80` frontend + proxy `/api`, `/admin`, `/healthz`.
+
+## Быстрый деплой GitHub -> VPS
+
+### На локальной машине
+
+```bash
+git add .
+git commit -m "prod update"
+git push origin main
+```
+
+### На VPS
+
+```bash
+cd /var/www/FRPclient
+git pull --ff-only origin main
+
+# первый запуск
+cp backend/.env.example backend/.env
+cp frontend/.env.example frontend/.env
+nano backend/.env
+nano frontend/.env
+
+# production запуск
+# если нужен Telegram login на фронте:
+# export VITE_TELEGRAM_BOT_USERNAME=your_bot_username
+docker compose -f docker-compose.prod.yml up -d --build
+```
+
+## Проверки после запуска
+
+```bash
+docker compose -f docker-compose.prod.yml ps
+curl -I http://127.0.0.1/healthz
+curl -I http://127.0.0.1/api/health/
+```
+
+## Полезные команды
+
+```bash
+# логи backend
+docker compose -f docker-compose.prod.yml logs -f backend
+
+# логи frontend
+docker compose -f docker-compose.prod.yml logs -f frontend
+
+# перезапуск
+docker compose -f docker-compose.prod.yml up -d --build
+```
+
+## Важные замечания
+
+- Не храните `.env` в git.
+- Для продакшена используйте длинный `SECRET_KEY` (минимум 32+ символа).
+- Ограничьте `ALLOWED_HOSTS`, `CSRF_TRUSTED_ORIGINS`, `CORS_ALLOWED_ORIGINS` под ваш домен.
