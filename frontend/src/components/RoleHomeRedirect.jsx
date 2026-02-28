@@ -16,7 +16,7 @@ export default function RoleHomeRedirect() {
     return <Navigate to="/master/new" replace />;
   }
   if (user.role === "admin") {
-    return <Navigate to="/admin/appointments" replace />;
+    return <Navigate to="/admin/system" replace />;
   }
 
   return <Navigate to="/login" replace />;

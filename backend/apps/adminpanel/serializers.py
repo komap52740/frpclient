@@ -2,8 +2,7 @@
 
 from rest_framework import serializers
 
-from apps.accounts.models import User
-from apps.appointments.serializers import AppointmentSerializer
+from apps.accounts.models import RoleChoices, SiteSettings, User
 
 
 class BanUserSerializer(serializers.Serializer):
@@ -16,10 +15,45 @@ class AdminUserSerializer(serializers.ModelSerializer):
         fields = (
             "id",
             "username",
+            "first_name",
+            "last_name",
             "role",
             "telegram_username",
             "is_banned",
             "ban_reason",
             "banned_at",
             "is_master_active",
+            "is_staff",
+            "is_superuser",
         )
+
+
+class AdminUserRoleSerializer(serializers.Serializer):
+    role = serializers.ChoiceField(choices=RoleChoices.choices)
+    is_master_active = serializers.BooleanField(required=False)
+
+
+class AdminSystemSettingsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SiteSettings
+        fields = (
+            "bank_requisites",
+            "crypto_requisites",
+            "instructions",
+        )
+
+
+class AdminSystemActionSerializer(serializers.Serializer):
+    ACTION_MIGRATE = "migrate"
+    ACTION_COLLECTSTATIC = "collectstatic"
+    ACTION_CLEARSESSIONS = "clearsessions"
+    ACTION_CHECK = "check"
+
+    ACTION_CHOICES = (
+        (ACTION_MIGRATE, "Применить миграции"),
+        (ACTION_COLLECTSTATIC, "Собрать статические файлы"),
+        (ACTION_CLEARSESSIONS, "Очистить просроченные сессии"),
+        (ACTION_CHECK, "Проверка конфигурации Django"),
+    )
+
+    action = serializers.ChoiceField(choices=ACTION_CHOICES)

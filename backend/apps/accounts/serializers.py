@@ -85,3 +85,25 @@ class TelegramAuthSerializer(serializers.Serializer):
 
 class MarkPaidSerializer(serializers.Serializer):
     payment_method = serializers.ChoiceField(choices=(("crypto", "crypto"), ("bank_transfer", "bank_transfer")))
+
+
+class PasswordLoginSerializer(serializers.Serializer):
+    username = serializers.CharField(max_length=150)
+    password = serializers.CharField(max_length=255, trim_whitespace=False)
+
+
+class BootstrapAdminSerializer(serializers.Serializer):
+    username = serializers.CharField(max_length=150)
+    password = serializers.CharField(max_length=255, trim_whitespace=False)
+    first_name = serializers.CharField(max_length=150, required=False, allow_blank=True)
+    last_name = serializers.CharField(max_length=150, required=False, allow_blank=True)
+
+    def validate_username(self, value: str) -> str:
+        if User.objects.filter(username=value).exists():
+            raise serializers.ValidationError("Пользователь с таким логином уже существует.")
+        return value
+
+    def validate_password(self, value: str) -> str:
+        if len(value) < 8:
+            raise serializers.ValidationError("Пароль должен содержать минимум 8 символов.")
+        return value

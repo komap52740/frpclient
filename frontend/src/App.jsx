@@ -7,6 +7,8 @@ import MainLayout from "./layouts/MainLayout";
 import AdminAppointmentsPage from "./pages/admin/AdminAppointmentsPage";
 import AdminClientsPage from "./pages/admin/AdminClientsPage";
 import AdminMastersPage from "./pages/admin/AdminMastersPage";
+import AdminSystemPage from "./pages/admin/AdminSystemPage";
+import AdminUsersPage from "./pages/admin/AdminUsersPage";
 import AppointmentDetailPage from "./pages/AppointmentDetailPage";
 import LoginPage from "./pages/auth/LoginPage";
 import ClientHomePage from "./pages/client/ClientHomePage";
@@ -94,6 +96,22 @@ function AuthenticatedLayout() {
             element={
               <ProtectedRoute roles={["admin"]}>
                 <AdminMastersPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/system"
+            element={
+              <ProtectedRoute roles={["admin"]}>
+                <AdminSystemPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/users"
+            element={
+              <ProtectedRoute roles={["admin"]}>
+                <AdminUsersPage />
               </ProtectedRoute>
             }
           />

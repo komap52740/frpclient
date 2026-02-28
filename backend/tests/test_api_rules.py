@@ -212,3 +212,106 @@ def test_permissions_scope(client_user, client_user_2, master_user, master_user_
 
     denied_confirm = auth_as(master_user_2).post(f"/api/appointments/{appointment.id}/confirm-payment/")
     assert denied_confirm.status_code == 403
+
+
+@pytest.mark.django_db
+def test_admin_system_status(admin_user):
+    response = auth_as(admin_user).get("/api/admin/system/status/")
+    assert response.status_code == 200
+    assert "database" in response.data
+    assert "counts" in response.data
+    assert response.data["database"]["connected"] is True
+
+
+@pytest.mark.django_db
+def test_admin_system_action_check(admin_user):
+    response = auth_as(admin_user).post("/api/admin/system/run-action/", {"action": "check"}, format="json")
+    assert response.status_code == 200
+    assert response.data["action"] == "check"
+    assert response.data["success"] is True
+
+
+@pytest.mark.django_db
+def test_admin_system_action_requires_admin(client_user):
+    response = auth_as(client_user).post("/api/admin/system/run-action/", {"action": "check"}, format="json")
+    assert response.status_code == 403
+
+
+@pytest.mark.django_db
+def test_bootstrap_admin_flow(api_client):
+    status_before = api_client.get("/api/auth/bootstrap-status/")
+    assert status_before.status_code == 200
+    assert status_before.data["requires_setup"] is True
+
+    create_response = api_client.post(
+        "/api/auth/bootstrap-admin/",
+        {
+            "username": "owner",
+            "password": "supersecure123",
+            "first_name": "Иван",
+            "last_name": "Админ",
+        },
+        format="json",
+    )
+    assert create_response.status_code == 200
+    assert create_response.data["user"]["role"] == RoleChoices.ADMIN
+
+    status_after = api_client.get("/api/auth/bootstrap-status/")
+    assert status_after.status_code == 200
+    assert status_after.data["requires_setup"] is False
+
+    conflict = api_client.post(
+        "/api/auth/bootstrap-admin/",
+        {"username": "second", "password": "anothersecure123"},
+        format="json",
+    )
+    assert conflict.status_code == 409
+
+
+@pytest.mark.django_db
+def test_password_login_flow(api_client):
+    User.objects.create_user(username="local_admin", password="safe-pass-123", role=RoleChoices.ADMIN, is_staff=True)
+
+    ok_response = api_client.post(
+        "/api/auth/login/",
+        {"username": "local_admin", "password": "safe-pass-123"},
+        format="json",
+    )
+    assert ok_response.status_code == 200
+    assert ok_response.data["user"]["role"] == RoleChoices.ADMIN
+    assert "access" in ok_response.data
+
+    bad_response = api_client.post(
+        "/api/auth/login/",
+        {"username": "local_admin", "password": "wrong-pass"},
+        format="json",
+    )
+    assert bad_response.status_code == 401
+
+
+@pytest.mark.django_db
+def test_admin_can_update_system_settings(admin_user):
+    payload = {
+        "bank_requisites": "Счет 123",
+        "crypto_requisites": "USDT TRC20 ...",
+        "instructions": "Оплатите и приложите чек.",
+    }
+    response = auth_as(admin_user).put("/api/admin/system/settings/", payload, format="json")
+    assert response.status_code == 200
+    assert response.data["bank_requisites"] == payload["bank_requisites"]
+    assert response.data["crypto_requisites"] == payload["crypto_requisites"]
+    assert response.data["instructions"] == payload["instructions"]
+
+
+@pytest.mark.django_db
+def test_admin_can_change_user_role(admin_user, client_user):
+    response = auth_as(admin_user).post(
+        f"/api/admin/users/{client_user.id}/role/",
+        {"role": RoleChoices.MASTER, "is_master_active": True},
+        format="json",
+    )
+    assert response.status_code == 200
+
+    client_user.refresh_from_db()
+    assert client_user.role == RoleChoices.MASTER
+    assert client_user.is_master_active is True

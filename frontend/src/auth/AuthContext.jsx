@@ -53,7 +53,29 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
-  const logout = useCallback(() => {
+  const loginWithPassword = useCallback(async (credentials) => {
+    const data = await authApi.passwordLogin(credentials);
+    setAccessToken(data.access);
+    if (data.user) {
+      setUser(data.user);
+    }
+
+    try {
+      const me = await authApi.getMe();
+      setUser(me.user);
+      setPaymentSettings(me.payment_settings);
+      return me.user;
+    } catch {
+      return data.user || null;
+    }
+  }, []);
+
+  const logout = useCallback(async () => {
+    try {
+      await authApi.logout();
+    } catch {
+      // Ignore backend logout errors and clear local state anyway.
+    }
     clearTokens();
     setUser(null);
     setPaymentSettings(null);
@@ -65,10 +87,11 @@ export function AuthProvider({ children }) {
       paymentSettings,
       loading,
       loginWithTelegram,
+      loginWithPassword,
       logout,
       reloadMe: loadMe,
     }),
-    [user, paymentSettings, loading, loginWithTelegram, logout, loadMe]
+    [user, paymentSettings, loading, loginWithTelegram, loginWithPassword, logout, loadMe]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -42,7 +42,16 @@ api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
-    if (!error.response || error.response.status !== 401 || originalRequest._retry) {
+    const requestUrl = originalRequest?.url || "";
+    const bypassRefresh =
+      requestUrl.includes("/auth/login/") ||
+      requestUrl.includes("/auth/telegram/") ||
+      requestUrl.includes("/auth/logout/") ||
+      requestUrl.includes("/auth/bootstrap-admin/") ||
+      requestUrl.includes("/auth/bootstrap-status/") ||
+      requestUrl.includes("/auth/refresh/");
+
+    if (!error.response || error.response.status !== 401 || originalRequest._retry || bypassRefresh) {
       return Promise.reject(error);
     }
 
@@ -73,8 +82,24 @@ api.interceptors.response.use(
 );
 
 export const authApi = {
+  async bootstrapStatus() {
+    const response = await api.get("/auth/bootstrap-status/");
+    return response.data;
+  },
+  async bootstrapAdmin(payload) {
+    const response = await api.post("/auth/bootstrap-admin/", payload);
+    return response.data;
+  },
+  async passwordLogin(payload) {
+    const response = await api.post("/auth/login/", payload);
+    return response.data;
+  },
   async telegramAuth(payload) {
     const response = await api.post("/auth/telegram/", payload);
+    return response.data;
+  },
+  async logout() {
+    const response = await api.post("/auth/logout/");
     return response.data;
   },
   async getMe() {
@@ -166,11 +191,17 @@ export const adminApi = {
   clients() {
     return api.get("/admin/users/");
   },
+  users(params = {}) {
+    return api.get("/admin/users/all/", { params });
+  },
   ban(userId, reason) {
     return api.post(`/admin/users/${userId}/ban/`, { reason });
   },
   unban(userId) {
     return api.post(`/admin/users/${userId}/unban/`);
+  },
+  updateUserRole(userId, payload) {
+    return api.post(`/admin/users/${userId}/role/`, payload);
   },
   masters() {
     return api.get("/admin/masters/");
@@ -180,5 +211,17 @@ export const adminApi = {
   },
   suspendMaster(userId) {
     return api.post(`/admin/masters/${userId}/suspend/`);
+  },
+  systemStatus() {
+    return api.get("/admin/system/status/");
+  },
+  systemSettings() {
+    return api.get("/admin/system/settings/");
+  },
+  updateSystemSettings(payload) {
+    return api.put("/admin/system/settings/", payload);
+  },
+  runSystemAction(action) {
+    return api.post("/admin/system/run-action/", { action });
   },
 };

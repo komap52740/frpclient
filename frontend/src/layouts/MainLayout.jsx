@@ -34,7 +34,9 @@ function buildMenu(role) {
   }
   if (role === "admin") {
     return [
+      { label: "Система", to: "/admin/system" },
       { label: "Заявки", to: "/admin/appointments" },
+      { label: "Пользователи", to: "/admin/users" },
       { label: "Клиенты", to: "/admin/clients" },
       { label: "Мастера", to: "/admin/masters" },
     ];
@@ -48,8 +50,8 @@ export default function MainLayout({ children }) {
   const navigate = useNavigate();
   const menuItems = buildMenu(user?.role);
 
-  const onLogout = () => {
-    logout();
+  const onLogout = async () => {
+    await logout();
     navigate("/login", { replace: true });
   };
 
