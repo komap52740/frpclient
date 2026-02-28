@@ -38,11 +38,19 @@ export function AuthProvider({ children }) {
   const loginWithTelegram = useCallback(async (telegramPayload) => {
     const data = await authApi.telegramAuth(telegramPayload);
     setAccessToken(data.access);
-    setUser(data.user);
-    const me = await authApi.getMe();
-    setUser(me.user);
-    setPaymentSettings(me.payment_settings);
-    return me.user;
+    if (data.user) {
+      setUser(data.user);
+    }
+
+    // Do not fail login if /me temporarily returns an error.
+    try {
+      const me = await authApi.getMe();
+      setUser(me.user);
+      setPaymentSettings(me.payment_settings);
+      return me.user;
+    } catch {
+      return data.user || null;
+    }
   }, []);
 
   const logout = useCallback(() => {

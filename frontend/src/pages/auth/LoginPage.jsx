@@ -1,4 +1,4 @@
-import { Alert, Box, CircularProgress, Paper, Typography } from "@mui/material";
+﻿import { Alert, Box, CircularProgress, Paper, Typography } from "@mui/material";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -8,25 +8,39 @@ const BOT_USERNAME = import.meta.env.VITE_TELEGRAM_BOT_USERNAME || "";
 
 function getTelegramErrorMessage(error) {
   const data = error?.response?.data;
+  const status = error?.response?.status;
+
   if (!data) {
-    return "Ошибка авторизации Telegram";
+    if (status) {
+      return `Ошибка авторизации Telegram (HTTP ${status})`;
+    }
+    return `Ошибка авторизации Telegram: ${error?.message || "нет ответа от сервера"}`;
   }
+
   if (typeof data === "string") {
     return data;
   }
+
   if (typeof data.detail === "string" && data.detail) {
     return data.detail;
   }
+
   if (Array.isArray(data.non_field_errors) && typeof data.non_field_errors[0] === "string") {
     return data.non_field_errors[0];
   }
 
   const firstKey = Object.keys(data)[0];
   const firstValue = firstKey ? data[firstKey] : null;
+  if (typeof firstValue === "string") {
+    return firstValue;
+  }
   if (Array.isArray(firstValue) && typeof firstValue[0] === "string") {
     return firstValue[0];
   }
 
+  if (status) {
+    return `Ошибка авторизации Telegram (HTTP ${status})`;
+  }
   return "Ошибка авторизации Telegram";
 }
 
