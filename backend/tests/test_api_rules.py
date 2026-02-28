@@ -1,0 +1,214 @@
+﻿from __future__ import annotations
+
+import pytest
+from django.core.files.uploadedfile import SimpleUploadedFile
+from rest_framework.test import APIClient
+from rest_framework_simplejwt.tokens import RefreshToken
+
+from apps.accounts.models import RoleChoices, User
+from apps.appointments.models import Appointment, AppointmentStatusChoices
+from apps.chat.models import Message
+
+
+@pytest.fixture
+def client_user(db):
+    return User.objects.create_user(username="client1", password="x", role=RoleChoices.CLIENT)
+
+
+@pytest.fixture
+def client_user_2(db):
+    return User.objects.create_user(username="client2", password="x", role=RoleChoices.CLIENT)
+
+
+@pytest.fixture
+def master_user(db):
+    return User.objects.create_user(
+        username="master1",
+        password="x",
+        role=RoleChoices.MASTER,
+        is_master_active=True,
+    )
+
+
+@pytest.fixture
+def master_user_2(db):
+    return User.objects.create_user(
+        username="master2",
+        password="x",
+        role=RoleChoices.MASTER,
+        is_master_active=True,
+    )
+
+
+@pytest.fixture
+def admin_user(db):
+    return User.objects.create_user(username="admin1", password="x", role=RoleChoices.ADMIN, is_staff=True)
+
+
+@pytest.fixture
+def api_client():
+    return APIClient()
+
+
+def auth_as(user: User) -> APIClient:
+    client = APIClient()
+    token = str(RefreshToken.for_user(user).access_token)
+    client.credentials(HTTP_AUTHORIZATION=f"Bearer {token}")
+    return client
+
+
+@pytest.mark.django_db
+def test_take_appointment_locking(client_user, master_user, master_user_2):
+    appointment = Appointment.objects.create(
+        client=client_user,
+        brand="Samsung",
+        model="A50",
+        lock_type="PIN",
+        has_pc=True,
+        description="desc",
+    )
+
+    first = auth_as(master_user).post(f"/api/appointments/{appointment.id}/take/")
+    assert first.status_code == 200
+
+    second = auth_as(master_user_2).post(f"/api/appointments/{appointment.id}/take/")
+    assert second.status_code == 400
+
+    appointment.refresh_from_db()
+    assert appointment.assigned_master_id == master_user.id
+    assert appointment.status == AppointmentStatusChoices.IN_REVIEW
+
+
+@pytest.mark.django_db
+def test_set_price_only_in_review(client_user, master_user):
+    appointment = Appointment.objects.create(
+        client=client_user,
+        assigned_master=master_user,
+        brand="Samsung",
+        model="A50",
+        lock_type="PIN",
+        has_pc=True,
+        description="desc",
+        status=AppointmentStatusChoices.NEW,
+    )
+
+    bad = auth_as(master_user).post(f"/api/appointments/{appointment.id}/set-price/", {"total_price": 2000})
+    assert bad.status_code == 400
+
+    appointment.status = AppointmentStatusChoices.IN_REVIEW
+    appointment.save(update_fields=["status", "updated_at"])
+
+    ok = auth_as(master_user).post(f"/api/appointments/{appointment.id}/set-price/", {"total_price": 2500})
+    assert ok.status_code == 200
+
+    appointment.refresh_from_db()
+    assert appointment.total_price == 2500
+    assert appointment.status == AppointmentStatusChoices.AWAITING_PAYMENT
+
+
+@pytest.mark.django_db
+def test_upload_proof_only_awaiting_payment(client_user, master_user):
+    appointment = Appointment.objects.create(
+        client=client_user,
+        assigned_master=master_user,
+        brand="Xiaomi",
+        model="Note",
+        lock_type="PIN",
+        has_pc=True,
+        description="desc",
+        status=AppointmentStatusChoices.IN_REVIEW,
+    )
+
+    proof = SimpleUploadedFile("proof.jpg", b"filecontent", content_type="image/jpeg")
+    bad = auth_as(client_user).post(
+        f"/api/appointments/{appointment.id}/upload-payment-proof/",
+        {"payment_proof": proof},
+        format="multipart",
+    )
+    assert bad.status_code == 400
+
+    appointment.status = AppointmentStatusChoices.AWAITING_PAYMENT
+    appointment.save(update_fields=["status", "updated_at"])
+
+    proof2 = SimpleUploadedFile("proof2.jpg", b"filecontent", content_type="image/jpeg")
+    ok = auth_as(client_user).post(
+        f"/api/appointments/{appointment.id}/upload-payment-proof/",
+        {"payment_proof": proof2},
+        format="multipart",
+    )
+    assert ok.status_code == 200
+
+
+@pytest.mark.django_db
+def test_start_only_from_paid(client_user, master_user):
+    appointment = Appointment.objects.create(
+        client=client_user,
+        assigned_master=master_user,
+        brand="iPhone",
+        model="12",
+        lock_type="APPLE_ID",
+        has_pc=True,
+        description="desc",
+        status=AppointmentStatusChoices.AWAITING_PAYMENT,
+    )
+
+    bad = auth_as(master_user).post(f"/api/appointments/{appointment.id}/start/")
+    assert bad.status_code == 400
+
+    appointment.status = AppointmentStatusChoices.PAID
+    appointment.save(update_fields=["status", "updated_at"])
+
+    ok = auth_as(master_user).post(f"/api/appointments/{appointment.id}/start/")
+    assert ok.status_code == 200
+
+    appointment.refresh_from_db()
+    assert appointment.status == AppointmentStatusChoices.IN_PROGRESS
+
+
+@pytest.mark.django_db
+def test_unread_count_flow(client_user, master_user):
+    appointment = Appointment.objects.create(
+        client=client_user,
+        assigned_master=master_user,
+        brand="Honor",
+        model="X",
+        lock_type="PIN",
+        has_pc=True,
+        description="desc",
+        status=AppointmentStatusChoices.IN_PROGRESS,
+    )
+
+    m1 = Message.objects.create(appointment=appointment, sender=master_user, text="1")
+    m2 = Message.objects.create(appointment=appointment, sender=master_user, text="2")
+
+    list_resp = auth_as(client_user).get("/api/appointments/my/")
+    assert list_resp.status_code == 200
+    assert list_resp.data[0]["unread_count"] == 2
+
+    read_resp = auth_as(client_user).post(f"/api/appointments/{appointment.id}/read/", {"last_read_message_id": m2.id})
+    assert read_resp.status_code == 200
+
+    list_resp2 = auth_as(client_user).get("/api/appointments/my/")
+    assert list_resp2.status_code == 200
+    assert list_resp2.data[0]["unread_count"] == 0
+
+
+@pytest.mark.django_db
+def test_permissions_scope(client_user, client_user_2, master_user, master_user_2):
+    appointment = Appointment.objects.create(
+        client=client_user,
+        assigned_master=master_user,
+        brand="Nokia",
+        model="G",
+        lock_type="PIN",
+        has_pc=True,
+        description="desc",
+        status=AppointmentStatusChoices.PAYMENT_PROOF_UPLOADED,
+        payment_proof=SimpleUploadedFile("proof.jpg", b"x", content_type="image/jpeg"),
+    )
+
+    denied_detail = auth_as(client_user_2).get(f"/api/appointments/{appointment.id}/")
+    assert denied_detail.status_code == 403
+
+    denied_confirm = auth_as(master_user_2).post(f"/api/appointments/{appointment.id}/confirm-payment/")
+    assert denied_confirm.status_code == 403

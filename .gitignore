@@ -1,0 +1,6 @@
+backend/.env
+frontend/.env
+backend/media/
+backend/staticfiles/
+backend/db.sqlite3
+frontend/dist/
