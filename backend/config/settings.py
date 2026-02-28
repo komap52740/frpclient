@@ -1,12 +1,41 @@
-﻿import os
+import os
 from datetime import timedelta
 from pathlib import Path
+from urllib.parse import urlparse
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = os.getenv("SECRET_KEY", "change-me")
 DEBUG = os.getenv("DEBUG", "1") == "1"
-ALLOWED_HOSTS = [h.strip() for h in os.getenv("ALLOWED_HOSTS", "*").split(",") if h.strip()]
+
+
+def _normalize_host(value: str) -> str:
+    host = value.strip()
+    if not host:
+        return ""
+    if host == "*":
+        return host
+    if "://" in host:
+        parsed = urlparse(host)
+        return parsed.hostname or ""
+    if "/" in host:
+        host = host.split("/", 1)[0].strip()
+    if ":" in host and host.count(":") == 1:
+        host = host.split(":", 1)[0].strip()
+    return host
+
+
+_raw_allowed_hosts = os.getenv("ALLOWED_HOSTS", "*")
+_internal_allowed_hosts = ("127.0.0.1", "localhost", "frp-backend")
+ALLOWED_HOSTS = [
+    host
+    for host in (_normalize_host(item) for item in _raw_allowed_hosts.split(","))
+    if host
+]
+if "*" not in ALLOWED_HOSTS:
+    for host in _internal_allowed_hosts:
+        if host not in ALLOWED_HOSTS:
+            ALLOWED_HOSTS.append(host)
 
 INSTALLED_APPS = [
     "django.contrib.admin",
