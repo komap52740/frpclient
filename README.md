@@ -43,7 +43,9 @@ docker compose -f docker-compose.prod.yml up -d --build
 ```
 
 Порт:
-- `80` frontend + proxy `/api`, `/admin`, `/healthz`.
+- `80` frontend + proxy `/api`, `/django-admin`, `/healthz`.
+
+Django admin доступен по пути: `/django-admin/`.
 
 ## Быстрый деплой GitHub -> VPS
 

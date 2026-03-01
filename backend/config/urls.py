@@ -11,7 +11,7 @@ admin.site.index_title = "Управление системой"
 
 urlpatterns = [
     path("healthz", healthz, name="healthz"),
-    path("admin/", admin.site.urls),
+    path("django-admin/", admin.site.urls),
     path("api/", include("apps.accounts.urls")),
     path("api/", include("apps.appointments.urls")),
     path("api/", include("apps.chat.urls")),
