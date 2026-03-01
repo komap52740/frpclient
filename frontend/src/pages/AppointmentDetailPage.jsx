@@ -23,6 +23,7 @@ import { useAuth } from "../auth/AuthContext";
 import ChatPanel from "../components/ChatPanel";
 import PrimaryCTA from "../components/ui/PrimaryCTA";
 import StatusStepper from "../components/ui/StatusStepper";
+import AppointmentDetailSkeleton from "../components/ui/skeletons/AppointmentDetailSkeleton";
 import {
   APPOINTMENT_STATUS_OPTIONS,
   getLockTypeLabel,
@@ -207,7 +208,7 @@ export default function AppointmentDetailPage() {
   };
 
   if (!appointment) {
-    return <Typography>Загрузка заявки...</Typography>;
+    return <AppointmentDetailSkeleton />;
   }
 
   const isMasterAssigned = user.role === "master" && appointment.assigned_master === user.id;

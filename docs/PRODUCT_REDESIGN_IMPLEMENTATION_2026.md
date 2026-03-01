@@ -526,3 +526,14 @@ No-Go, РµСЃР»Рё:
   - condition builder (field/op/value)
   - guarded action builder (notification / status change / tag / admin attention)
   - active toggle + delete for existing rules
+### 2026-03-01 (Phase 10, Step 7)
+- Added skeleton loaders to reduce perceived wait and layout shifts:
+  - `AppointmentCardSkeleton`
+  - `AppointmentDetailSkeleton`
+- Integrated skeleton states into:
+  - ClientHome
+  - MyAppointments
+  - MasterNew
+  - MasterActive
+  - AppointmentDetail
+- Continued copy polish in main journey blocks with “Что делать дальше” and reassurance microcopy.

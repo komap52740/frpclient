@@ -8,6 +8,7 @@ import { appointmentsApi, authApi } from "../../api/client";
 import AppointmentCard from "../../components/AppointmentCard";
 import EmptyState from "../../components/EmptyState";
 import KpiCard from "../../components/KpiCard";
+import AppointmentCardSkeleton from "../../components/ui/skeletons/AppointmentCardSkeleton";
 import useAutoRefresh from "../../hooks/useAutoRefresh";
 
 export default function ClientHomePage() {
@@ -15,8 +16,10 @@ export default function ClientHomePage() {
   const [summary, setSummary] = useState(null);
   const [latestAppointments, setLatestAppointments] = useState([]);
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const loadData = useCallback(async ({ silent = false } = {}) => {
+    setLoading(true);
     try {
       const [summaryData, appointmentsResponse] = await Promise.all([
         authApi.dashboardSummary(),
@@ -29,6 +32,8 @@ export default function ClientHomePage() {
       if (!silent) {
         setError("Не удалось загрузить дашборд клиента");
       }
+    } finally {
+      setLoading(false);
     }
   }, []);
 
@@ -85,7 +90,12 @@ export default function ClientHomePage() {
 
       <Paper sx={{ p: 2, borderRadius: 3 }}>
         <Typography variant="h6" mb={1}>Последние заявки</Typography>
-        {latestAppointments.length ? (
+        {loading && !latestAppointments.length ? (
+          <Stack spacing={1.25}>
+            <AppointmentCardSkeleton />
+            <AppointmentCardSkeleton />
+          </Stack>
+        ) : latestAppointments.length ? (
           <Stack spacing={1.25}>
             {latestAppointments.map((item) => (
               <AppointmentCard key={item.id} item={item} role="client" linkTo={`/appointments/${item.id}`} />

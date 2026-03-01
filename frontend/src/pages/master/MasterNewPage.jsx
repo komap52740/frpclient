@@ -6,6 +6,7 @@ import { appointmentsApi, authApi } from "../../api/client";
 import AppointmentCard from "../../components/AppointmentCard";
 import EmptyState from "../../components/EmptyState";
 import KpiCard from "../../components/KpiCard";
+import AppointmentCardSkeleton from "../../components/ui/skeletons/AppointmentCardSkeleton";
 import useAutoRefresh from "../../hooks/useAutoRefresh";
 
 export default function MasterNewPage() {
@@ -72,7 +73,13 @@ export default function MasterNewPage() {
 
       {error && <Alert severity="error">{error}</Alert>}
 
-      {items.length ? (
+      {loading && !items.length ? (
+        <Stack spacing={1.25}>
+          <AppointmentCardSkeleton />
+          <AppointmentCardSkeleton />
+          <AppointmentCardSkeleton />
+        </Stack>
+      ) : items.length ? (
         <Stack spacing={1.25}>
           {items.map((item) => (
             <AppointmentCard key={item.id} item={item} role="master" linkTo={`/appointments/${item.id}`} />
