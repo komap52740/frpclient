@@ -13,6 +13,11 @@ api.interceptors.request.use((config) => {
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
+  if ((config.method || "get").toLowerCase() === "get") {
+    config.params = { ...(config.params || {}), _t: Date.now() };
+    config.headers["Cache-Control"] = "no-cache";
+    config.headers.Pragma = "no-cache";
+  }
   return config;
 });
 

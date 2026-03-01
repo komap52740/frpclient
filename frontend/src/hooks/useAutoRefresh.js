@@ -21,7 +21,9 @@ export default function useAutoRefresh(callback, options = {}) {
     let isRunning = false;
 
     const run = async () => {
-      if (isRunning || document.visibilityState !== "visible") {
+      const isVisible =
+        typeof document.visibilityState !== "string" || document.visibilityState === "visible";
+      if (isRunning || !isVisible) {
         return;
       }
       isRunning = true;
