@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import time
 from urllib import error as url_error
 from urllib import request as url_request
+
+from django.core.files.base import ContentFile
 
 from apps.appointments.client_actions import (
     CLIENT_SIGNAL_META,
@@ -51,6 +54,9 @@ SIGNAL_ALIASES = {
     "reschedule": "need_reschedule",
     "need_reschedule": "need_reschedule",
 }
+
+CHAT_MAX_FILE_SIZE = 10 * 1024 * 1024
+CHAT_ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".pdf", ".txt", ".log", ".zip"}
 
 
 def parse_yes_no(value: str) -> bool | None:
@@ -134,6 +140,48 @@ class ClientTelegramBot:
             self._request("sendMessage", payload)
         except (url_error.URLError, TimeoutError, OSError, RuntimeError) as exc:
             logger.warning("sendMessage failed for chat_id=%s: %s", chat_id, exc)
+
+    def _extract_attachment(self, message: dict) -> dict | None:
+        document = message.get("document")
+        if document and document.get("file_id"):
+            file_name = document.get("file_name") or f"telegram_{document.get('file_unique_id', 'file')}.bin"
+            return {
+                "file_id": document["file_id"],
+                "file_name": file_name,
+                "caption": (message.get("caption") or "").strip(),
+            }
+
+        photos = message.get("photo") or []
+        if photos:
+            best_photo = max(photos, key=lambda item: int(item.get("file_size", 0)))
+            file_id = best_photo.get("file_id")
+            if not file_id:
+                return None
+            file_unique_id = best_photo.get("file_unique_id") or file_id
+            return {
+                "file_id": file_id,
+                "file_name": f"telegram_photo_{file_unique_id}.jpg",
+                "caption": (message.get("caption") or "").strip(),
+            }
+
+        return None
+
+    def _download_telegram_file(self, file_id: str) -> tuple[str, bytes]:
+        result = self._request("getFile", {"file_id": file_id})
+        file_path = result.get("file_path") or ""
+        if not file_path:
+            raise RuntimeError("Telegram getFile did not return file_path")
+
+        file_url = f"https://api.telegram.org/file/bot{self.token}/{file_path}"
+        with url_request.urlopen(file_url, timeout=40) as response:
+            payload = response.read()
+
+        file_name = os.path.basename(file_path) or "telegram_file.bin"
+        return file_name, payload
+
+    def _safe_file_name(self, file_name: str) -> str:
+        base_name = os.path.basename(file_name or "").strip() or f"telegram_file_{int(time.time())}.bin"
+        return "".join(ch if ch.isalnum() or ch in {".", "-", "_"} else "_" for ch in base_name)
 
     def answer_callback(self, callback_query_id: str, text: str = "") -> None:
         payload = {"callback_query_id": callback_query_id}
@@ -404,18 +452,45 @@ class ClientTelegramBot:
 
         return False
 
-    def _send_chat_message(self, *, chat_id: int, user: User, appointment_id: int, text: str) -> None:
+    def _send_chat_message(
+        self,
+        *,
+        chat_id: int,
+        user: User,
+        appointment_id: int,
+        text: str,
+        file_payload: bytes | None = None,
+        file_name: str = "",
+    ) -> None:
         appointment = self._resolve_client_appointment(user, appointment_id)
         if not appointment:
             self.send_message(chat_id, "Заявка не найдена или нет доступа.")
             return
 
         normalized = (text or "").strip()
-        if not normalized:
+        has_file = bool(file_payload)
+        if not normalized and not has_file:
             self.send_message(chat_id, "Пустое сообщение не отправлено.")
             return
 
-        message = Message.objects.create(appointment=appointment, sender=user, text=normalized)
+        message_file = None
+        if has_file:
+            if len(file_payload) > CHAT_MAX_FILE_SIZE:
+                self.send_message(chat_id, "Файл слишком большой. Максимум 10 МБ.")
+                return
+            safe_name = self._safe_file_name(file_name)
+            extension = os.path.splitext(safe_name.lower())[1]
+            if extension not in CHAT_ALLOWED_EXTENSIONS:
+                self.send_message(chat_id, "Формат файла не поддерживается.")
+                return
+            message_file = ContentFile(file_payload, name=safe_name)
+
+        message = Message.objects.create(
+            appointment=appointment,
+            sender=user,
+            text=normalized,
+            file=message_file,
+        )
         emit_event(
             "chat.message_sent",
             message,
@@ -525,31 +600,52 @@ class ClientTelegramBot:
             return
 
         text = (message.get("text") or "").strip()
-        if not text:
+        caption = (message.get("caption") or "").strip()
+        user_input = text or caption
+        attachment = self._extract_attachment(message)
+        if not user_input and not attachment:
             return
 
         user = self._ensure_client(chat_id)
         if not user:
             return
 
-        if text.lower() == "/cancel":
+        if user_input.lower() == "/cancel":
             self._cancel_state(chat_id)
             return
 
-        if self._process_create_flow(chat_id, user, text):
+        if self._process_create_flow(chat_id, user, user_input):
             return
 
-        if text.startswith("/"):
-            self._handle_command(chat_id, user, text)
+        if user_input.startswith("/"):
+            self._handle_command(chat_id, user, user_input)
             return
 
         active_appointment_id = self.active_appointments.get(chat_id)
         if active_appointment_id:
+            if attachment:
+                try:
+                    downloaded_name, payload = self._download_telegram_file(attachment["file_id"])
+                except (url_error.URLError, TimeoutError, OSError, RuntimeError) as exc:
+                    logger.warning("Failed to download telegram file: %s", exc)
+                    self.send_message(chat_id, "Не удалось получить файл из Telegram. Попробуйте еще раз.")
+                    return
+
+                self._send_chat_message(
+                    chat_id=chat_id,
+                    user=user,
+                    appointment_id=active_appointment_id,
+                    text=user_input,
+                    file_payload=payload,
+                    file_name=attachment.get("file_name") or downloaded_name,
+                )
+                return
+
             self._send_chat_message(
                 chat_id=chat_id,
                 user=user,
                 appointment_id=active_appointment_id,
-                text=text,
+                text=user_input,
             )
             return
 
@@ -640,4 +736,3 @@ class ClientTelegramBot:
             return
 
         self.send_message(chat_id, "Неизвестная команда. Используйте /help.")
-

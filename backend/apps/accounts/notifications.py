@@ -7,7 +7,7 @@ from urllib import request as url_request
 
 from django.conf import settings
 
-from apps.appointments.models import Appointment
+from apps.appointments.models import Appointment, AppointmentStatusChoices
 
 from .models import RoleChoices, User
 
@@ -62,3 +62,31 @@ def notify_masters_about_new_appointment(appointment: Appointment) -> int:
         if send_telegram_message(master.telegram_id, text):
             sent += 1
     return sent
+
+
+def notify_client_about_status_change(
+    appointment: Appointment,
+    *,
+    from_status: str,
+    to_status: str,
+    note: str = "",
+) -> bool:
+    client = appointment.client
+    if not client or not client.telegram_id:
+        return False
+
+    status_map = dict(AppointmentStatusChoices.choices)
+    from_label = status_map.get(from_status, from_status or "—")
+    to_label = status_map.get(to_status, to_status or "—")
+
+    lines = [
+        f"Обновление по заявке #{appointment.id}",
+        f"Статус: {from_label} -> {to_label}",
+    ]
+    if note:
+        lines.append(f"Комментарий: {note}")
+    if settings.TELEGRAM_CLIENT_BOT_FRONTEND_URL:
+        base = settings.TELEGRAM_CLIENT_BOT_FRONTEND_URL.rstrip("/")
+        lines.append(f"Открыть заявку: {base}/appointments/{appointment.id}")
+
+    return send_telegram_message(int(client.telegram_id), "\n".join(lines))

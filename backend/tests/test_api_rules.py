@@ -83,6 +83,29 @@ def test_take_appointment_locking(client_user, master_user, master_user_2):
 
 
 @pytest.mark.django_db
+def test_status_change_is_forwarded_to_client_telegram(client_user, master_user):
+    client_user.telegram_id = 222333444
+    client_user.save(update_fields=["telegram_id", "updated_at"])
+    appointment = Appointment.objects.create(
+        client=client_user,
+        brand="Samsung",
+        model="A50",
+        lock_type="PIN",
+        has_pc=True,
+        description="desc",
+    )
+
+    with patch("apps.accounts.notifications.send_telegram_message", return_value=True) as tg_mock:
+        response = auth_as(master_user).post(f"/api/appointments/{appointment.id}/take/")
+        assert response.status_code == 200
+        tg_mock.assert_called()
+        args, _ = tg_mock.call_args
+        assert args[0] == 222333444
+        assert f"заявке #{appointment.id}".lower() in args[1].lower()
+        assert "Статус:" in args[1]
+
+
+@pytest.mark.django_db
 def test_set_price_only_in_review(client_user, master_user):
     appointment = Appointment.objects.create(
         client=client_user,

@@ -123,6 +123,14 @@ def transition_status(appointment: Appointment, actor: User, to_status: str, not
             "note": note,
         },
     )
+    from apps.accounts.notifications import notify_client_about_status_change
+
+    notify_client_about_status_change(
+        appointment,
+        from_status=from_status,
+        to_status=to_status,
+        note=note,
+    )
     if to_status == AppointmentStatusChoices.IN_REVIEW:
         evaluate_response_sla(appointment, actor)
     if to_status == AppointmentStatusChoices.COMPLETED:
