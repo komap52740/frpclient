@@ -33,6 +33,12 @@
   - master score recalculation added and hooked into status/review flows.
   - master dashboard now returns `master_score`.
   - admin masters API supports score sorting/filtering (`ordering`, `min_score`).
+- ✅ Phase 6 complete:
+  - `DailyMetrics` model added for aggregated daily KPI snapshots.
+  - aggregation service and management command added:
+    - `python manage.py compute_daily_metrics --date=YYYY-MM-DD`
+    - `python manage.py compute_daily_metrics --from=YYYY-MM-DD --to=YYYY-MM-DD`
+  - admin metrics API added: `GET /api/v1/admin/metrics/daily?from=...&to=...`.
 
 ## 1. Repo Structure Summary
 

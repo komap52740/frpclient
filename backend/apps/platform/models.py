@@ -171,3 +171,23 @@ class Rule(models.Model):
 
     def __str__(self) -> str:
         return self.name
+
+
+class DailyMetrics(models.Model):
+    date = models.DateField(unique=True, db_index=True)
+    gmv_total = models.BigIntegerField(default=0)
+    new_users = models.PositiveIntegerField(default=0)
+    new_appointments = models.PositiveIntegerField(default=0)
+    paid_appointments = models.PositiveIntegerField(default=0)
+    completed_appointments = models.PositiveIntegerField(default=0)
+    avg_time_to_first_response = models.FloatField(default=0.0)
+    avg_time_to_complete = models.FloatField(default=0.0)
+    conversion_new_to_paid = models.FloatField(default=0.0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ("-date",)
+
+    def __str__(self) -> str:
+        return str(self.date)

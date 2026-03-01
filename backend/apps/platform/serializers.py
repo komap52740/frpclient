@@ -5,7 +5,7 @@ from rest_framework import serializers
 
 from apps.accounts.models import User
 
-from .models import FeatureFlag, Notification, PlatformEvent, Rule
+from .models import DailyMetrics, FeatureFlag, Notification, PlatformEvent, Rule
 
 
 class PlatformEventSerializer(serializers.ModelSerializer):
@@ -94,4 +94,20 @@ class RuleSerializer(serializers.ModelSerializer):
             "action_json",
             "created_at",
             "updated_at",
+        )
+
+
+class DailyMetricsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = DailyMetrics
+        fields = (
+            "date",
+            "gmv_total",
+            "new_users",
+            "new_appointments",
+            "paid_appointments",
+            "completed_appointments",
+            "avg_time_to_first_response",
+            "avg_time_to_complete",
+            "conversion_new_to_paid",
         )

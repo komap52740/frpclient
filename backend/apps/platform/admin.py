@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import FeatureFlag, Notification, PlatformEvent, Rule
+from .models import DailyMetrics, FeatureFlag, Notification, PlatformEvent, Rule
 
 
 @admin.register(PlatformEvent)
@@ -30,3 +30,10 @@ class RuleAdmin(admin.ModelAdmin):
     list_display = ("id", "name", "is_active", "trigger_event_type", "updated_at")
     list_filter = ("is_active", "trigger_event_type")
     search_fields = ("name", "trigger_event_type")
+
+
+@admin.register(DailyMetrics)
+class DailyMetricsAdmin(admin.ModelAdmin):
+    list_display = ("date", "gmv_total", "new_users", "new_appointments", "paid_appointments", "completed_appointments")
+    list_filter = ("date",)
+    date_hierarchy = "date"

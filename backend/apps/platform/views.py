@@ -8,13 +8,14 @@ from apps.accounts.permissions import IsAdminRole
 
 from .models import FeatureFlag, Notification
 from .serializers import (
+    DailyMetricsSerializer,
     FeatureFlagSerializer,
     NotificationMarkReadSerializer,
     NotificationSerializer,
     PlatformEventSerializer,
     RuleSerializer,
 )
-from .models import PlatformEvent, Rule
+from .models import DailyMetrics, PlatformEvent, Rule
 
 
 class FeatureFlagListCreateView(generics.ListCreateAPIView):
@@ -91,3 +92,18 @@ class RuleDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Rule.objects.all()
     lookup_field = "id"
     lookup_url_kwarg = "rule_id"
+
+
+class DailyMetricsListView(generics.ListAPIView):
+    permission_classes = (permissions.IsAuthenticated, IsAdminRole)
+    serializer_class = DailyMetricsSerializer
+
+    def get_queryset(self):
+        queryset = DailyMetrics.objects.all().order_by("-date")
+        date_from = self.request.query_params.get("from")
+        date_to = self.request.query_params.get("to")
+        if date_from:
+            queryset = queryset.filter(date__gte=date_from)
+        if date_to:
+            queryset = queryset.filter(date__lte=date_to)
+        return queryset[:365]

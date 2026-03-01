@@ -3,6 +3,7 @@ from django.urls import path
 from .views import (
     FeatureFlagDetailView,
     FeatureFlagListCreateView,
+    DailyMetricsListView,
     NotificationListView,
     NotificationMarkReadView,
     NotificationUnreadCountView,
@@ -20,4 +21,5 @@ urlpatterns = [
     path("v1/events/", PlatformEventListView.as_view(), name="platform-events-list"),
     path("v1/admin/rules/", RuleListCreateView.as_view(), name="rules-list"),
     path("v1/admin/rules/<int:rule_id>/", RuleDetailView.as_view(), name="rules-detail"),
+    path("v1/admin/metrics/daily/", DailyMetricsListView.as_view(), name="daily-metrics-list"),
 ]
