@@ -508,3 +508,11 @@ No-Go, РµСЃР»Рё:
   - optimistic send
   - inline system events in chat stream
   - shared renderer `frontend/src/components/ui/ChatThread.jsx`
+### 2026-03-01 (Phase 10, Step 5)
+- Added global notifications UX:
+  - `NotificationBell` in app shell (`MainLayout`)
+  - `NotificationsDrawer` with list, mark read, mark all read
+- Connected frontend API methods for notifications:
+  - `/api/notifications/`
+  - `/api/notifications/unread-count/`
+  - `/api/notifications/mark-read/`

@@ -18,6 +18,7 @@ import { useMemo, useState } from "react";
 import { Link as RouterLink, useNavigate } from "react-router-dom";
 
 import { useAuth } from "../auth/AuthContext";
+import NotificationBell from "../components/ui/NotificationBell";
 
 function buildMenu(role) {
   if (role === "client") {
@@ -77,6 +78,7 @@ export default function MainLayout({ children }) {
             <Typography sx={{ fontWeight: 800 }}>FRP Клиент</Typography>
             <Chip size="small" label={roleLabel} sx={{ bgcolor: "rgba(255,255,255,0.2)", color: "#fff" }} />
           </Stack>
+          <NotificationBell />
           <Typography sx={{ mr: 2, display: { xs: "none", sm: "block" } }}>{user?.username}</Typography>
           <Button color="inherit" onClick={onLogout}>
             Выйти

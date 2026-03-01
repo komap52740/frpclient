@@ -237,3 +237,18 @@ export const adminApi = {
     return api.post("/admin/system/run-action/", { action });
   },
 };
+
+export const notificationsApi = {
+  list(params = {}) {
+    return api.get("/notifications/", { params });
+  },
+  unreadCount() {
+    return api.get("/notifications/unread-count/");
+  },
+  markRead(notificationIds = []) {
+    return api.post("/notifications/mark-read/", { notification_ids: notificationIds });
+  },
+  markAllRead() {
+    return api.post("/notifications/mark-read/", { mark_all: true });
+  },
+};
