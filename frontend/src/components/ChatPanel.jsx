@@ -3,6 +3,7 @@ import SendIcon from "@mui/icons-material/Send";
 import {
   Alert,
   Button,
+  Chip,
   Paper,
   Stack,
   TextField,
@@ -18,6 +19,25 @@ import ChatThread from "./ui/ChatThread";
 
 dayjs.locale("ru");
 
+const MAX_FILE_SIZE = 10 * 1024 * 1024;
+const ALLOWED_EXTENSIONS = ["jpg", "jpeg", "png", "pdf", "txt", "zip"];
+
+const QUICK_TEMPLATES = {
+  client: [
+    "Я на месте, готов к подключению.",
+    "Оплату отправил, проверьте пожалуйста.",
+    "Не получается, нужна помощь пошагово.",
+  ],
+  master: [
+    "Проверил данные, сейчас продолжаю работу.",
+    "Нужен короткий доступ к ПК для следующего шага.",
+    "Проверьте результат и дайте обратную связь.",
+  ],
+  admin: [
+    "Подключили поддержку, сейчас поможем решить вопрос.",
+  ],
+};
+
 function mapSystemEvents(systemEvents = []) {
   return (systemEvents || []).map((event) => ({
     type: "system_event",
@@ -27,11 +47,32 @@ function mapSystemEvents(systemEvents = []) {
   }));
 }
 
+function validateAttachment(file) {
+  if (!file) {
+    return "";
+  }
+
+  const extension = (file.name.split(".").pop() || "").toLowerCase();
+  if (!ALLOWED_EXTENSIONS.includes(extension)) {
+    return "Файл должен быть в формате jpg/jpeg/png/pdf/txt/zip";
+  }
+
+  if (file.size > MAX_FILE_SIZE) {
+    return "Размер файла не должен превышать 10 МБ";
+  }
+
+  return "";
+}
+
 export default function ChatPanel({ appointmentId, currentUser, systemEvents = [] }) {
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState("");
   const [file, setFile] = useState(null);
   const [error, setError] = useState("");
+  const [fileError, setFileError] = useState("");
+  const [isSending, setIsSending] = useState(false);
+
+  const quickTemplates = QUICK_TEMPLATES[currentUser.role] || QUICK_TEMPLATES.client;
 
   const lastMessageId = useMemo(() => {
     return messages.reduce((maxId, message) => (typeof message.id === "number" && message.id > maxId ? message.id : maxId), 0);
@@ -78,6 +119,12 @@ export default function ChatPanel({ appointmentId, currentUser, systemEvents = [
     const cleanText = text.trim();
     if (!cleanText && !file) return;
 
+    const attachmentError = validateAttachment(file);
+    setFileError(attachmentError);
+    if (attachmentError) {
+      return;
+    }
+
     const optimisticId = `optimistic-${Date.now()}`;
     const optimisticMessage = {
       id: optimisticId,
@@ -102,6 +149,8 @@ export default function ChatPanel({ appointmentId, currentUser, systemEvents = [
 
     setText("");
     setFile(null);
+    setFileError("");
+    setIsSending(true);
 
     try {
       const response = await chatApi.sendMessage(appointmentId, formData);
@@ -113,6 +162,8 @@ export default function ChatPanel({ appointmentId, currentUser, systemEvents = [
     } catch {
       setMessages((prev) => prev.filter((item) => item.id !== optimisticId));
       setError("Не удалось отправить сообщение");
+    } finally {
+      setIsSending(false);
     }
   };
 
@@ -131,13 +182,40 @@ export default function ChatPanel({ appointmentId, currentUser, systemEvents = [
     }
   };
 
+  const applyTemplate = (templateText) => {
+    setText((prev) => {
+      if (!prev.trim()) {
+        return templateText;
+      }
+      return `${prev.trim()} ${templateText}`;
+    });
+  };
+
+  const onFileChange = (nextFile) => {
+    setFile(nextFile);
+    setFileError(validateAttachment(nextFile));
+  };
+
   return (
     <Paper sx={{ p: 2.2 }}>
       <Typography variant="h3" sx={{ mb: 1.25 }}>
         Чат по заявке
       </Typography>
 
+      <Stack direction="row" spacing={0.7} flexWrap="wrap" useFlexGap sx={{ mb: 1.1 }}>
+        {quickTemplates.map((template) => (
+          <Chip
+            key={template}
+            label={template}
+            variant="outlined"
+            onClick={() => applyTemplate(template)}
+            sx={{ cursor: "pointer" }}
+          />
+        ))}
+      </Stack>
+
       {error ? <Alert severity="error" sx={{ mb: 1 }}>{error}</Alert> : null}
+      {fileError ? <Alert severity="warning" sx={{ mb: 1 }}>{fileError}</Alert> : null}
 
       <ChatThread
         items={threadItems}
@@ -159,18 +237,22 @@ export default function ChatPanel({ appointmentId, currentUser, systemEvents = [
               onSend();
             }
           }}
-          helperText="Ctrl+Enter для быстрой отправки"
+          helperText={
+            text.trim().length
+              ? "Сообщение готово к отправке. Ctrl+Enter для быстрой отправки"
+              : "Выберите шаблон или напишите вручную. Ctrl+Enter для быстрой отправки"
+          }
         />
         <Stack direction="row" spacing={1} alignItems="center">
           <Button component="label" variant="outlined" startIcon={<AttachFileIcon />}>
             Файл
-            <input hidden type="file" onChange={(event) => setFile(event.target.files?.[0] || null)} />
+            <input hidden type="file" onChange={(event) => onFileChange(event.target.files?.[0] || null)} />
           </Button>
           <Typography variant="body2" sx={{ flexGrow: 1 }}>
             {file ? file.name : "Файл не выбран"}
           </Typography>
-          <Button variant="contained" onClick={onSend} endIcon={<SendIcon />}>
-            Отправить
+          <Button variant="contained" onClick={onSend} endIcon={<SendIcon />} disabled={isSending || Boolean(fileError)}>
+            {isSending ? "Отправка..." : "Отправить"}
           </Button>
         </Stack>
       </Stack>

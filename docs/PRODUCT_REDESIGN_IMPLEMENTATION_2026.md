@@ -559,3 +559,11 @@ No-Go, РµСЃР»Рё:
   - backend `/api/appointments/{id}/events/` now supports optional `after_id` for incremental polling (backward compatible).
   - frontend appointment details now poll events incrementally every 3.5 seconds and merge them without full list reload.
 - Added API test coverage for `after_id` behavior and validation.
+### 2026-03-01 (Phase 10, Step 12)
+- Client UX upgraded with stronger engagement patterns:
+  - `ClientHomePage`: added a priority `Action Center` with one main CTA, interactive readiness checklist (persisted in `localStorage`), focus mode toggle, and trust/flow accordion.
+  - `MyAppointmentsPage`: added search, quick status filters, unread-only toggle, and smart sorting (latest / priority / newest).
+- Interaction density in appointment communication increased:
+  - `ChatPanel`: added quick message templates by role, attachment validation, and clearer send-state microcopy.
+- Visual hierarchy of cards improved:
+  - `AppointmentCard`: now shows “what to do next” hint and stronger state emphasis for attention-driving actions.

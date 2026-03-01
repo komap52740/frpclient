@@ -1,4 +1,4 @@
-import ChatBubbleOutlineRoundedIcon from "@mui/icons-material/ChatBubbleOutlineRounded";
+﻿import ChatBubbleOutlineRoundedIcon from "@mui/icons-material/ChatBubbleOutlineRounded";
 import ScheduleRoundedIcon from "@mui/icons-material/ScheduleRounded";
 import WarningAmberRoundedIcon from "@mui/icons-material/WarningAmberRounded";
 import { Badge, Box, Button, Card, CardContent, Chip, Stack, Typography } from "@mui/material";
@@ -41,7 +41,7 @@ export default function AppointmentCard({
   const riskUi = riskTone(item.client_risk_level);
 
   return (
-    <Card>
+    <Card sx={{ transition: "transform 220ms ease, box-shadow 220ms ease", "&:hover": { transform: "translateY(-2px)", boxShadow: 6 } }}>
       <CardContent>
         <Stack spacing={1.25}>
           <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={1}>
@@ -65,17 +65,23 @@ export default function AppointmentCard({
           </Stack>
 
           {item.description ? (
-            <Typography variant="body2" color="text.secondary" sx={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+            <Typography
+              variant="body2"
+              color="text.secondary"
+              sx={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}
+            >
               {item.description}
             </Typography>
           ) : null}
 
           <StatusStepper status={item.status} role={role} compact slaBreached={item.sla_breached} />
 
+          <PaperHint hint={statusUi.hint} />
+
           <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap alignItems="center">
             <Chip size="small" icon={<ScheduleRoundedIcon />} label={`Обновлено: ${formatLastActivity(item)}`} variant="outlined" />
             <Badge color="primary" badgeContent={unreadCount} max={99}>
-              <Chip size="small" icon={<ChatBubbleOutlineRoundedIcon />} label="Сообщения" variant="outlined" />
+              <Chip size="small" icon={<ChatBubbleOutlineRoundedIcon />} label={unreadCount ? "Есть новые" : "Сообщения"} variant="outlined" />
             </Badge>
             {role === "master" && item.client_risk_level ? (
               <Chip
@@ -103,5 +109,26 @@ export default function AppointmentCard({
         </Stack>
       </CardContent>
     </Card>
+  );
+}
+
+function PaperHint({ hint }) {
+  if (!hint) {
+    return null;
+  }
+
+  return (
+    <Box
+      sx={{
+        p: 1,
+        borderRadius: 2,
+        bgcolor: "#f3f8fd",
+        border: "1px solid #dbe8f5",
+      }}
+    >
+      <Typography variant="caption" color="text.secondary">
+        Что делать дальше: {hint}
+      </Typography>
+    </Box>
   );
 }
