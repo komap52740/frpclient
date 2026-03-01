@@ -141,6 +141,13 @@ function validatePaymentFile(file) {
   return "";
 }
 
+function getLatestEventId(eventItems = []) {
+  return eventItems.reduce(
+    (maxId, event) => (typeof event.id === "number" && event.id > maxId ? event.id : maxId),
+    0
+  );
+}
+
 export default function AppointmentDetailPage() {
   const { id } = useParams();
   const { user, paymentSettings } = useAuth();
@@ -165,15 +172,29 @@ export default function AppointmentDetailPage() {
   const paymentRef = useRef(null);
   const chatRef = useRef(null);
   const reviewRef = useRef(null);
+  const lastEventIdRef = useRef(0);
 
-  const loadData = useCallback(async ({ preserveDrafts = false, silent = false } = {}) => {
+  const mergeEvents = useCallback((incomingEvents = []) => {
+    if (!incomingEvents.length) {
+      return;
+    }
+    setEvents((prev) => {
+      const dedup = new Map();
+      [...prev, ...incomingEvents].forEach((event) => {
+        dedup.set(String(event.id), event);
+      });
+      const merged = Array.from(dedup.values()).sort(
+        (a, b) => dayjs(b.created_at).valueOf() - dayjs(a.created_at).valueOf()
+      );
+      lastEventIdRef.current = getLatestEventId(merged);
+      return merged;
+    });
+  }, []);
+
+  const loadDetail = useCallback(async ({ preserveDrafts = false, silent = false } = {}) => {
     try {
-      const [appointmentResponse, eventsResponse] = await Promise.all([
-        appointmentsApi.detail(id),
-        appointmentsApi.events(id),
-      ]);
+      const appointmentResponse = await appointmentsApi.detail(id);
       setAppointment(appointmentResponse.data);
-      setEvents(eventsResponse.data || []);
       if (!preserveDrafts) {
         setPrice(appointmentResponse.data.total_price || "");
         setManualStatus(appointmentResponse.data.status);
@@ -186,13 +207,55 @@ export default function AppointmentDetailPage() {
     }
   }, [id]);
 
+  const loadEvents = useCallback(
+    async ({ silent = false, incremental = false } = {}) => {
+      try {
+        const params = {};
+        if (incremental && lastEventIdRef.current > 0) {
+          params.after_id = lastEventIdRef.current;
+        }
+        const response = await appointmentsApi.events(id, params);
+        const incoming = response.data || [];
+
+        if (incremental) {
+          mergeEvents(incoming);
+          return;
+        }
+
+        const normalized = [...incoming].sort((a, b) => dayjs(b.created_at).valueOf() - dayjs(a.created_at).valueOf());
+        setEvents(normalized);
+        lastEventIdRef.current = getLatestEventId(normalized);
+      } catch {
+        if (!silent) {
+          setError("Не удалось загрузить ленту событий");
+        }
+      }
+    },
+    [id, mergeEvents]
+  );
+
+  const loadData = useCallback(
+    async ({ preserveDrafts = false, silent = false } = {}) => {
+      await Promise.all([
+        loadDetail({ preserveDrafts, silent }),
+        loadEvents({ silent, incremental: false }),
+      ]);
+    },
+    [loadDetail, loadEvents]
+  );
+
   useEffect(() => {
     loadData();
   }, [loadData]);
 
-  useAutoRefresh(() => loadData({ preserveDrafts: true, silent: true }), {
+  useAutoRefresh(async () => {
+    await Promise.all([
+      loadDetail({ preserveDrafts: true, silent: true }),
+      loadEvents({ silent: true, incremental: true }),
+    ]);
+  }, {
     enabled: Boolean(id),
-    intervalMs: 5000,
+    intervalMs: 3500,
   });
 
   const runAction = async (action) => {
@@ -563,6 +626,9 @@ export default function AppointmentDetailPage() {
                 <TimelineRoundedIcon color="primary" fontSize="small" />
                 <Typography variant="h3">Лента событий</Typography>
               </Stack>
+              <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1 }}>
+                Обновляется автоматически каждые 3-4 секунды
+              </Typography>
 
               {timelineEvents.length ? (
                 <Stack spacing={1}>

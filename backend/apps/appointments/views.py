@@ -79,7 +79,16 @@ class AppointmentEventsView(APIView):
 
     def get(self, request, appointment_id: int):
         appointment = get_appointment_for_user(request.user, appointment_id)
-        queryset = appointment.events.select_related("actor").all()[:100]
+        after_id_raw = request.query_params.get("after_id", "0")
+        try:
+            after_id = int(after_id_raw or 0)
+        except (TypeError, ValueError):
+            return Response({"detail": "Параметр after_id должен быть числом"}, status=status.HTTP_400_BAD_REQUEST)
+
+        queryset = appointment.events.select_related("actor").all()
+        if after_id > 0:
+            queryset = queryset.filter(id__gt=after_id)
+        queryset = queryset[:100]
         data = AppointmentEventSerializer(queryset, many=True).data
         return Response(data)
 

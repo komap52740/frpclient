@@ -368,3 +368,17 @@ def test_appointment_events_endpoint(client_user, master_user):
     events_response = auth_as(client_user).get(f"/api/appointments/{appointment.id}/events/")
     assert events_response.status_code == 200
     assert len(events_response.data) >= 1
+
+    latest_event_id = events_response.data[0]["id"]
+    incremental_response = auth_as(client_user).get(
+        f"/api/appointments/{appointment.id}/events/",
+        {"after_id": latest_event_id},
+    )
+    assert incremental_response.status_code == 200
+    assert incremental_response.data == []
+
+    bad_after_id_response = auth_as(client_user).get(
+        f"/api/appointments/{appointment.id}/events/",
+        {"after_id": "abc"},
+    )
+    assert bad_after_id_response.status_code == 400

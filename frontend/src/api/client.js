@@ -127,8 +127,8 @@ export const appointmentsApi = {
   detail(id) {
     return api.get(`/appointments/${id}/`);
   },
-  events(id) {
-    return api.get(`/appointments/${id}/events/`);
+  events(id, params = {}) {
+    return api.get(`/appointments/${id}/events/`, { params });
   },
   newList() {
     return api.get("/appointments/new/");

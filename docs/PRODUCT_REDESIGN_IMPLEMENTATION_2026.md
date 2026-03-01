@@ -554,3 +554,8 @@ No-Go, РµСЃР»Рё:
   - `vendor-core`, `vendor-axios`, `vendor-dayjs`.
 - Goal: reduce startup pressure on the main app chunk and improve initial route responsiveness in production.
 - Set `chunkSizeWarningLimit` to `700` to align warning threshold with the new vendor split profile.
+### 2026-03-01 (Phase 10, Step 11)
+- Improved live updates on appointment details:
+  - backend `/api/appointments/{id}/events/` now supports optional `after_id` for incremental polling (backward compatible).
+  - frontend appointment details now poll events incrementally every 3.5 seconds and merge them without full list reload.
+- Added API test coverage for `after_id` behavior and validation.
