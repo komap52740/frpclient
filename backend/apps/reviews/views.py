@@ -6,7 +6,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.accounts.models import RoleChoices
-from apps.accounts.services import recalculate_client_stats
+from apps.accounts.services import recalculate_client_stats, recalculate_master_stats
 from apps.appointments.access import get_appointment_for_user
 from apps.appointments.models import AppointmentStatusChoices
 from apps.platform.services import emit_event
@@ -50,6 +50,7 @@ class ReviewMasterView(APIView):
             actor=request.user,
             payload={"appointment_id": appointment.id, "rating": review.rating},
         )
+        recalculate_master_stats(appointment.assigned_master)
         return Response(ReviewSerializer(review).data, status=status.HTTP_201_CREATED)
 
 

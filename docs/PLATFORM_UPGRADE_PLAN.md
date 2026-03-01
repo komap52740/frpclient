@@ -28,6 +28,11 @@
   - client risk scoring fields added to `ClientStats`: `risk_score`, `risk_level`, `risk_updated_at`.
   - risk score is recalculated in `recalculate_client_stats` and refreshed on key flows (including ban/unban and review updates).
   - risk is exposed in `/api/me`, admin users API and appointment detail for the assigned master.
+- ✅ Phase 5 complete:
+  - `MasterStats` model added with `master_score` and KPI components.
+  - master score recalculation added and hooked into status/review flows.
+  - master dashboard now returns `master_score`.
+  - admin masters API supports score sorting/filtering (`ordering`, `min_score`).
 
 ## 1. Repo Structure Summary
 

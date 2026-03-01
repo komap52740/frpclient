@@ -6,7 +6,7 @@ from django.conf import settings
 from django.utils import timezone
 from rest_framework import serializers
 
-from .models import ClientStats, SiteSettings, User
+from .models import ClientStats, MasterStats, SiteSettings, User
 from .telegram import verify_telegram_login
 
 
@@ -37,6 +37,7 @@ class SiteSettingsSerializer(serializers.ModelSerializer):
 
 class MeSerializer(serializers.ModelSerializer):
     client_stats = ClientStatsSerializer(read_only=True)
+    master_stats = serializers.SerializerMethodField()
 
     class Meta:
         model = User
@@ -53,6 +54,27 @@ class MeSerializer(serializers.ModelSerializer):
             "is_banned",
             "ban_reason",
             "client_stats",
+            "master_stats",
+        )
+
+    def get_master_stats(self, obj: User):
+        if obj.role != "master":
+            return None
+        stats = getattr(obj, "master_stats", None)
+        return MasterStatsSerializer(stats).data if stats else None
+
+
+class MasterStatsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = MasterStats
+        fields = (
+            "avg_rating",
+            "completion_rate",
+            "avg_response_seconds",
+            "active_workload",
+            "cancellation_rate",
+            "master_score",
+            "score_updated_at",
         )
 
 

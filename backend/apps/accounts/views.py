@@ -11,6 +11,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenRefreshView
 
 from .models import RoleChoices, SiteSettings, User
+from .services import recalculate_master_stats
 from apps.appointments.models import Appointment, AppointmentStatusChoices
 from apps.chat.models import ReadState
 from .serializers import (
@@ -243,6 +244,7 @@ class DashboardSummaryView(APIView):
             return Response(payload, status=status.HTTP_200_OK)
 
         if user.role == RoleChoices.MASTER:
+            master_stats = recalculate_master_stats(user)
             new_available_queryset = Appointment.objects.filter(
                 status=AppointmentStatusChoices.NEW,
                 assigned_master__isnull=True,
@@ -259,6 +261,7 @@ class DashboardSummaryView(APIView):
                     "in_progress": own_queryset.filter(status=AppointmentStatusChoices.IN_PROGRESS).count(),
                     "completed_total": own_queryset.filter(status=AppointmentStatusChoices.COMPLETED).count(),
                     "unread_total": calculate_unread_total(own_active_queryset, user),
+                    "master_score": master_stats.master_score,
                 },
             }
             return Response(payload, status=status.HTTP_200_OK)

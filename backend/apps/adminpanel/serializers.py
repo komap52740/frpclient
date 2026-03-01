@@ -3,7 +3,7 @@
 from rest_framework import serializers
 
 from apps.accounts.models import RoleChoices, SiteSettings, User
-from apps.accounts.serializers import ClientStatsSerializer
+from apps.accounts.serializers import ClientStatsSerializer, MasterStatsSerializer
 
 
 class BanUserSerializer(serializers.Serializer):
@@ -12,6 +12,7 @@ class BanUserSerializer(serializers.Serializer):
 
 class AdminUserSerializer(serializers.ModelSerializer):
     client_stats = ClientStatsSerializer(read_only=True)
+    master_stats = MasterStatsSerializer(read_only=True)
 
     class Meta:
         model = User
@@ -29,6 +30,7 @@ class AdminUserSerializer(serializers.ModelSerializer):
             "is_staff",
             "is_superuser",
             "client_stats",
+            "master_stats",
         )
 
 

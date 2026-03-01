@@ -117,3 +117,22 @@ class SiteSettings(TimeStampedModel):
         )
         return obj
 
+
+class MasterStats(TimeStampedModel):
+    user = models.OneToOneField(
+        "accounts.User",
+        related_name="master_stats",
+        on_delete=models.CASCADE,
+    )
+    avg_rating = models.FloatField(default=0.0)
+    completion_rate = models.FloatField(default=0.0)
+    avg_response_seconds = models.FloatField(default=0.0)
+    active_workload = models.PositiveIntegerField(default=0)
+    cancellation_rate = models.FloatField(default=0.0)
+    master_score = models.PositiveSmallIntegerField(default=0)
+    score_updated_at = models.DateTimeField(null=True, blank=True)
+
+    def clean(self) -> None:
+        if not self.user.is_master:
+            raise ValidationError("MasterStats доступна только для пользователей с ролью master")
+

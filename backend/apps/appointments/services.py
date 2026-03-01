@@ -74,6 +74,10 @@ def transition_status(appointment: Appointment, actor: User, to_status: str, not
             "note": note,
         },
     )
+    if appointment.assigned_master_id:
+        from apps.accounts.services import recalculate_master_stats
+
+        recalculate_master_stats(appointment.assigned_master)
     return appointment
 
 

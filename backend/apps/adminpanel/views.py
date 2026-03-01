@@ -109,7 +109,16 @@ class AdminMastersView(generics.ListAPIView):
     serializer_class = AdminUserSerializer
 
     def get_queryset(self):
-        return User.objects.filter(role=RoleChoices.MASTER).order_by("-id")
+        queryset = User.objects.filter(role=RoleChoices.MASTER).select_related("master_stats").order_by("-id")
+        min_score = self.request.query_params.get("min_score")
+        ordering = self.request.query_params.get("ordering")
+
+        if min_score and str(min_score).isdigit():
+            queryset = queryset.filter(master_stats__master_score__gte=int(min_score))
+
+        if ordering in {"master_score", "-master_score"}:
+            queryset = queryset.order_by(f"{'' if ordering == 'master_score' else '-'}master_stats__master_score", "-id")
+        return queryset
 
 
 class AdminAllUsersView(generics.ListAPIView):
