@@ -36,6 +36,7 @@ docker compose up -d --build
 Production-контур включает:
 - backend (gunicorn + migrate + collectstatic);
 - frontend (Nginx + статическая сборка Vite + reverse-proxy на backend);
+- раздачу пользовательских медиафайлов через frontend Nginx (общий volume);
 - healthchecks сервисов.
 
 ```bash
