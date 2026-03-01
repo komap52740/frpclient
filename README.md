@@ -13,6 +13,7 @@
 - Регистрация клиента по нику и паролю.
 - Первичное создание первого администратора на странице входа.
 - Telegram-уведомления мастерам о новых заявках (если у мастера привязан Telegram).
+- Telegram-бот клиентского кабинета: заявки, статусы, чат, сигналы мастеру, повтор заявки.
 - Быстрые ответы мастера в чате: собственные команды (`/1`, `/инструкция`) с управлением через UI.
 - Быстрые сигналы клиента в заявке: `готов к подключению`, `нужна помощь`, `проблема с оплатой`, `перенос сессии`.
 - Повтор заявки в 1 клик (создание новой заявки по параметрам завершенной/закрытой).
@@ -81,6 +82,42 @@ nano frontend/.env
 # если нужны Telegram-уведомления мастерам:
 # убедитесь, что в backend/.env задан TELEGRAM_BOT_TOKEN
 docker compose -f docker-compose.prod.yml up -d --build
+
+# запуск Telegram-бота клиента (отдельный профиль)
+docker compose -f docker-compose.prod.yml --profile bot up -d --build telegram-bot
+```
+
+### Переменные для Telegram-бота
+
+В `backend/.env`:
+
+```bash
+TELEGRAM_BOT_TOKEN=ваш_токен_бота
+TELEGRAM_CLIENT_BOT_FRONTEND_URL=https://client.androidmultitool.ru
+```
+
+Бот авторизует пользователя по `telegram_id` уже привязанного аккаунта. Сначала зайдите на сайт через Telegram-вход.
+
+Запуск вручную без Docker:
+
+```bash
+cd backend
+python manage.py run_client_telegram_bot --frontend-url https://client.androidmultitool.ru
+```
+
+### Команды Telegram-бота клиента
+
+```text
+/menu
+/profile
+/my
+/open <id>
+/new
+/active <id>
+/chat <id> <сообщение>
+/signal <id> <ready|help|payment|reschedule> [комментарий]
+/repeat <id>
+/cancel
 ```
 
 ## Проверки после запуска

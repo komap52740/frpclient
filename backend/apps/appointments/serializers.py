@@ -12,6 +12,7 @@ from .models import (
     LockTypeChoices,
     PaymentMethodChoices,
 )
+from .client_actions import CLIENT_SIGNAL_META
 
 
 class AppointmentSerializer(serializers.ModelSerializer):
@@ -153,14 +154,7 @@ class MarkPaidSerializer(serializers.Serializer):
 
 
 class ClientSignalSerializer(serializers.Serializer):
-    signal = serializers.ChoiceField(
-        choices=[
-            ("ready_for_session", "Готов к подключению"),
-            ("need_help", "Нужна помощь"),
-            ("payment_issue", "Проблема с оплатой"),
-            ("need_reschedule", "Нужно перенести сессию"),
-        ]
-    )
+    signal = serializers.ChoiceField(choices=tuple((code, meta["title"]) for code, meta in CLIENT_SIGNAL_META.items()))
     comment = serializers.CharField(required=False, allow_blank=True, max_length=500)
 
 

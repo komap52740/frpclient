@@ -433,7 +433,7 @@ def test_client_can_repeat_appointment(client_user):
         status=AppointmentStatusChoices.COMPLETED,
     )
 
-    with patch("apps.appointments.views.notify_masters_about_new_appointment") as notify_mock:
+    with patch("apps.appointments.client_actions.notify_masters_about_new_appointment") as notify_mock:
         response = auth_as(client_user).post(f"/api/appointments/{source.id}/repeat/")
         assert response.status_code == 201
         notify_mock.assert_called_once()

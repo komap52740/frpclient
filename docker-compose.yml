@@ -53,6 +53,22 @@ services:
     ports:
       - "5173:5173"
 
+  telegram-bot:
+    build:
+      context: ./backend
+    container_name: frp-telegram-bot
+    restart: unless-stopped
+    profiles:
+      - bot
+    env_file:
+      - ./backend/.env
+    volumes:
+      - ./backend:/app
+    depends_on:
+      backend:
+        condition: service_healthy
+    command: python manage.py run_client_telegram_bot
+
 volumes:
   postgres_data:
   backend_media:
