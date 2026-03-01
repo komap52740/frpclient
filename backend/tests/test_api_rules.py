@@ -197,6 +197,35 @@ def test_unread_count_flow(client_user, master_user):
 
 
 @pytest.mark.django_db
+def test_master_message_is_forwarded_to_client_telegram(client_user, master_user):
+    client_user.telegram_id = 123456789
+    client_user.save(update_fields=["telegram_id", "updated_at"])
+
+    appointment = Appointment.objects.create(
+        client=client_user,
+        assigned_master=master_user,
+        brand="Honor",
+        model="X",
+        lock_type="PIN",
+        has_pc=True,
+        description="desc",
+        status=AppointmentStatusChoices.IN_PROGRESS,
+    )
+
+    with patch("apps.chat.services.send_telegram_message", return_value=True) as telegram_mock:
+        response = auth_as(master_user).post(
+            f"/api/appointments/{appointment.id}/messages/",
+            {"text": "Проверил, можно продолжать"},
+            format="json",
+        )
+        assert response.status_code == 201
+        telegram_mock.assert_called_once()
+        args, _ = telegram_mock.call_args
+        assert args[0] == 123456789
+        assert f"заявке #{appointment.id}".lower() in args[1].lower()
+
+
+@pytest.mark.django_db
 def test_permissions_scope(client_user, client_user_2, master_user, master_user_2):
     appointment = Appointment.objects.create(
         client=client_user,
