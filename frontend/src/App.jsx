@@ -9,6 +9,7 @@ import AdminClientsPage from "./pages/admin/AdminClientsPage";
 import AdminMastersPage from "./pages/admin/AdminMastersPage";
 import AdminSystemPage from "./pages/admin/AdminSystemPage";
 import AdminUsersPage from "./pages/admin/AdminUsersPage";
+import AdminRulesPage from "./pages/admin/AdminRulesPage";
 import AppointmentDetailPage from "./pages/AppointmentDetailPage";
 import LoginPage from "./pages/auth/LoginPage";
 import ClientHomePage from "./pages/client/ClientHomePage";
@@ -112,6 +113,14 @@ function AuthenticatedLayout() {
             element={
               <ProtectedRoute roles={["admin"]}>
                 <AdminUsersPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/rules"
+            element={
+              <ProtectedRoute roles={["admin"]}>
+                <AdminRulesPage />
               </ProtectedRoute>
             }
           />

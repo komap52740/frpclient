@@ -236,6 +236,21 @@ export const adminApi = {
   runSystemAction(action) {
     return api.post("/admin/system/run-action/", { action });
   },
+  dailyMetrics(params = {}) {
+    return api.get("/v1/admin/metrics/daily/", { params });
+  },
+  rules() {
+    return api.get("/v1/admin/rules/");
+  },
+  createRule(payload) {
+    return api.post("/v1/admin/rules/", payload);
+  },
+  updateRule(ruleId, payload) {
+    return api.patch(`/v1/admin/rules/${ruleId}/`, payload);
+  },
+  deleteRule(ruleId) {
+    return api.delete(`/v1/admin/rules/${ruleId}/`);
+  },
 };
 
 export const notificationsApi = {

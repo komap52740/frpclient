@@ -39,6 +39,7 @@ function buildMenu(role) {
     return [
       { label: "Система", to: "/admin/system" },
       { label: "Заявки", to: "/admin/appointments" },
+      { label: "Правила", to: "/admin/rules" },
       { label: "Пользователи", to: "/admin/users" },
       { label: "Клиенты", to: "/admin/clients" },
       { label: "Мастера", to: "/admin/masters" },

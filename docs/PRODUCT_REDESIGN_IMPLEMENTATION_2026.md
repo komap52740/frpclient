@@ -516,3 +516,13 @@ No-Go, РµСЃР»Рё:
   - `/api/notifications/`
   - `/api/notifications/unread-count/`
   - `/api/notifications/mark-read/`
+### 2026-03-01 (Phase 10, Step 6)
+- Admin metrics UX added on `AdminSystemPage`:
+  - daily KPI tiles from `/api/v1/admin/metrics/daily`
+  - simple trend bars without extra heavy chart libraries
+  - critical unread notifications block on top
+- Added admin rules UI (`/admin/rules`) with safe form builder:
+  - trigger event select
+  - condition builder (field/op/value)
+  - guarded action builder (notification / status change / tag / admin attention)
+  - active toggle + delete for existing rules
