@@ -24,6 +24,10 @@
   - supported actions: `create_notification`, `change_status` (safe transitions), `assign_tag/assign_flag`, `request_admin_attention`.
   - admin CRUD API for rules: `/api/v1/admin/rules/`.
   - management command added: `python manage.py replay_platform_rules --last=200`.
+- ✅ Phase 4 complete:
+  - client risk scoring fields added to `ClientStats`: `risk_score`, `risk_level`, `risk_updated_at`.
+  - risk score is recalculated in `recalculate_client_stats` and refreshed on key flows (including ban/unban and review updates).
+  - risk is exposed in `/api/me`, admin users API and appointment detail for the assigned master.
 
 ## 1. Repo Structure Summary
 
@@ -231,3 +235,18 @@ Health / ops:
 - Small commits per phase.
 - Backward-compatible APIs preserved.
 - Existing production flows remain primary acceptance criterion.
+
+## 11. Client Risk Formula (Phase 4)
+
+`risk_score` (0..100, higher = riskier) is computed as:
+- `cancellation_component = cancellation_rate * 45`
+- `behavior_component = min(negative_behavior_flags * 8, 25)`
+- `age_component = ((30 - account_age_days) / 30) * 15`, if account younger than 30 days
+- `experience_component = ((5 - completed_orders) / 5) * 10`, if completed orders < 5
+- `rating_component = ((5 - avg_rating) / 4) * 20`
+
+Level thresholds:
+- `0..24` => `low`
+- `25..49` => `medium`
+- `50..74` => `high`
+- `75..100` => `critical`

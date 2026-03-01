@@ -51,6 +51,13 @@ class ClientLevelChoices(models.TextChoices):
     PROBLEMATIC = "problematic", "Проблемный"
 
 
+class RiskLevelChoices(models.TextChoices):
+    LOW = "low", "Низкий"
+    MEDIUM = "medium", "Средний"
+    HIGH = "high", "Высокий"
+    CRITICAL = "critical", "Критический"
+
+
 class ClientStats(TimeStampedModel):
     user = models.OneToOneField(
         "accounts.User",
@@ -62,6 +69,9 @@ class ClientStats(TimeStampedModel):
     average_rating = models.FloatField(default=0.0)
     cancellation_rate = models.FloatField(default=0.0)
     level = models.CharField(max_length=20, choices=ClientLevelChoices.choices, default=ClientLevelChoices.NEWBIE)
+    risk_score = models.PositiveSmallIntegerField(default=0)
+    risk_level = models.CharField(max_length=20, choices=RiskLevelChoices.choices, default=RiskLevelChoices.LOW)
+    risk_updated_at = models.DateTimeField(null=True, blank=True)
 
     def clean(self) -> None:
         if not self.user.is_client:

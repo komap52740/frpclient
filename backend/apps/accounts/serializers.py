@@ -19,6 +19,9 @@ class ClientStatsSerializer(serializers.ModelSerializer):
             "average_rating",
             "cancellation_rate",
             "level",
+            "risk_score",
+            "risk_level",
+            "risk_updated_at",
         )
 
 

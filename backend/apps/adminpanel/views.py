@@ -15,6 +15,7 @@ from rest_framework.views import APIView
 
 from apps.accounts.models import RoleChoices, SiteSettings, User
 from apps.accounts.permissions import IsAdminRole
+from apps.accounts.services import recalculate_client_stats
 from apps.appointments.models import Appointment, AppointmentStatusChoices
 from apps.appointments.serializers import AppointmentSerializer
 from apps.appointments.views import ConfirmPaymentMixin
@@ -58,6 +59,7 @@ class AdminBanUserView(APIView):
         user.ban_reason = serializer.validated_data.get("reason", "")
         user.banned_at = timezone.now()
         user.save(update_fields=["is_banned", "ban_reason", "banned_at", "updated_at"])
+        recalculate_client_stats(user)
         return Response(AdminUserSerializer(user).data)
 
 
@@ -70,6 +72,7 @@ class AdminUnbanUserView(APIView):
         user.ban_reason = ""
         user.banned_at = None
         user.save(update_fields=["is_banned", "ban_reason", "banned_at", "updated_at"])
+        recalculate_client_stats(user)
         return Response(AdminUserSerializer(user).data)
 
 
