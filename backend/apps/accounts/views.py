@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from django.conf import settings
 from django.contrib.auth import authenticate
@@ -11,6 +11,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenRefreshView
 
 from .models import RoleChoices, SiteSettings, User
+from .permissions import IsAuthenticatedAndNotBanned
 from .services import recalculate_master_stats
 from apps.appointments.models import Appointment, AppointmentStatusChoices
 from apps.chat.models import ReadState
@@ -234,7 +235,7 @@ def calculate_unread_total(appointments_queryset, user: User) -> int:
 
 
 class DashboardSummaryView(APIView):
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (IsAuthenticatedAndNotBanned,)
 
     def get(self, request):
         user = request.user

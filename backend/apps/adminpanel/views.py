@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import io
 import time
@@ -14,7 +14,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.accounts.models import RoleChoices, SiteSettings, User
-from apps.accounts.permissions import IsAdminRole
+from apps.accounts.permissions import IsAdminRole, IsAuthenticatedAndNotBanned
 from apps.accounts.services import recalculate_client_stats
 from apps.appointments.models import Appointment, AppointmentStatusChoices
 from apps.appointments.serializers import AppointmentSerializer
@@ -31,7 +31,7 @@ from .serializers import (
 
 
 class AdminAppointmentListView(generics.ListAPIView):
-    permission_classes = (permissions.IsAuthenticated, IsAdminRole)
+    permission_classes = (IsAuthenticatedAndNotBanned, IsAdminRole)
     serializer_class = AppointmentSerializer
     filter_backends = (DjangoFilterBackend,)
     filterset_class = AdminAppointmentFilter
@@ -41,14 +41,14 @@ class AdminAppointmentListView(generics.ListAPIView):
 
 
 class AdminConfirmPaymentView(APIView, ConfirmPaymentMixin):
-    permission_classes = (permissions.IsAuthenticated, IsAdminRole)
+    permission_classes = (IsAuthenticatedAndNotBanned, IsAdminRole)
 
     def post(self, request, appointment_id: int):
         return self.confirm_payment(request, appointment_id)
 
 
 class AdminBanUserView(APIView):
-    permission_classes = (permissions.IsAuthenticated, IsAdminRole)
+    permission_classes = (IsAuthenticatedAndNotBanned, IsAdminRole)
 
     def post(self, request, user_id: int):
         user = get_object_or_404(User, id=user_id, role=RoleChoices.CLIENT)
@@ -64,7 +64,7 @@ class AdminBanUserView(APIView):
 
 
 class AdminUnbanUserView(APIView):
-    permission_classes = (permissions.IsAuthenticated, IsAdminRole)
+    permission_classes = (IsAuthenticatedAndNotBanned, IsAdminRole)
 
     def post(self, request, user_id: int):
         user = get_object_or_404(User, id=user_id, role=RoleChoices.CLIENT)
@@ -77,7 +77,7 @@ class AdminUnbanUserView(APIView):
 
 
 class AdminActivateMasterView(APIView):
-    permission_classes = (permissions.IsAuthenticated, IsAdminRole)
+    permission_classes = (IsAuthenticatedAndNotBanned, IsAdminRole)
 
     def post(self, request, user_id: int):
         user = get_object_or_404(User, id=user_id, role=RoleChoices.MASTER)
@@ -87,7 +87,7 @@ class AdminActivateMasterView(APIView):
 
 
 class AdminSuspendMasterView(APIView):
-    permission_classes = (permissions.IsAuthenticated, IsAdminRole)
+    permission_classes = (IsAuthenticatedAndNotBanned, IsAdminRole)
 
     def post(self, request, user_id: int):
         user = get_object_or_404(User, id=user_id, role=RoleChoices.MASTER)
@@ -97,7 +97,7 @@ class AdminSuspendMasterView(APIView):
 
 
 class AdminClientsView(generics.ListAPIView):
-    permission_classes = (permissions.IsAuthenticated, IsAdminRole)
+    permission_classes = (IsAuthenticatedAndNotBanned, IsAdminRole)
     serializer_class = AdminUserSerializer
 
     def get_queryset(self):
@@ -105,7 +105,7 @@ class AdminClientsView(generics.ListAPIView):
 
 
 class AdminMastersView(generics.ListAPIView):
-    permission_classes = (permissions.IsAuthenticated, IsAdminRole)
+    permission_classes = (IsAuthenticatedAndNotBanned, IsAdminRole)
     serializer_class = AdminUserSerializer
 
     def get_queryset(self):
@@ -122,7 +122,7 @@ class AdminMastersView(generics.ListAPIView):
 
 
 class AdminAllUsersView(generics.ListAPIView):
-    permission_classes = (permissions.IsAuthenticated, IsAdminRole)
+    permission_classes = (IsAuthenticatedAndNotBanned, IsAdminRole)
     serializer_class = AdminUserSerializer
 
     def get_queryset(self):
@@ -134,7 +134,7 @@ class AdminAllUsersView(generics.ListAPIView):
 
 
 class AdminUserRoleUpdateView(APIView):
-    permission_classes = (permissions.IsAuthenticated, IsAdminRole)
+    permission_classes = (IsAuthenticatedAndNotBanned, IsAdminRole)
 
     def post(self, request, user_id: int):
         user = get_object_or_404(User, id=user_id)
@@ -174,7 +174,7 @@ class AdminUserRoleUpdateView(APIView):
 
 
 class AdminSystemSettingsView(APIView):
-    permission_classes = (permissions.IsAuthenticated, IsAdminRole)
+    permission_classes = (IsAuthenticatedAndNotBanned, IsAdminRole)
 
     def get(self, request):
         settings_obj = SiteSettings.load()
@@ -197,7 +197,7 @@ class AdminSystemSettingsView(APIView):
 
 
 class AdminSystemStatusView(APIView):
-    permission_classes = (permissions.IsAuthenticated, IsAdminRole)
+    permission_classes = (IsAuthenticatedAndNotBanned, IsAdminRole)
 
     def get(self, request):
         db_connected = False
@@ -255,7 +255,7 @@ class AdminSystemStatusView(APIView):
 
 
 class AdminSystemRunActionView(APIView):
-    permission_classes = (permissions.IsAuthenticated, IsAdminRole)
+    permission_classes = (IsAuthenticatedAndNotBanned, IsAdminRole)
 
     ACTION_COMMANDS = {
         AdminSystemActionSerializer.ACTION_MIGRATE: {
@@ -309,3 +309,4 @@ class AdminSystemRunActionView(APIView):
             },
             status=status.HTTP_200_OK if success else status.HTTP_400_BAD_REQUEST,
         )
+

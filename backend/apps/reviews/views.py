@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from django.db import transaction
 from rest_framework import permissions, status
@@ -6,6 +6,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.accounts.models import RoleChoices
+from apps.accounts.permissions import IsAuthenticatedAndNotBanned
 from apps.accounts.services import recalculate_client_stats, recalculate_master_stats
 from apps.appointments.access import get_appointment_for_user
 from apps.appointments.models import AppointmentStatusChoices
@@ -21,7 +22,7 @@ def ensure_behavior_flags_seeded() -> None:
 
 
 class ReviewMasterView(APIView):
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (IsAuthenticatedAndNotBanned,)
 
     @transaction.atomic
     def post(self, request, appointment_id: int):
@@ -55,7 +56,7 @@ class ReviewMasterView(APIView):
 
 
 class ReviewClientView(APIView):
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (IsAuthenticatedAndNotBanned,)
 
     @transaction.atomic
     def post(self, request, appointment_id: int):
@@ -93,3 +94,4 @@ class ReviewClientView(APIView):
         )
         recalculate_client_stats(appointment.client)
         return Response(ReviewSerializer(review).data, status=status.HTTP_201_CREATED)
+

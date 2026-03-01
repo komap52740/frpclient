@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -8,7 +8,7 @@ from rest_framework.views import APIView
 
 from apps.accounts.models import RoleChoices
 from apps.accounts.notifications import notify_masters_about_new_appointment
-from apps.accounts.permissions import IsAdminRole
+from apps.accounts.permissions import IsAdminRole, IsAuthenticatedAndNotBanned
 from apps.accounts.services import recalculate_client_stats
 from apps.appointments.access import get_appointment_for_user
 from apps.platform.services import emit_event
@@ -35,7 +35,7 @@ from .services import (
 
 
 class AppointmentCreateView(APIView):
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (IsAuthenticatedAndNotBanned,)
 
     def post(self, request):
         if request.user.role != RoleChoices.CLIENT:
@@ -58,7 +58,7 @@ class AppointmentCreateView(APIView):
 
 
 class MyAppointmentsView(APIView):
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (IsAuthenticatedAndNotBanned,)
 
     def get(self, request):
         if request.user.role != RoleChoices.CLIENT:
@@ -70,7 +70,7 @@ class MyAppointmentsView(APIView):
 
 
 class AppointmentDetailView(APIView):
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (IsAuthenticatedAndNotBanned,)
 
     def get(self, request, appointment_id: int):
         appointment = get_appointment_for_user(request.user, appointment_id)
@@ -79,7 +79,7 @@ class AppointmentDetailView(APIView):
 
 
 class AppointmentEventsView(APIView):
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (IsAuthenticatedAndNotBanned,)
 
     def get(self, request, appointment_id: int):
         appointment = get_appointment_for_user(request.user, appointment_id)
@@ -98,7 +98,7 @@ class AppointmentEventsView(APIView):
 
 
 class UploadPaymentProofView(APIView):
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (IsAuthenticatedAndNotBanned,)
 
     def post(self, request, appointment_id: int):
         appointment = get_appointment_for_user(request.user, appointment_id)
@@ -123,7 +123,7 @@ class UploadPaymentProofView(APIView):
 
 
 class MarkPaidView(APIView):
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (IsAuthenticatedAndNotBanned,)
 
     def post(self, request, appointment_id: int):
         appointment = get_appointment_for_user(request.user, appointment_id)
@@ -157,7 +157,7 @@ class MarkPaidView(APIView):
 
 
 class ClientSignalView(APIView):
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (IsAuthenticatedAndNotBanned,)
 
     def post(self, request, appointment_id: int):
         appointment = get_appointment_for_user(request.user, appointment_id)
@@ -186,7 +186,7 @@ class ClientSignalView(APIView):
 
 
 class RepeatAppointmentView(APIView):
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (IsAuthenticatedAndNotBanned,)
 
     def post(self, request, appointment_id: int):
         source = get_appointment_for_user(request.user, appointment_id)
@@ -204,7 +204,7 @@ class RepeatAppointmentView(APIView):
 
 
 class MasterNewAppointmentsView(APIView):
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (IsAuthenticatedAndNotBanned,)
 
     def get(self, request):
         if request.user.role != RoleChoices.MASTER:
@@ -218,7 +218,7 @@ class MasterNewAppointmentsView(APIView):
 
 
 class MasterActiveAppointmentsView(APIView):
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (IsAuthenticatedAndNotBanned,)
 
     def get(self, request):
         if request.user.role != RoleChoices.MASTER:
@@ -237,7 +237,7 @@ class MasterActiveAppointmentsView(APIView):
 
 
 class MasterTakeView(APIView):
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (IsAuthenticatedAndNotBanned,)
 
     def post(self, request, appointment_id: int):
         appointment = take_appointment(appointment_id, request.user)
@@ -245,7 +245,7 @@ class MasterTakeView(APIView):
 
 
 class MasterDeclineView(APIView):
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (IsAuthenticatedAndNotBanned,)
 
     def post(self, request, appointment_id: int):
         appointment = get_appointment_for_user(request.user, appointment_id)
@@ -261,7 +261,7 @@ class MasterDeclineView(APIView):
 
 
 class MasterSetPriceView(APIView):
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (IsAuthenticatedAndNotBanned,)
 
     def post(self, request, appointment_id: int):
         appointment = get_appointment_for_user(request.user, appointment_id)
@@ -317,14 +317,14 @@ class ConfirmPaymentMixin:
 
 
 class MasterConfirmPaymentView(APIView, ConfirmPaymentMixin):
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (IsAuthenticatedAndNotBanned,)
 
     def post(self, request, appointment_id: int):
         return self.confirm_payment(request, appointment_id)
 
 
 class MasterStartView(APIView):
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (IsAuthenticatedAndNotBanned,)
 
     def post(self, request, appointment_id: int):
         appointment = get_appointment_for_user(request.user, appointment_id)
@@ -345,7 +345,7 @@ class MasterStartView(APIView):
 
 
 class MasterCompleteView(APIView):
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (IsAuthenticatedAndNotBanned,)
 
     def post(self, request, appointment_id: int):
         appointment = get_appointment_for_user(request.user, appointment_id)
@@ -367,7 +367,7 @@ class MasterCompleteView(APIView):
 
 
 class AdminManualStatusView(APIView):
-    permission_classes = (permissions.IsAuthenticated, IsAdminRole)
+    permission_classes = (IsAuthenticatedAndNotBanned, IsAdminRole)
 
     def post(self, request, appointment_id: int):
         appointment = get_object_or_404(Appointment, id=appointment_id)
@@ -378,4 +378,5 @@ class AdminManualStatusView(APIView):
         transition_status(appointment, request.user, to_status, serializer.validated_data.get("note", ""))
         recalculate_client_stats(appointment.client)
         return Response(AppointmentSerializer(appointment, context={"request": request}).data)
+
 

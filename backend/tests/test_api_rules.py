@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from unittest.mock import patch
 
@@ -515,6 +515,25 @@ def test_register_flow(api_client):
 
     duplicate = api_client.post("/api/auth/register/", payload, format="json")
     assert duplicate.status_code == 400
+
+
+@pytest.mark.django_db
+def test_banned_client_is_blocked_from_functional_api_but_can_read_me(client_user):
+    client_user.is_banned = True
+    client_user.ban_reason = "Нарушение правил платформы"
+    client_user.save(update_fields=["is_banned", "ban_reason", "updated_at"])
+
+    list_response = auth_as(client_user).get("/api/appointments/my/")
+    assert list_response.status_code == 403
+    assert "заблокирован" in str(list_response.data.get("detail", "")).lower()
+
+    dashboard_response = auth_as(client_user).get("/api/dashboard/")
+    assert dashboard_response.status_code == 403
+
+    me_response = auth_as(client_user).get("/api/me/")
+    assert me_response.status_code == 200
+    assert me_response.data["user"]["is_banned"] is True
+    assert "Нарушение правил платформы" in me_response.data["user"]["ban_reason"]
 
 
 @pytest.mark.django_db

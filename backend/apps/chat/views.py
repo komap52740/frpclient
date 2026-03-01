@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -7,6 +7,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.accounts.models import RoleChoices
+from apps.accounts.permissions import IsAuthenticatedAndNotBanned
 from apps.appointments.access import get_appointment_for_user
 from apps.appointments.models import AppointmentEventType
 from apps.appointments.services import add_event, evaluate_response_sla
@@ -47,7 +48,7 @@ def apply_master_quick_reply(user, text: str) -> str:
 
 
 class AppointmentMessagesView(APIView):
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (IsAuthenticatedAndNotBanned,)
 
     def get(self, request, appointment_id: int):
         appointment = get_appointment_for_user(request.user, appointment_id)
@@ -79,7 +80,7 @@ class AppointmentMessagesView(APIView):
 
 
 class MessageDeleteView(APIView):
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (IsAuthenticatedAndNotBanned,)
 
     def delete(self, request, message_id: int):
         message = get_object_or_404(Message.objects.select_related("sender", "appointment"), id=message_id)
@@ -111,7 +112,7 @@ class MessageDeleteView(APIView):
 
 
 class AppointmentReadView(APIView):
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (IsAuthenticatedAndNotBanned,)
 
     def post(self, request, appointment_id: int):
         appointment = get_appointment_for_user(request.user, appointment_id)
@@ -128,7 +129,7 @@ class AppointmentReadView(APIView):
 
 
 class MasterQuickReplyListCreateView(APIView):
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (IsAuthenticatedAndNotBanned,)
 
     def _ensure_master(self, request):
         if request.user.role != RoleChoices.MASTER:
@@ -159,7 +160,7 @@ class MasterQuickReplyListCreateView(APIView):
 
 
 class MasterQuickReplyDetailView(APIView):
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (IsAuthenticatedAndNotBanned,)
 
     def _get_master_reply(self, request, reply_id: int) -> MasterQuickReply | None:
         if request.user.role != RoleChoices.MASTER:
@@ -185,3 +186,4 @@ class MasterQuickReplyDetailView(APIView):
             return Response({"detail": "Шаблон не найден."}, status=status.HTTP_404_NOT_FOUND)
         reply.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+

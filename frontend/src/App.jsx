@@ -1,4 +1,4 @@
-﻿import { Component, lazy, Suspense } from "react";
+import { Component, lazy, Suspense } from "react";
 import { Alert, Box, Button, CircularProgress, Stack, Typography } from "@mui/material";
 import { Navigate, Route, Routes } from "react-router-dom";
 
@@ -43,6 +43,7 @@ const AdminSystemPage = lazyWithRetry(() => import("./pages/admin/AdminSystemPag
 const AdminUsersPage = lazyWithRetry(() => import("./pages/admin/AdminUsersPage"));
 const AdminRulesPage = lazyWithRetry(() => import("./pages/admin/AdminRulesPage"));
 const AppointmentDetailPage = lazyWithRetry(() => import("./pages/AppointmentDetailPage"));
+const BannedPage = lazyWithRetry(() => import("./pages/BannedPage"));
 const LoginPage = lazyWithRetry(() => import("./pages/auth/LoginPage"));
 const ClientHomePage = lazyWithRetry(() => import("./pages/client/ClientHomePage"));
 const ClientProfilePage = lazyWithRetry(() => import("./pages/client/ClientProfilePage"));
@@ -125,6 +126,12 @@ class RouteErrorBoundary extends Component {
 }
 
 function AuthenticatedLayout() {
+  const { user } = useAuth();
+
+  if (user?.role === "client" && user?.is_banned) {
+    return <Navigate to="/banned" replace />;
+  }
+
   return (
     <ProtectedRoute>
       <MainLayout>
@@ -240,12 +247,17 @@ function AuthenticatedLayout() {
 
 export default function App() {
   const { user } = useAuth();
+  const isBannedClient = user?.role === "client" && user?.is_banned;
 
   return (
     <RouteErrorBoundary>
       <Suspense fallback={<RouteFallback />}>
         <Routes>
-          <Route path="/login" element={user ? <Navigate to="/" replace /> : <LoginPage />} />
+          <Route path="/login" element={user ? <Navigate to={isBannedClient ? "/banned" : "/"} replace /> : <LoginPage />} />
+          <Route
+            path="/banned"
+            element={user ? (isBannedClient ? <BannedPage /> : <Navigate to="/" replace />) : <Navigate to="/login" replace />}
+          />
           <Route path="/*" element={<AuthenticatedLayout />} />
         </Routes>
       </Suspense>

@@ -4,7 +4,7 @@ from rest_framework import generics, permissions
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.accounts.permissions import IsAdminRole
+from apps.accounts.permissions import IsAdminRole, IsAuthenticatedAndNotBanned
 
 from .models import FeatureFlag, Notification
 from .serializers import (
@@ -19,13 +19,13 @@ from .models import DailyMetrics, PlatformEvent, Rule
 
 
 class FeatureFlagListCreateView(generics.ListCreateAPIView):
-    permission_classes = (permissions.IsAuthenticated, IsAdminRole)
+    permission_classes = (IsAuthenticatedAndNotBanned, IsAdminRole)
     serializer_class = FeatureFlagSerializer
     queryset = FeatureFlag.objects.prefetch_related("users").all()
 
 
 class FeatureFlagDetailView(generics.RetrieveUpdateDestroyAPIView):
-    permission_classes = (permissions.IsAuthenticated, IsAdminRole)
+    permission_classes = (IsAuthenticatedAndNotBanned, IsAdminRole)
     serializer_class = FeatureFlagSerializer
     queryset = FeatureFlag.objects.prefetch_related("users").all()
     lookup_field = "id"
@@ -33,7 +33,7 @@ class FeatureFlagDetailView(generics.RetrieveUpdateDestroyAPIView):
 
 
 class NotificationListView(generics.ListAPIView):
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (IsAuthenticatedAndNotBanned,)
     serializer_class = NotificationSerializer
 
     def get_queryset(self):
@@ -45,7 +45,7 @@ class NotificationListView(generics.ListAPIView):
 
 
 class NotificationMarkReadView(APIView):
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (IsAuthenticatedAndNotBanned,)
 
     def post(self, request):
         serializer = NotificationMarkReadSerializer(data=request.data)
@@ -55,7 +55,7 @@ class NotificationMarkReadView(APIView):
 
 
 class NotificationUnreadCountView(APIView):
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (IsAuthenticatedAndNotBanned,)
 
     def get(self, request):
         count = Notification.objects.filter(user=request.user, is_read=False).count()
@@ -63,7 +63,7 @@ class NotificationUnreadCountView(APIView):
 
 
 class PlatformEventListView(generics.ListAPIView):
-    permission_classes = (permissions.IsAuthenticated, IsAdminRole)
+    permission_classes = (IsAuthenticatedAndNotBanned, IsAdminRole)
     serializer_class = PlatformEventSerializer
 
     def get_queryset(self):
@@ -81,13 +81,13 @@ class PlatformEventListView(generics.ListAPIView):
 
 
 class RuleListCreateView(generics.ListCreateAPIView):
-    permission_classes = (permissions.IsAuthenticated, IsAdminRole)
+    permission_classes = (IsAuthenticatedAndNotBanned, IsAdminRole)
     serializer_class = RuleSerializer
     queryset = Rule.objects.all().order_by("name")
 
 
 class RuleDetailView(generics.RetrieveUpdateDestroyAPIView):
-    permission_classes = (permissions.IsAuthenticated, IsAdminRole)
+    permission_classes = (IsAuthenticatedAndNotBanned, IsAdminRole)
     serializer_class = RuleSerializer
     queryset = Rule.objects.all()
     lookup_field = "id"
@@ -95,7 +95,7 @@ class RuleDetailView(generics.RetrieveUpdateDestroyAPIView):
 
 
 class DailyMetricsListView(generics.ListAPIView):
-    permission_classes = (permissions.IsAuthenticated, IsAdminRole)
+    permission_classes = (IsAuthenticatedAndNotBanned, IsAdminRole)
     serializer_class = DailyMetricsSerializer
 
     def get_queryset(self):
@@ -107,3 +107,4 @@ class DailyMetricsListView(generics.ListAPIView):
         if date_to:
             queryset = queryset.filter(date__lte=date_to)
         return queryset[:365]
+

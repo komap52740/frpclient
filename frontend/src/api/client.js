@@ -1,7 +1,8 @@
-﻿import axios from "axios";
+import axios from "axios";
 import { clearTokens, getAccessToken, setAccessToken } from "./authStorage";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
+export const BANNED_EVENT_NAME = "frp:user-banned";
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
@@ -48,6 +49,15 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
     const requestUrl = originalRequest?.url || "";
+    const detailMessage = error?.response?.data?.detail;
+    if (error?.response?.status === 403 && typeof detailMessage === "string") {
+      const normalized = detailMessage.toLowerCase();
+      if (normalized.includes("заблокирован") || normalized.includes("забанен")) {
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent(BANNED_EVENT_NAME, { detail: { message: detailMessage } }));
+        }
+      }
+    }
     const bypassRefresh =
       requestUrl.includes("/auth/login/") ||
       requestUrl.includes("/auth/register/") ||

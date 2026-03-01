@@ -1,4 +1,4 @@
-﻿import { Navigate } from "react-router-dom";
+import { Navigate } from "react-router-dom";
 
 import { useAuth } from "../auth/AuthContext";
 
@@ -7,6 +7,10 @@ export default function RoleHomeRedirect() {
 
   if (!user) {
     return <Navigate to="/login" replace />;
+  }
+
+  if (user.role === "client" && user.is_banned) {
+    return <Navigate to="/banned" replace />;
   }
 
   if (user.role === "client") {

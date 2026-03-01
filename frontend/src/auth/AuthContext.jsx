@@ -1,6 +1,6 @@
-﻿import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 
-import { authApi } from "../api/client";
+import { authApi, BANNED_EVENT_NAME } from "../api/client";
 import { clearTokens, getAccessToken, setAccessToken } from "../api/authStorage";
 
 const AuthContext = createContext(null);
@@ -34,6 +34,30 @@ export function AuthProvider({ children }) {
     }
     bootstrap();
   }, [loadMe]);
+
+  useEffect(() => {
+    const onBanned = (event) => {
+      const message = event?.detail?.message || "Ваш аккаунт заблокирован администратором.";
+      setUser((prev) => {
+        if (!prev) return prev;
+        const hasReason = Boolean((prev.ban_reason || "").trim());
+        return {
+          ...prev,
+          is_banned: true,
+          ban_reason: hasReason ? prev.ban_reason : message,
+        };
+      });
+    };
+
+    if (typeof window !== "undefined") {
+      window.addEventListener(BANNED_EVENT_NAME, onBanned);
+    }
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener(BANNED_EVENT_NAME, onBanned);
+      }
+    };
+  }, []);
 
   const loginWithTelegram = useCallback(async (telegramPayload) => {
     const data = await authApi.telegramAuth(telegramPayload);

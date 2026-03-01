@@ -1,4 +1,4 @@
-﻿import { Navigate, useLocation } from "react-router-dom";
+import { Navigate, useLocation } from "react-router-dom";
 
 import { useAuth } from "../auth/AuthContext";
 
@@ -12,6 +12,10 @@ export function ProtectedRoute({ children, roles }) {
 
   if (!user) {
     return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  if (user.role === "client" && user.is_banned) {
+    return <Navigate to="/banned" replace />;
   }
 
   if (roles && !roles.includes(user.role)) {
