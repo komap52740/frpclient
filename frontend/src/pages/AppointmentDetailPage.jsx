@@ -48,11 +48,83 @@ const EVENT_LABELS = {
 
 function getEventTitle(event) {
   if (event.event_type === "status_changed") {
-    const from = getStatusLabel(event.from_status);
-    const to = getStatusLabel(event.to_status);
-    return `${EVENT_LABELS.status_changed}: ${from} -> ${to}`;
+    if (event.from_status && event.to_status) {
+      const from = getStatusLabel(event.from_status);
+      const to = getStatusLabel(event.to_status);
+      return `${EVENT_LABELS.status_changed}: ${from} -> ${to}`;
+    }
+    if (event.to_status) {
+      return `${EVENT_LABELS.status_changed}: ${getStatusLabel(event.to_status)}`;
+    }
+    return EVENT_LABELS.status_changed;
   }
   return EVENT_LABELS[event.event_type] || event.event_type;
+}
+
+function buildFallbackEvents(appointment) {
+  if (!appointment) {
+    return [];
+  }
+
+  const actorId = appointment.assigned_master || null;
+  const actorUsername = appointment.master_username || "";
+  const events = [];
+
+  const push = (eventType, createdAt, extra = {}) => {
+    if (!createdAt) return;
+    events.push({
+      id: `fallback-${events.length + 1}`,
+      event_type: eventType,
+      from_status: "",
+      to_status: "",
+      note: "",
+      metadata: {},
+      actor: actorId,
+      actor_username: actorUsername,
+      created_at: createdAt,
+      ...extra,
+    });
+  };
+
+  push("status_changed", appointment.created_at, {
+    to_status: "NEW",
+    actor: appointment.client || null,
+    actor_username: appointment.client_username || "Клиент",
+    note: "Заявка создана",
+  });
+  push("status_changed", appointment.taken_at, {
+    from_status: "NEW",
+    to_status: "IN_REVIEW",
+    note: "Заявка взята мастером",
+  });
+  push("price_set", appointment.updated_at, {
+    note: appointment.total_price ? `total_price=${appointment.total_price}` : "",
+    metadata: appointment.total_price ? { total_price: appointment.total_price } : {},
+  });
+  push("payment_marked", appointment.payment_marked_at);
+  push("payment_confirmed", appointment.payment_confirmed_at);
+  push("status_changed", appointment.started_at, {
+    to_status: "IN_PROGRESS",
+  });
+  push("status_changed", appointment.completed_at, {
+    to_status: "COMPLETED",
+  });
+  push("status_changed", appointment.updated_at, {
+    to_status: appointment.status || "",
+    note: "Текущее состояние заявки",
+  });
+
+  return events
+    .filter((event) => {
+      if (event.event_type === "price_set") {
+        return Boolean(appointment.total_price);
+      }
+      if (event.event_type === "status_changed" && event.to_status === "NEW") {
+        return true;
+      }
+      return Boolean(event.created_at);
+    })
+    .sort((a, b) => dayjs(b.created_at).valueOf() - dayjs(a.created_at).valueOf());
 }
 
 export default function AppointmentDetailPage() {
@@ -133,6 +205,7 @@ export default function AppointmentDetailPage() {
 
   const showAdminControls = user.role === "admin";
   const showAdminPaymentConfirm = showAdminControls && appointment.status === "PAYMENT_PROOF_UPLOADED";
+  const timelineEvents = events.length ? events : buildFallbackEvents(appointment);
 
   return (
     <Stack spacing={2}>
@@ -317,16 +390,16 @@ export default function AppointmentDetailPage() {
 
       <Paper sx={{ p: 2, borderRadius: 3 }}>
         <Typography variant="h6" mb={1}>Лента событий</Typography>
-        {events.length ? (
+        {timelineEvents.length ? (
           <Stack spacing={1}>
-            {events.map((event, index) => (
+            {timelineEvents.map((event, index) => (
               <Stack key={event.id} spacing={0.5}>
                 <Typography variant="body2"><b>{getEventTitle(event)}</b></Typography>
                 {event.note ? <Typography variant="caption" color="text.secondary">{event.note}</Typography> : null}
                 <Typography variant="caption" color="text.secondary">
                   {event.actor_username || "Система"} | {dayjs(event.created_at).format("DD.MM.YYYY HH:mm")}
                 </Typography>
-                {index < events.length - 1 ? <Divider /> : null}
+                {index < timelineEvents.length - 1 ? <Divider /> : null}
               </Stack>
             ))}
           </Stack>
