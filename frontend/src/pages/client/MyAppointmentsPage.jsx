@@ -1,11 +1,12 @@
 ﻿import RefreshIcon from "@mui/icons-material/Refresh";
 import { Alert, Button, Paper, Stack, Typography } from "@mui/material";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { appointmentsApi } from "../../api/client";
 import AppointmentCard from "../../components/AppointmentCard";
 import EmptyState from "../../components/EmptyState";
+import useAutoRefresh from "../../hooks/useAutoRefresh";
 
 export default function MyAppointmentsPage() {
   const navigate = useNavigate();
@@ -13,22 +14,30 @@ export default function MyAppointmentsPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const load = async () => {
-    setLoading(true);
+  const load = useCallback(async ({ silent = false, withLoading = true } = {}) => {
+    if (withLoading) {
+      setLoading(true);
+    }
     try {
       const response = await appointmentsApi.my();
       setItems(response.data || []);
       setError("");
     } catch {
-      setError("Не удалось загрузить список заявок");
+      if (!silent) {
+        setError("Не удалось загрузить список заявок");
+      }
     } finally {
-      setLoading(false);
+      if (withLoading) {
+        setLoading(false);
+      }
     }
-  };
+  }, []);
 
   useEffect(() => {
     load();
-  }, []);
+  }, [load]);
+
+  useAutoRefresh(() => load({ silent: true, withLoading: false }), { intervalMs: 6000 });
 
   const unreadTotal = useMemo(() => items.reduce((sum, item) => sum + (item.unread_count || 0), 0), [items]);
 

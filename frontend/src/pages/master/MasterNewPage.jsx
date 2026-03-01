@@ -1,11 +1,12 @@
 ﻿import RefreshIcon from "@mui/icons-material/Refresh";
 import { Alert, Button, Grid, Paper, Stack, Typography } from "@mui/material";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { appointmentsApi, authApi } from "../../api/client";
 import AppointmentCard from "../../components/AppointmentCard";
 import EmptyState from "../../components/EmptyState";
 import KpiCard from "../../components/KpiCard";
+import useAutoRefresh from "../../hooks/useAutoRefresh";
 
 export default function MasterNewPage() {
   const [items, setItems] = useState([]);
@@ -13,8 +14,10 @@ export default function MasterNewPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const load = async () => {
-    setLoading(true);
+  const load = useCallback(async ({ silent = false, withLoading = true } = {}) => {
+    if (withLoading) {
+      setLoading(true);
+    }
     try {
       const [appointmentsResponse, summaryData] = await Promise.all([
         appointmentsApi.newList(),
@@ -24,15 +27,21 @@ export default function MasterNewPage() {
       setSummary(summaryData.counts || {});
       setError("");
     } catch {
-      setError("Не удалось загрузить новые заявки");
+      if (!silent) {
+        setError("Не удалось загрузить новые заявки");
+      }
     } finally {
-      setLoading(false);
+      if (withLoading) {
+        setLoading(false);
+      }
     }
-  };
+  }, []);
 
   useEffect(() => {
     load();
-  }, []);
+  }, [load]);
+
+  useAutoRefresh(() => load({ silent: true, withLoading: false }), { intervalMs: 5000 });
 
   return (
     <Stack spacing={2}>

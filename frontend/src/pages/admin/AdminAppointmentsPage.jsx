@@ -14,13 +14,14 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link as RouterLink } from "react-router-dom";
 
 import { adminApi, authApi } from "../../api/client";
 import KpiCard from "../../components/KpiCard";
 import StatusChip from "../../components/StatusChip";
 import { APPOINTMENT_STATUS_OPTIONS, getStatusLabel } from "../../constants/labels";
+import useAutoRefresh from "../../hooks/useAutoRefresh";
 
 export default function AdminAppointmentsPage() {
   const [rows, setRows] = useState([]);
@@ -28,7 +29,7 @@ export default function AdminAppointmentsPage() {
   const [filters, setFilters] = useState({ status: "", master: "", client: "", date_from: "", date_to: "" });
   const [error, setError] = useState("");
 
-  const load = async () => {
+  const load = useCallback(async ({ silent = false } = {}) => {
     try {
       const params = Object.fromEntries(Object.entries(filters).filter(([, v]) => v !== ""));
       const [appointmentsResponse, summaryData] = await Promise.all([
@@ -39,14 +40,17 @@ export default function AdminAppointmentsPage() {
       setSummary(summaryData.counts || {});
       setError("");
     } catch {
-      setError("Не удалось загрузить список заявок");
+      if (!silent) {
+        setError("Не удалось загрузить список заявок");
+      }
     }
-  };
+  }, [filters]);
 
   useEffect(() => {
     load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [load]);
+
+  useAutoRefresh(() => load({ silent: true }), { intervalMs: 7000 });
 
   return (
     <Stack spacing={2}>

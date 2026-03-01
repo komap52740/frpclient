@@ -23,6 +23,7 @@ import {
   getPaymentMethodLabel,
   getStatusLabel,
 } from "../constants/labels";
+import useAutoRefresh from "../hooks/useAutoRefresh";
 
 dayjs.locale("ru");
 
@@ -73,7 +74,7 @@ export default function AppointmentDetailPage() {
   const [manualStatus, setManualStatus] = useState("NEW");
   const [manualNote, setManualNote] = useState("");
 
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async ({ preserveDrafts = false, silent = false } = {}) => {
     try {
       const [appointmentResponse, eventsResponse] = await Promise.all([
         appointmentsApi.detail(id),
@@ -81,17 +82,26 @@ export default function AppointmentDetailPage() {
       ]);
       setAppointment(appointmentResponse.data);
       setEvents(eventsResponse.data || []);
-      setPrice(appointmentResponse.data.total_price || "");
-      setManualStatus(appointmentResponse.data.status);
+      if (!preserveDrafts) {
+        setPrice(appointmentResponse.data.total_price || "");
+        setManualStatus(appointmentResponse.data.status);
+      }
       setError("");
     } catch {
-      setError("Не удалось загрузить заявку");
+      if (!silent) {
+        setError("Не удалось загрузить заявку");
+      }
     }
   }, [id]);
 
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  useAutoRefresh(
+    () => loadData({ preserveDrafts: true, silent: true }),
+    { enabled: Boolean(id), intervalMs: 5000 }
+  );
 
   const runAction = async (action) => {
     try {

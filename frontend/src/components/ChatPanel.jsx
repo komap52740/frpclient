@@ -16,6 +16,7 @@ import "dayjs/locale/ru";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { chatApi } from "../api/client";
+import useAutoRefresh from "../hooks/useAutoRefresh";
 
 dayjs.locale("ru");
 
@@ -54,13 +55,7 @@ export default function ChatPanel({ appointmentId, currentUser }) {
     loadMessages(0);
   }, [appointmentId, loadMessages]);
 
-  useEffect(() => {
-    const timer = setInterval(() => {
-      loadMessages(lastMessageId);
-    }, 4000);
-
-    return () => clearInterval(timer);
-  }, [loadMessages, lastMessageId]);
+  useAutoRefresh(() => loadMessages(lastMessageId), { intervalMs: 4000 });
 
   useEffect(() => {
     if (!lastMessageId) return;

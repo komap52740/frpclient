@@ -1,13 +1,14 @@
 ﻿import AddTaskIcon from "@mui/icons-material/AddTask";
 import ListAltIcon from "@mui/icons-material/ListAlt";
 import { Alert, Button, Grid, Paper, Stack, Typography } from "@mui/material";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link as RouterLink, useNavigate } from "react-router-dom";
 
 import { appointmentsApi, authApi } from "../../api/client";
 import AppointmentCard from "../../components/AppointmentCard";
 import EmptyState from "../../components/EmptyState";
 import KpiCard from "../../components/KpiCard";
+import useAutoRefresh from "../../hooks/useAutoRefresh";
 
 export default function ClientHomePage() {
   const navigate = useNavigate();
@@ -15,22 +16,27 @@ export default function ClientHomePage() {
   const [latestAppointments, setLatestAppointments] = useState([]);
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        const [summaryData, appointmentsResponse] = await Promise.all([
-          authApi.dashboardSummary(),
-          appointmentsApi.my(),
-        ]);
-        setSummary(summaryData.counts || {});
-        setLatestAppointments((appointmentsResponse.data || []).slice(0, 3));
-      } catch {
+  const loadData = useCallback(async ({ silent = false } = {}) => {
+    try {
+      const [summaryData, appointmentsResponse] = await Promise.all([
+        authApi.dashboardSummary(),
+        appointmentsApi.my(),
+      ]);
+      setSummary(summaryData.counts || {});
+      setLatestAppointments((appointmentsResponse.data || []).slice(0, 3));
+      setError("");
+    } catch {
+      if (!silent) {
         setError("Не удалось загрузить дашборд клиента");
       }
-    };
-
-    loadData();
+    }
   }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  useAutoRefresh(() => loadData({ silent: true }), { intervalMs: 7000 });
 
   return (
     <Stack spacing={2}>
