@@ -63,3 +63,24 @@ class ReadState(TimeStampedModel):
 
     class Meta:
         unique_together = ("appointment", "user")
+
+
+class MasterQuickReply(TimeStampedModel):
+    user = models.ForeignKey(
+        "accounts.User",
+        on_delete=models.CASCADE,
+        related_name="master_quick_replies",
+    )
+    command = models.CharField(max_length=20)
+    title = models.CharField(max_length=120, blank=True)
+    text = models.TextField()
+
+    class Meta:
+        ordering = ("command", "id")
+        unique_together = ("user", "command")
+        indexes = [
+            models.Index(fields=("user", "command")),
+        ]
+
+    def __str__(self) -> str:
+        return f"/{self.command}"

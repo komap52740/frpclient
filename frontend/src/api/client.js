@@ -184,6 +184,18 @@ export const chatApi = {
   read(appointmentId, last_read_message_id) {
     return api.post(`/appointments/${appointmentId}/read/`, { last_read_message_id });
   },
+  listQuickReplies() {
+    return api.get("/chat/quick-replies/");
+  },
+  createQuickReply(payload) {
+    return api.post("/chat/quick-replies/", payload);
+  },
+  updateQuickReply(replyId, payload) {
+    return api.patch(`/chat/quick-replies/${replyId}/`, payload);
+  },
+  deleteQuickReply(replyId) {
+    return api.delete(`/chat/quick-replies/${replyId}/`);
+  },
 };
 
 export const reviewsApi = {

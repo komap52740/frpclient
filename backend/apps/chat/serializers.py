@@ -3,7 +3,7 @@
 from django.utils import timezone
 from rest_framework import serializers
 
-from .models import Message
+from .models import MasterQuickReply, Message
 
 
 class MessageSerializer(serializers.ModelSerializer):
@@ -63,3 +63,36 @@ class MessageCreateSerializer(serializers.ModelSerializer):
 
 class ReadStateSerializer(serializers.Serializer):
     last_read_message_id = serializers.IntegerField(min_value=0)
+
+
+class MasterQuickReplySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = MasterQuickReply
+        fields = (
+            "id",
+            "command",
+            "title",
+            "text",
+            "created_at",
+            "updated_at",
+        )
+        read_only_fields = ("id", "created_at", "updated_at")
+
+    def validate_command(self, value: str) -> str:
+        command = (value or "").strip()
+        if command.startswith("/"):
+            command = command[1:]
+        command = command.lower()
+        if not command:
+            raise serializers.ValidationError("Укажите команду, например 1 или привет.")
+        if len(command) > 20:
+            raise serializers.ValidationError("Команда не должна быть длиннее 20 символов.")
+        if not all(ch.isalnum() or ch in {"_", "-"} for ch in command):
+            raise serializers.ValidationError("Команда может содержать только буквы, цифры, '_' и '-'.")
+        return command
+
+    def validate_text(self, value: str) -> str:
+        text = (value or "").strip()
+        if not text:
+            raise serializers.ValidationError("Текст шаблона не может быть пустым.")
+        return text

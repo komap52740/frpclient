@@ -1,9 +1,20 @@
-﻿import AttachFileIcon from "@mui/icons-material/AttachFile";
+﻿import AddRoundedIcon from "@mui/icons-material/AddRounded";
+import AttachFileIcon from "@mui/icons-material/AttachFile";
+import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
+import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import SendIcon from "@mui/icons-material/Send";
+import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
 import {
   Alert,
+  Box,
   Button,
   Chip,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  Divider,
+  IconButton,
   Paper,
   Stack,
   TextField,
@@ -20,7 +31,7 @@ import ChatThread from "./ui/ChatThread";
 dayjs.locale("ru");
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
-const ALLOWED_EXTENSIONS = ["jpg", "jpeg", "png", "pdf", "txt", "zip"];
+const ALLOWED_EXTENSIONS = ["jpg", "jpeg", "png", "pdf", "txt", "log", "zip"];
 
 const QUICK_TEMPLATES = {
   client: [
@@ -33,9 +44,7 @@ const QUICK_TEMPLATES = {
     "Нужен короткий доступ к ПК для следующего шага.",
     "Проверьте результат и дайте обратную связь.",
   ],
-  admin: [
-    "Подключили поддержку, сейчас поможем решить вопрос.",
-  ],
+  admin: ["Подключили поддержку, сейчас поможем решить вопрос."],
 };
 
 function mapSystemEvents(systemEvents = []) {
@@ -54,7 +63,7 @@ function validateAttachment(file) {
 
   const extension = (file.name.split(".").pop() || "").toLowerCase();
   if (!ALLOWED_EXTENSIONS.includes(extension)) {
-    return "Файл должен быть в формате jpg/jpeg/png/pdf/txt/zip";
+    return "Файл должен быть в формате jpg/jpeg/png/pdf/txt/log/zip";
   }
 
   if (file.size > MAX_FILE_SIZE) {
@@ -64,6 +73,38 @@ function validateAttachment(file) {
   return "";
 }
 
+function normalizeCommand(value) {
+  const raw = (value || "").trim();
+  if (!raw) {
+    return "";
+  }
+  const withoutSlash = raw.startsWith("/") ? raw.slice(1) : raw;
+  return withoutSlash.toLowerCase();
+}
+
+function splitCommandText(rawText) {
+  const text = (rawText || "").trim();
+  if (!text.startsWith("/") || text.startsWith("//")) {
+    return null;
+  }
+
+  const firstToken = text.split(" ")[0];
+  const command = normalizeCommand(firstToken);
+  if (!command) {
+    return null;
+  }
+
+  const tail = text.slice(firstToken.length).trim();
+  return { command, tail };
+}
+
+const EMPTY_REPLY_FORM = {
+  id: 0,
+  command: "",
+  title: "",
+  text: "",
+};
+
 export default function ChatPanel({ appointmentId, currentUser, systemEvents = [] }) {
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState("");
@@ -72,11 +113,25 @@ export default function ChatPanel({ appointmentId, currentUser, systemEvents = [
   const [fileError, setFileError] = useState("");
   const [isSending, setIsSending] = useState(false);
 
+  const [quickReplies, setQuickReplies] = useState([]);
+  const [quickRepliesOpen, setQuickRepliesOpen] = useState(false);
+  const [quickReplyError, setQuickReplyError] = useState("");
+  const [quickReplySaving, setQuickReplySaving] = useState(false);
+  const [replyForm, setReplyForm] = useState(EMPTY_REPLY_FORM);
+
+  const isMaster = currentUser.role === "master";
   const quickTemplates = QUICK_TEMPLATES[currentUser.role] || QUICK_TEMPLATES.client;
 
-  const lastMessageId = useMemo(() => {
-    return messages.reduce((maxId, message) => (typeof message.id === "number" && message.id > maxId ? message.id : maxId), 0);
-  }, [messages]);
+  const quickReplyMap = useMemo(() => {
+    const map = new Map();
+    quickReplies.forEach((item) => map.set(item.command, item));
+    return map;
+  }, [quickReplies]);
+
+  const lastMessageId = useMemo(
+    () => messages.reduce((maxId, message) => (typeof message.id === "number" && message.id > maxId ? message.id : maxId), 0),
+    [messages]
+  );
 
   const threadItems = useMemo(() => {
     const messageItems = messages.map((message) => ({ ...message, type: "message" }));
@@ -103,10 +158,29 @@ export default function ChatPanel({ appointmentId, currentUser, systemEvents = [
     [appointmentId]
   );
 
+  const loadQuickReplies = useCallback(async () => {
+    if (!isMaster) {
+      setQuickReplies([]);
+      return;
+    }
+
+    try {
+      const response = await chatApi.listQuickReplies();
+      setQuickReplies(response.data || []);
+      setQuickReplyError("");
+    } catch {
+      setQuickReplyError("Не удалось загрузить быстрые ответы.");
+    }
+  }, [isMaster]);
+
   useEffect(() => {
     setMessages([]);
     loadMessages(0);
   }, [appointmentId, loadMessages]);
+
+  useEffect(() => {
+    loadQuickReplies();
+  }, [loadQuickReplies]);
 
   useAutoRefresh(() => loadMessages(lastMessageId), { intervalMs: 4000 });
 
@@ -115,9 +189,37 @@ export default function ChatPanel({ appointmentId, currentUser, systemEvents = [
     chatApi.read(appointmentId, lastMessageId).catch(() => undefined);
   }, [appointmentId, lastMessageId]);
 
+  const resolveQuickReplyText = useCallback(
+    (rawText) => {
+      const normalized = (rawText || "").trim();
+      if (!isMaster || !normalized) {
+        return normalized;
+      }
+      if (normalized.startsWith("//")) {
+        return normalized.slice(1);
+      }
+
+      const parsed = splitCommandText(normalized);
+      if (!parsed) {
+        return normalized;
+      }
+
+      const matched = quickReplyMap.get(parsed.command);
+      if (!matched) {
+        return normalized;
+      }
+
+      if (parsed.tail) {
+        return `${matched.text}\n\n${parsed.tail}`;
+      }
+      return matched.text;
+    },
+    [isMaster, quickReplyMap]
+  );
+
   const onSend = async () => {
-    const cleanText = text.trim();
-    if (!cleanText && !file) return;
+    const rawText = text.trim();
+    if (!rawText && !file) return;
 
     const attachmentError = validateAttachment(file);
     setFileError(attachmentError);
@@ -125,12 +227,14 @@ export default function ChatPanel({ appointmentId, currentUser, systemEvents = [
       return;
     }
 
+    const resolvedText = resolveQuickReplyText(rawText);
+
     const optimisticId = `optimistic-${Date.now()}`;
     const optimisticMessage = {
       id: optimisticId,
       sender: currentUser.id,
       sender_username: currentUser.username || "Вы",
-      text: cleanText,
+      text: resolvedText,
       file_url: null,
       created_at: new Date().toISOString(),
       is_deleted: false,
@@ -140,8 +244,8 @@ export default function ChatPanel({ appointmentId, currentUser, systemEvents = [
     setMessages((prev) => [...prev, optimisticMessage]);
 
     const formData = new FormData();
-    if (cleanText) {
-      formData.append("text", cleanText);
+    if (resolvedText) {
+      formData.append("text", resolvedText);
     }
     if (file) {
       formData.append("file", file);
@@ -191,9 +295,71 @@ export default function ChatPanel({ appointmentId, currentUser, systemEvents = [
     });
   };
 
+  const applyQuickReplyCommand = (command) => {
+    setText(`/${command}`);
+  };
+
   const onFileChange = (nextFile) => {
     setFile(nextFile);
     setFileError(validateAttachment(nextFile));
+  };
+
+  const resetReplyForm = () => {
+    setReplyForm(EMPTY_REPLY_FORM);
+    setQuickReplyError("");
+  };
+
+  const startEditReply = (item) => {
+    setReplyForm({
+      id: item.id,
+      command: `/${item.command}`,
+      title: item.title || "",
+      text: item.text || "",
+    });
+    setQuickReplyError("");
+  };
+
+  const saveQuickReply = async () => {
+    const payload = {
+      command: normalizeCommand(replyForm.command),
+      title: (replyForm.title || "").trim(),
+      text: (replyForm.text || "").trim(),
+    };
+
+    if (!payload.command || !payload.text) {
+      setQuickReplyError("Заполните команду и текст шаблона.");
+      return;
+    }
+
+    setQuickReplySaving(true);
+    try {
+      if (replyForm.id) {
+        await chatApi.updateQuickReply(replyForm.id, payload);
+      } else {
+        await chatApi.createQuickReply(payload);
+      }
+      await loadQuickReplies();
+      resetReplyForm();
+    } catch (err) {
+      setQuickReplyError(err?.response?.data?.detail || "Не удалось сохранить быстрый ответ.");
+    } finally {
+      setQuickReplySaving(false);
+    }
+  };
+
+  const removeQuickReply = async (replyId) => {
+    setQuickReplySaving(true);
+    try {
+      await chatApi.deleteQuickReply(replyId);
+      await loadQuickReplies();
+      if (replyForm.id === replyId) {
+        resetReplyForm();
+      }
+    } catch (err) {
+      setQuickReplyError(err?.response?.data?.detail || "Не удалось удалить быстрый ответ.");
+    } finally {
+      setQuickReplySaving(false);
+    }
   };
 
   return (
@@ -212,7 +378,35 @@ export default function ChatPanel({ appointmentId, currentUser, systemEvents = [
             sx={{ cursor: "pointer" }}
           />
         ))}
+
+        {isMaster
+          ? quickReplies.map((item) => (
+              <Chip
+                key={item.id}
+                label={item.title ? `/${item.command} — ${item.title}` : `/${item.command}`}
+                color="primary"
+                variant="outlined"
+                onClick={() => applyQuickReplyCommand(item.command)}
+                sx={{ cursor: "pointer" }}
+              />
+            ))
+          : null}
       </Stack>
+
+      {isMaster ? (
+        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
+          <Typography variant="caption" color="text.secondary">
+            Быстрые команды мастера: введите `/команда`, например `/1`.
+          </Typography>
+          <Button
+            size="small"
+            startIcon={<SettingsRoundedIcon fontSize="small" />}
+            onClick={() => setQuickRepliesOpen(true)}
+          >
+            Управлять
+          </Button>
+        </Stack>
+      ) : null}
 
       {error ? <Alert severity="error" sx={{ mb: 1 }}>{error}</Alert> : null}
       {fileError ? <Alert severity="warning" sx={{ mb: 1 }}>{fileError}</Alert> : null}
@@ -240,7 +434,9 @@ export default function ChatPanel({ appointmentId, currentUser, systemEvents = [
           helperText={
             text.trim().length
               ? "Сообщение готово к отправке. Ctrl+Enter для быстрой отправки"
-              : "Выберите шаблон или напишите вручную. Ctrl+Enter для быстрой отправки"
+              : isMaster
+                ? "Можно писать /команда (пример: /1). Ctrl+Enter для быстрой отправки"
+                : "Выберите шаблон или напишите вручную. Ctrl+Enter для быстрой отправки"
           }
         />
         <Stack direction="row" spacing={1} alignItems="center">
@@ -256,6 +452,96 @@ export default function ChatPanel({ appointmentId, currentUser, systemEvents = [
           </Button>
         </Stack>
       </Stack>
+
+      <Dialog open={quickRepliesOpen} onClose={() => setQuickRepliesOpen(false)} fullWidth maxWidth="md">
+        <DialogTitle>Быстрые ответы мастера</DialogTitle>
+        <DialogContent dividers>
+          <Stack spacing={1.2}>
+            <Typography variant="body2" color="text.secondary">
+              Создайте свои команды и используйте их в чате: `/1`, `/привет` и т.д.
+            </Typography>
+
+            {quickReplyError ? <Alert severity="error">{quickReplyError}</Alert> : null}
+
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+              <TextField
+                label="Команда"
+                placeholder="/1"
+                value={replyForm.command}
+                onChange={(event) => setReplyForm((prev) => ({ ...prev, command: event.target.value }))}
+                sx={{ minWidth: { xs: "100%", sm: 160 } }}
+              />
+              <TextField
+                label="Название (опционально)"
+                placeholder="Инструкция по установке"
+                value={replyForm.title}
+                onChange={(event) => setReplyForm((prev) => ({ ...prev, title: event.target.value }))}
+                sx={{ flexGrow: 1 }}
+              />
+            </Stack>
+
+            <TextField
+              label="Текст шаблона"
+              multiline
+              minRows={3}
+              value={replyForm.text}
+              onChange={(event) => setReplyForm((prev) => ({ ...prev, text: event.target.value }))}
+            />
+
+            <Stack direction="row" spacing={1}>
+              <Button
+                variant="contained"
+                startIcon={replyForm.id ? <EditRoundedIcon /> : <AddRoundedIcon />}
+                onClick={saveQuickReply}
+                disabled={quickReplySaving}
+              >
+                {replyForm.id ? "Сохранить" : "Добавить"}
+              </Button>
+              {replyForm.id ? (
+                <Button variant="outlined" onClick={resetReplyForm} disabled={quickReplySaving}>
+                  Новый шаблон
+                </Button>
+              ) : null}
+            </Stack>
+
+            <Divider />
+
+            <Stack spacing={0.8}>
+              {quickReplies.length ? (
+                quickReplies.map((item) => (
+                  <Box key={item.id} sx={{ p: 1.1, border: "1px solid #dce6f0", borderRadius: 2 }}>
+                    <Stack direction="row" justifyContent="space-between" spacing={1}>
+                      <Box sx={{ minWidth: 0 }}>
+                        <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                          /{item.command} {item.title ? `— ${item.title}` : ""}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: "pre-wrap" }}>
+                          {item.text}
+                        </Typography>
+                      </Box>
+                      <Stack direction="row" spacing={0.3}>
+                        <IconButton size="small" onClick={() => startEditReply(item)}>
+                          <EditRoundedIcon fontSize="small" />
+                        </IconButton>
+                        <IconButton size="small" color="error" onClick={() => removeQuickReply(item.id)}>
+                          <DeleteOutlineRoundedIcon fontSize="small" />
+                        </IconButton>
+                      </Stack>
+                    </Stack>
+                  </Box>
+                ))
+              ) : (
+                <Typography variant="body2" color="text.secondary">
+                  Шаблонов пока нет. Добавьте первый быстрый ответ.
+                </Typography>
+              )}
+            </Stack>
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setQuickRepliesOpen(false)}>Закрыть</Button>
+        </DialogActions>
+      </Dialog>
     </Paper>
   );
 }
