@@ -479,3 +479,15 @@ No-Go, РµСЃР»Рё:
 - РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ РЅРµ РїРѕРЅРёРјР°РµС‚ СЃР»РµРґСѓСЋС‰РёР№ С€Р°Рі.
 - Р§Р°С‚ РЅРµ РґР°РµС‚ РѕС‰СѓС‰РµРЅРёРµ РєРѕРЅС‚СЂРѕР»СЏ.
 
+---
+
+## 17. Progress Log
+
+### 2026-03-01 (Phase 10, Step 1)
+- Added a new design system layer in `frontend/src/theme/`:
+  - `tokens.js` (spacing, radius, typography scale, shadows, brand colors).
+  - `status.js` (status color mapping for all appointment states + SLA breach state).
+  - `index.js` (MUI theme with component overrides and consistent visual rules).
+- Kept app compatibility by using `frontend/src/theme/` as the canonical theme import path.
+- Validated by production build:
+  - `cd frontend && npm run build` (passed).
