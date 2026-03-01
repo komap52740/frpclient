@@ -445,7 +445,9 @@ export default function AppointmentDetailPage() {
 
   const isMasterAssigned = user.role === "master" && appointment.assigned_master === user.id;
 
-  const showClientPaymentActions = user.role === "client" && appointment.status === "AWAITING_PAYMENT";
+  const showClientPaymentActions =
+    user.role === "client" &&
+    ["AWAITING_PAYMENT", "PAYMENT_PROOF_UPLOADED"].includes(appointment.status);
   const showClientReview = user.role === "client" && appointment.status === "COMPLETED";
   const showClientSignals =
     user.role === "client" &&
@@ -466,6 +468,10 @@ export default function AppointmentDetailPage() {
   const showClientPaymentHighlight =
     user.role === "client" && ["AWAITING_PAYMENT", "PAYMENT_PROOF_UPLOADED"].includes(appointment.status);
   const showClientPaymentDock = showClientPaymentHighlight;
+  const showClientFloatingActionBar =
+    user.role === "client" &&
+    !showClientPaymentDock &&
+    !["COMPLETED", "CANCELLED", "DECLINED_BY_MASTER"].includes(appointment.status);
   const paymentFlowStatusesDone = ["PAYMENT_PROOF_UPLOADED", "PAID", "IN_PROGRESS", "COMPLETED"];
   const paymentConfirmedStatuses = ["PAID", "IN_PROGRESS", "COMPLETED"];
   const latestPaymentProofEvent = timelineEvents.find((event) => event.event_type === "payment_proof_uploaded");
@@ -714,16 +720,28 @@ export default function AppointmentDetailPage() {
                   boxShadow: (theme) => `0 0 0 3px ${theme.palette.warning.light}22`,
                 }}
               >
-                <Typography variant="h3" sx={{ mb: 0.7 }}>РћРїР»Р°С‚Р° Рё С‡РµРє</Typography>
+                <Typography variant="h3" sx={{ mb: 0.7 }}>
+                  {appointment.status === "AWAITING_PAYMENT" ? "Оплата и чек" : "Чек отправлен на проверку"}
+                </Typography>
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                  Р§С‚Рѕ РґРµР»Р°С‚СЊ РґР°Р»СЊС€Рµ: 1) РѕРїР»Р°С‚РёС‚Рµ 2) Р·Р°РіСЂСѓР·РёС‚Рµ С‡РµРє 3) РЅР°Р¶РјРёС‚Рµ В«РЇ РѕРїР»Р°С‚РёР»В».
+                  {appointment.status === "AWAITING_PAYMENT"
+                    ? "Что делать дальше: 1) оплатите 2) загрузите чек 3) нажмите «Я оплатил»."
+                    : "Проверяем чек. Обычно это занимает 1-5 минут. Если задержка — откройте чат и напишите мастеру."}
                 </Typography>
 
+                {appointment.status === "PAYMENT_PROOF_UPLOADED" && paymentReviewMinutes != null ? (
+                  <Alert severity={paymentReviewMinutes >= 10 ? "warning" : "info"} sx={{ mb: 1 }}>
+                    {paymentReviewMinutes < 1
+                      ? "Проверка чека началась только что."
+                      : `Проверка чека идет ${paymentReviewMinutes} мин.`}
+                  </Alert>
+                ) : null}
+
                 <Stack spacing={0.4} sx={{ mb: 1 }}>
-                  <Typography variant="body2"><b>Р‘Р°РЅРє:</b> {paymentSettings?.bank_requisites || "РЅРµ СѓРєР°Р·Р°РЅРѕ"}</Typography>
-                  <Typography variant="body2"><b>РљСЂРёРїС‚РѕРІР°Р»СЋС‚Р°:</b> {paymentSettings?.crypto_requisites || "РЅРµ СѓРєР°Р·Р°РЅРѕ"}</Typography>
+                  <Typography variant="body2"><b>Банк:</b> {paymentSettings?.bank_requisites || "не указано"}</Typography>
+                  <Typography variant="body2"><b>Криптовалюта:</b> {paymentSettings?.crypto_requisites || "не указано"}</Typography>
                   <Typography variant="body2" color="text.secondary">
-                    {paymentSettings?.instructions || "Р•СЃР»Рё РЅРµ РїРѕР»СѓС‡Р°РµС‚СЃСЏ вЂ” РЅР°РїРёС€РёС‚Рµ РІ С‡Р°С‚."}
+                    {paymentSettings?.instructions || "Если не получается — напишите в чат."}
                   </Typography>
                   <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
                     <Button
@@ -732,7 +750,7 @@ export default function AppointmentDetailPage() {
                       startIcon={<ContentCopyRoundedIcon fontSize="small" />}
                       onClick={() => copyToClipboard(paymentSettings?.bank_requisites)}
                     >
-                      РЎРєРѕРїРёСЂРѕРІР°С‚СЊ СЂРµРєРІРёР·РёС‚С‹ Р±Р°РЅРєР°
+                      Скопировать реквизиты банка
                     </Button>
                     <Button
                       variant="text"
@@ -740,14 +758,14 @@ export default function AppointmentDetailPage() {
                       startIcon={<ContentCopyRoundedIcon fontSize="small" />}
                       onClick={() => copyToClipboard(paymentSettings?.crypto_requisites)}
                     >
-                      РЎРєРѕРїРёСЂРѕРІР°С‚СЊ СЂРµРєРІРёР·РёС‚С‹ РєСЂРёРїС‚Рѕ
+                      Скопировать реквизиты крипто
                     </Button>
                   </Stack>
                 </Stack>
 
                 <Stack spacing={1}>
                   <Button component="label" variant="outlined">
-                    Р’С‹Р±СЂР°С‚СЊ С„Р°Р№Р» С‡РµРєР°
+                    {appointment.status === "AWAITING_PAYMENT" ? "Выбрать файл чека" : "Загрузить новый чек"}
                     <input
                       hidden
                       type="file"
@@ -758,24 +776,35 @@ export default function AppointmentDetailPage() {
                       }}
                     />
                   </Button>
-                  <Typography variant="body2">{paymentProofFile ? paymentProofFile.name : "Р¤Р°Р№Р» РЅРµ РІС‹Р±СЂР°РЅ"}</Typography>
+                  <Typography variant="body2">{paymentProofFile ? paymentProofFile.name : "Файл не выбран"}</Typography>
                   <Typography variant="caption" color="text.secondary">
-                    Р¤РѕСЂРјР°С‚С‹: jpg, jpeg, png, pdf. РњР°РєСЃРёРјСѓРј 10 РњР‘.
+                    Форматы: jpg, jpeg, png, pdf. Максимум 10 МБ.
                   </Typography>
                   {paymentFileError ? <Alert severity="warning">{paymentFileError}</Alert> : null}
 
                   <Button variant="contained" onClick={uploadPaymentProof} disabled={uploadingProof || !paymentProofFile}>
-                    {uploadingProof ? "Р—Р°РіСЂСѓР¶Р°РµРј С‡РµРє..." : "Р—Р°РіСЂСѓР·РёС‚СЊ С‡РµРє"}
+                    {uploadingProof ? "Загружаем чек..." : appointment.status === "AWAITING_PAYMENT" ? "Загрузить чек" : "Отправить новый чек"}
                   </Button>
 
-                  <TextField select label="РЎРїРѕСЃРѕР± РѕРїР»Р°С‚С‹" value={paymentMethod} onChange={(event) => setPaymentMethod(event.target.value)}>
+                  <TextField select label="Способ оплаты" value={paymentMethod} onChange={(event) => setPaymentMethod(event.target.value)}>
                     <MenuItem value="bank_transfer">{getPaymentMethodLabel("bank_transfer")}</MenuItem>
                     <MenuItem value="crypto">{getPaymentMethodLabel("crypto")}</MenuItem>
                   </TextField>
 
-                  <Button variant="outlined" onClick={() => runAction(() => appointmentsApi.markPaid(id, paymentMethod))}>
-                    РЇ РѕРїР»Р°С‚РёР»
-                  </Button>
+                  {appointment.status === "AWAITING_PAYMENT" ? (
+                    <Button variant="outlined" onClick={() => runAction(() => appointmentsApi.markPaid(id, paymentMethod))}>
+                      Я оплатил
+                    </Button>
+                  ) : (
+                    <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+                      <Button variant="outlined" onClick={() => handlePrimaryAction("open_chat")}>
+                        Открыть чат
+                      </Button>
+                      <Button variant="text" onClick={() => handlePrimaryAction("open_timeline")}>
+                        Открыть ленту
+                      </Button>
+                    </Stack>
+                  )}
                 </Stack>
               </Paper>
             ) : null}
@@ -989,6 +1018,45 @@ export default function AppointmentDetailPage() {
           </Stack>
         </Grid>
       </Grid>
+      {showClientFloatingActionBar ? (
+        <Paper
+          elevation={6}
+          sx={{
+            display: { xs: "block", md: "none" },
+            position: "fixed",
+            left: 8,
+            right: 8,
+            bottom: "calc(env(safe-area-inset-bottom, 0px) + 86px)",
+            zIndex: 1285,
+            p: 0.8,
+            borderRadius: 2.5,
+            border: "1px solid #dce6f0",
+          }}
+        >
+          <Stack direction="row" spacing={0.6}>
+            <Button
+              fullWidth
+              size="small"
+              variant={["AWAITING_PAYMENT", "PAYMENT_PROOF_UPLOADED"].includes(appointment.status) ? "contained" : "text"}
+              onClick={() =>
+                handlePrimaryAction(
+                  ["AWAITING_PAYMENT", "PAYMENT_PROOF_UPLOADED"].includes(appointment.status)
+                    ? "open_payment"
+                    : "open_chat"
+                )
+              }
+            >
+              {["AWAITING_PAYMENT", "PAYMENT_PROOF_UPLOADED"].includes(appointment.status) ? "Оплата" : "Помощь"}
+            </Button>
+            <Button fullWidth size="small" variant="text" onClick={() => handlePrimaryAction("open_chat")}>
+              Чат
+            </Button>
+            <Button fullWidth size="small" variant="text" onClick={() => handlePrimaryAction("open_timeline")}>
+              Статус
+            </Button>
+          </Stack>
+        </Paper>
+      ) : null}
       {showClientPaymentDock ? (
         <Paper
           elevation={6}

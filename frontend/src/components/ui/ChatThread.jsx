@@ -5,9 +5,21 @@ import "dayjs/locale/ru";
 
 dayjs.locale("ru");
 
-export default function ChatThread({ items, currentUserId, currentUserRole, onDeleteMessage }) {
+export default function ChatThread({
+  items,
+  currentUserId,
+  currentUserRole,
+  onDeleteMessage,
+  containerRef,
+  onScroll,
+}) {
   return (
-    <Stack spacing={1} sx={{ maxHeight: 420, overflowY: "auto", pr: 1 }}>
+    <Stack
+      ref={containerRef}
+      onScroll={onScroll}
+      spacing={1}
+      sx={{ maxHeight: 420, overflowY: "auto", pr: 1 }}
+    >
       {items.map((item) => {
         if (item.type === "system_event") {
           return (

@@ -1,8 +1,11 @@
 import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
+import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import StarRoundedIcon from "@mui/icons-material/StarRounded";
 import {
   Alert,
   Button,
+  Chip,
+  InputAdornment,
   MenuItem,
   Paper,
   Stack,
@@ -11,10 +14,11 @@ import {
 } from "@mui/material";
 import dayjs from "dayjs";
 import "dayjs/locale/ru";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { adminApi } from "../../api/client";
 import EmptyState from "../../components/EmptyState";
+import useAutoRefresh from "../../hooks/useAutoRefresh";
 
 dayjs.locale("ru");
 
@@ -31,6 +35,36 @@ const TARGET_ROLES = [
   { value: "admin", label: "Админ" },
 ];
 
+const MIN_RATINGS = [
+  { value: "0", label: "Любая оценка" },
+  { value: "5", label: "Только 5" },
+  { value: "4", label: "От 4" },
+  { value: "3", label: "От 3" },
+  { value: "2", label: "От 2" },
+  { value: "1", label: "От 1" },
+];
+
+function applyClientFilters(rows, { query, minRating }) {
+  const normalizedQuery = (query || "").trim().toLowerCase();
+  const min = Number(minRating || 0);
+
+  return rows
+    .filter((row) => (row.rating || 0) >= min)
+    .filter((row) => {
+      if (!normalizedQuery) return true;
+      const haystack = [
+        String(row.appointment || ""),
+        row.author_username || "",
+        row.target_username || "",
+        row.comment || "",
+      ]
+        .join(" ")
+        .toLowerCase();
+      return haystack.includes(normalizedQuery);
+    })
+    .sort((a, b) => dayjs(b.created_at).valueOf() - dayjs(a.created_at).valueOf());
+}
+
 export default function AdminReviewsPage() {
   const [rows, setRows] = useState([]);
   const [error, setError] = useState("");
@@ -38,24 +72,48 @@ export default function AdminReviewsPage() {
   const [filters, setFilters] = useState({
     review_type: "",
     target_role: "",
+    min_rating: "0",
+    query: "",
   });
 
-  const load = async () => {
-    setLoading(true);
+  const load = useCallback(async ({ silent = false, withLoading = true } = {}) => {
+    if (withLoading) {
+      setLoading(true);
+    }
     try {
-      const response = await adminApi.reviews(filters);
+      const response = await adminApi.reviews({
+        review_type: filters.review_type || undefined,
+        target_role: filters.target_role || undefined,
+      });
       setRows(response.data || []);
       setError("");
     } catch {
-      setError("Не удалось загрузить отзывы");
+      if (!silent) {
+        setError("Не удалось загрузить отзывы");
+      }
     } finally {
-      setLoading(false);
+      if (withLoading) {
+        setLoading(false);
+      }
     }
-  };
+  }, [filters.review_type, filters.target_role]);
 
   useEffect(() => {
     load();
-  }, []);
+  }, [load]);
+
+  useAutoRefresh(() => load({ silent: true, withLoading: false }), { intervalMs: 18000 });
+
+  const filteredRows = useMemo(
+    () => applyClientFilters(rows, { query: filters.query, minRating: filters.min_rating }),
+    [filters.min_rating, filters.query, rows]
+  );
+
+  const avg = filteredRows.length
+    ? (filteredRows.reduce((sum, row) => sum + (row.rating || 0), 0) / filteredRows.length).toFixed(1)
+    : null;
+  const lowCount = filteredRows.filter((row) => (row.rating || 0) <= 2).length;
+  const todayCount = filteredRows.filter((row) => dayjs(row.created_at).isAfter(dayjs().startOf("day"))).length;
 
   return (
     <Stack spacing={2}>
@@ -66,10 +124,25 @@ export default function AdminReviewsPage() {
         alignItems={{ xs: "flex-start", sm: "center" }}
       >
         <Typography variant="h5">Отзывы платформы</Typography>
-        <Button variant="outlined" startIcon={<RefreshRoundedIcon />} onClick={load} disabled={loading}>
+        <Button variant="outlined" startIcon={<RefreshRoundedIcon />} onClick={() => load()} disabled={loading}>
           Обновить
         </Button>
       </Stack>
+
+      <Paper sx={{ p: 1.5 }}>
+        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
+          <Chip size="small" label={`Записей: ${filteredRows.length}`} />
+          <Chip
+            size="small"
+            icon={<StarRoundedIcon fontSize="small" />}
+            label={avg ? `Средняя: ${avg}` : "Средняя: —"}
+            color="primary"
+            variant="outlined"
+          />
+          <Chip size="small" label={`Низкие (<=2): ${lowCount}`} sx={{ bgcolor: "#fee4e2", color: "#b42318" }} />
+          <Chip size="small" label={`Сегодня: ${todayCount}`} sx={{ bgcolor: "#e9f2ff", color: "#0f6ba8" }} />
+        </Stack>
+      </Paper>
 
       <Paper sx={{ p: 1.5 }}>
         <Stack direction={{ xs: "column", md: "row" }} spacing={1}>
@@ -78,7 +151,7 @@ export default function AdminReviewsPage() {
             label="Тип отзыва"
             value={filters.review_type}
             onChange={(event) => setFilters((prev) => ({ ...prev, review_type: event.target.value }))}
-            sx={{ minWidth: 220 }}
+            sx={{ minWidth: { xs: "100%", md: 220 } }}
           >
             {REVIEW_TYPES.map((item) => (
               <MenuItem key={item.value} value={item.value}>
@@ -92,7 +165,7 @@ export default function AdminReviewsPage() {
             label="Кому адресован"
             value={filters.target_role}
             onChange={(event) => setFilters((prev) => ({ ...prev, target_role: event.target.value }))}
-            sx={{ minWidth: 200 }}
+            sx={{ minWidth: { xs: "100%", md: 200 } }}
           >
             {TARGET_ROLES.map((item) => (
               <MenuItem key={item.value} value={item.value}>
@@ -101,26 +174,60 @@ export default function AdminReviewsPage() {
             ))}
           </TextField>
 
-          <Button variant="contained" onClick={load} sx={{ alignSelf: { xs: "stretch", md: "center" } }}>
-            Применить фильтр
+          <TextField
+            select
+            label="Минимальная оценка"
+            value={filters.min_rating}
+            onChange={(event) => setFilters((prev) => ({ ...prev, min_rating: event.target.value }))}
+            sx={{ minWidth: { xs: "100%", md: 190 } }}
+          >
+            {MIN_RATINGS.map((item) => (
+              <MenuItem key={item.value} value={item.value}>
+                {item.label}
+              </MenuItem>
+            ))}
+          </TextField>
+        </Stack>
+
+        <Stack direction={{ xs: "column", md: "row" }} spacing={1} sx={{ mt: 1 }}>
+          <TextField
+            fullWidth
+            label="Поиск"
+            value={filters.query}
+            onChange={(event) => setFilters((prev) => ({ ...prev, query: event.target.value }))}
+            placeholder="Заявка, автор, получатель, комментарий"
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchRoundedIcon fontSize="small" />
+                </InputAdornment>
+              ),
+            }}
+          />
+          <Button variant="contained" onClick={() => load()} sx={{ alignSelf: { xs: "stretch", md: "center" } }}>
+            Применить серверный фильтр
           </Button>
         </Stack>
       </Paper>
 
       {error ? <Alert severity="error">{error}</Alert> : null}
 
-      {!rows.length && !loading ? (
+      {!filteredRows.length && !loading ? (
         <EmptyState
-          title="Отзывов нет"
-          description="Здесь появятся отзывы после завершения заявок."
+          title={rows.length ? "По фильтрам ничего не найдено" : "Отзывов нет"}
+          description={
+            rows.length
+              ? "Измените поиск или порог оценки, чтобы увидеть результаты."
+              : "Здесь появятся отзывы после завершения заявок."
+          }
         />
       ) : (
         <Stack spacing={1.1}>
-          {rows.map((row) => (
+          {filteredRows.map((row) => (
             <Paper key={row.id} sx={{ p: 1.5 }}>
               <Stack spacing={0.6}>
                 <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={1}>
-                  <Stack direction="row" spacing={1} alignItems="center">
+                  <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
                     <Typography variant="subtitle2">Заявка #{row.appointment}</Typography>
                     <Typography variant="caption" color="text.secondary">
                       {row.review_type === "master_review" ? "Клиент -> Мастер" : "Мастер -> Клиент"}

@@ -93,6 +93,43 @@ const DETAIL_FOCUS_BY_ACTION = {
   leave_review: "review",
 };
 
+function resolveAttentionAction(item) {
+  if (!item) return null;
+  if (item.status === "AWAITING_PAYMENT") {
+    return {
+      actionKey: "open_payment",
+      title: `Заявка #${item.id}: нужна оплата`,
+      helper: "Оплатите и загрузите чек, чтобы мастер продолжил работу без паузы.",
+      cta: "Перейти к оплате",
+    };
+  }
+  if (item.status === "PAYMENT_PROOF_UPLOADED") {
+    return {
+      actionKey: "open_chat",
+      title: `Заявка #${item.id}: чек на проверке`,
+      helper: "Проверка обычно занимает 1-5 минут. Если есть вопрос, откройте чат.",
+      cta: "Открыть чат",
+    };
+  }
+  if ((item.unread_count || 0) > 0) {
+    return {
+      actionKey: "open_chat",
+      title: `Заявка #${item.id}: есть новые сообщения`,
+      helper: "Ответ в чате ускоряет весь процесс.",
+      cta: "Перейти к диалогу",
+    };
+  }
+  if (["NEW", "IN_REVIEW", "IN_PROGRESS", "PAID"].includes(item.status)) {
+    return {
+      actionKey: "open_timeline",
+      title: `Заявка #${item.id}: работа в процессе`,
+      helper: "Проверьте актуальный статус и последние события заявки.",
+      cta: "Открыть статус",
+    };
+  }
+  return null;
+}
+
 export default function MyAppointmentsPage() {
   const navigate = useNavigate();
   const [items, setItems] = useState([]);
@@ -160,6 +197,9 @@ export default function MyAppointmentsPage() {
 
     return sortItems(base, sortValue);
   }, [activeFilter, items, onlyUnread, search, sortValue]);
+
+  const priorityItem = useMemo(() => sortItems(items, "priority")[0] || null, [items]);
+  const attentionAction = useMemo(() => resolveAttentionAction(priorityItem), [priorityItem]);
 
   const repeatAppointment = async (appointmentId) => {
     try {
@@ -252,6 +292,36 @@ export default function MyAppointmentsPage() {
           </Box>
         </Stack>
       </Paper>
+
+      {attentionAction ? (
+        <Paper
+          sx={{
+            p: 1.6,
+            borderRadius: 3,
+            border: "1px solid #dce6f0",
+            background: "linear-gradient(140deg, #edf7ff 0%, #ffffff 60%)",
+          }}
+        >
+          <Stack spacing={0.7}>
+            <Typography variant="subtitle1" sx={{ fontWeight: 800 }}>
+              Главный шаг сейчас
+            </Typography>
+            <Typography variant="body2" sx={{ fontWeight: 700 }}>
+              {attentionAction.title}
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              {attentionAction.helper}
+            </Typography>
+            <Button
+              variant="contained"
+              sx={{ alignSelf: "flex-start" }}
+              onClick={() => handleWorkflowAction(attentionAction.actionKey, priorityItem)}
+            >
+              {attentionAction.cta}
+            </Button>
+          </Stack>
+        </Paper>
+      ) : null}
 
       {error && <Alert severity="error">{error}</Alert>}
 

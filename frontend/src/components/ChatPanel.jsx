@@ -22,7 +22,7 @@ import {
 } from "@mui/material";
 import dayjs from "dayjs";
 import "dayjs/locale/ru";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { chatApi } from "../api/client";
 import useAutoRefresh from "../hooks/useAutoRefresh";
@@ -118,6 +118,9 @@ export default function ChatPanel({ appointmentId, currentUser, systemEvents = [
   const [quickReplyError, setQuickReplyError] = useState("");
   const [quickReplySaving, setQuickReplySaving] = useState(false);
   const [replyForm, setReplyForm] = useState(EMPTY_REPLY_FORM);
+  const [newIncomingCount, setNewIncomingCount] = useState(0);
+
+  const threadRef = useRef(null);
 
   const isMaster = currentUser.role === "master";
   const quickTemplates = QUICK_TEMPLATES[currentUser.role] || QUICK_TEMPLATES.client;
@@ -139,23 +142,44 @@ export default function ChatPanel({ appointmentId, currentUser, systemEvents = [
     return [...messageItems, ...eventItems].sort((a, b) => dayjs(a.created_at).valueOf() - dayjs(b.created_at).valueOf());
   }, [messages, systemEvents]);
 
+  const isNearBottom = useCallback(() => {
+    const el = threadRef.current;
+    if (!el) return true;
+    return el.scrollHeight - el.scrollTop - el.clientHeight < 64;
+  }, []);
+
+  const scrollToBottom = useCallback(() => {
+    const el = threadRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+  }, []);
+
   const loadMessages = useCallback(
     async (afterId = 0) => {
       try {
         const response = await chatApi.listMessages(appointmentId, afterId);
         if (response.data.length) {
+          const shouldStickToBottom = isNearBottom();
+          const hasForeignMessages = response.data.some((item) => item.sender !== currentUser.id);
           setMessages((prev) => {
             const merged = [...prev.filter((item) => !item.is_pending), ...response.data];
             const dedup = new Map();
             merged.forEach((message) => dedup.set(String(message.id), message));
             return Array.from(dedup.values()).sort((a, b) => dayjs(a.created_at).valueOf() - dayjs(b.created_at).valueOf());
           });
+
+          if (afterId === 0 || shouldStickToBottom) {
+            setNewIncomingCount(0);
+            window.requestAnimationFrame(scrollToBottom);
+          } else if (hasForeignMessages) {
+            setNewIncomingCount((prev) => prev + response.data.filter((item) => item.sender !== currentUser.id).length);
+          }
         }
       } catch {
         setError("Не удалось загрузить сообщения");
       }
     },
-    [appointmentId]
+    [appointmentId, currentUser.id, isNearBottom, scrollToBottom]
   );
 
   const loadQuickReplies = useCallback(async () => {
@@ -175,6 +199,7 @@ export default function ChatPanel({ appointmentId, currentUser, systemEvents = [
 
   useEffect(() => {
     setMessages([]);
+    setNewIncomingCount(0);
     loadMessages(0);
   }, [appointmentId, loadMessages]);
 
@@ -182,12 +207,18 @@ export default function ChatPanel({ appointmentId, currentUser, systemEvents = [
     loadQuickReplies();
   }, [loadQuickReplies]);
 
-  useAutoRefresh(() => loadMessages(lastMessageId), { intervalMs: 4000 });
+  useAutoRefresh(() => loadMessages(lastMessageId), { intervalMs: 2500 });
 
   useEffect(() => {
     if (!lastMessageId) return;
     chatApi.read(appointmentId, lastMessageId).catch(() => undefined);
   }, [appointmentId, lastMessageId]);
+
+  const onThreadScroll = useCallback(() => {
+    if (isNearBottom()) {
+      setNewIncomingCount(0);
+    }
+  }, [isNearBottom]);
 
   const resolveQuickReplyText = useCallback(
     (rawText) => {
@@ -262,6 +293,8 @@ export default function ChatPanel({ appointmentId, currentUser, systemEvents = [
         const withoutOptimistic = prev.filter((item) => item.id !== optimisticId);
         return [...withoutOptimistic, response.data].sort((a, b) => dayjs(a.created_at).valueOf() - dayjs(b.created_at).valueOf());
       });
+      setNewIncomingCount(0);
+      window.requestAnimationFrame(scrollToBottom);
       setError("");
     } catch {
       setMessages((prev) => prev.filter((item) => item.id !== optimisticId));
@@ -411,11 +444,27 @@ export default function ChatPanel({ appointmentId, currentUser, systemEvents = [
       {error ? <Alert severity="error" sx={{ mb: 1 }}>{error}</Alert> : null}
       {fileError ? <Alert severity="warning" sx={{ mb: 1 }}>{fileError}</Alert> : null}
 
+      {newIncomingCount > 0 ? (
+        <Button
+          size="small"
+          variant="outlined"
+          sx={{ mb: 1, alignSelf: "flex-start" }}
+          onClick={() => {
+            setNewIncomingCount(0);
+            scrollToBottom();
+          }}
+        >
+          Новые сообщения: {newIncomingCount}
+        </Button>
+      ) : null}
+
       <ChatThread
         items={threadItems}
         currentUserId={currentUser.id}
         currentUserRole={currentUser.role}
         onDeleteMessage={onDelete}
+        containerRef={threadRef}
+        onScroll={onThreadScroll}
       />
 
       <Stack spacing={1} sx={{ mt: 1.75 }}>
