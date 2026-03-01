@@ -1,11 +1,8 @@
 ﻿import AttachFileIcon from "@mui/icons-material/AttachFile";
-import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import SendIcon from "@mui/icons-material/Send";
 import {
   Alert,
-  Box,
   Button,
-  IconButton,
   Paper,
   Stack,
   TextField,
@@ -17,19 +14,34 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { chatApi } from "../api/client";
 import useAutoRefresh from "../hooks/useAutoRefresh";
+import ChatThread from "./ui/ChatThread";
 
 dayjs.locale("ru");
 
-export default function ChatPanel({ appointmentId, currentUser }) {
+function mapSystemEvents(systemEvents = []) {
+  return (systemEvents || []).map((event) => ({
+    type: "system_event",
+    id: `system-${event.id}`,
+    created_at: event.created_at,
+    text: event.title || event.event_type || "Системное событие",
+  }));
+}
+
+export default function ChatPanel({ appointmentId, currentUser, systemEvents = [] }) {
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState("");
   const [file, setFile] = useState(null);
   const [error, setError] = useState("");
 
   const lastMessageId = useMemo(() => {
-    if (!messages.length) return 0;
-    return messages[messages.length - 1].id;
+    return messages.reduce((maxId, message) => (typeof message.id === "number" && message.id > maxId ? message.id : maxId), 0);
   }, [messages]);
+
+  const threadItems = useMemo(() => {
+    const messageItems = messages.map((message) => ({ ...message, type: "message" }));
+    const eventItems = mapSystemEvents(systemEvents);
+    return [...messageItems, ...eventItems].sort((a, b) => dayjs(a.created_at).valueOf() - dayjs(b.created_at).valueOf());
+  }, [messages, systemEvents]);
 
   const loadMessages = useCallback(
     async (afterId = 0) => {
@@ -37,10 +49,10 @@ export default function ChatPanel({ appointmentId, currentUser }) {
         const response = await chatApi.listMessages(appointmentId, afterId);
         if (response.data.length) {
           setMessages((prev) => {
-            const merged = [...prev, ...response.data];
+            const merged = [...prev.filter((item) => !item.is_pending), ...response.data];
             const dedup = new Map();
-            merged.forEach((m) => dedup.set(m.id, m));
-            return Array.from(dedup.values()).sort((a, b) => a.id - b.id);
+            merged.forEach((message) => dedup.set(String(message.id), message));
+            return Array.from(dedup.values()).sort((a, b) => dayjs(a.created_at).valueOf() - dayjs(b.created_at).valueOf());
           });
         }
       } catch {
@@ -63,18 +75,43 @@ export default function ChatPanel({ appointmentId, currentUser }) {
   }, [appointmentId, lastMessageId]);
 
   const onSend = async () => {
-    if (!text.trim() && !file) return;
+    const cleanText = text.trim();
+    if (!cleanText && !file) return;
+
+    const optimisticId = `optimistic-${Date.now()}`;
+    const optimisticMessage = {
+      id: optimisticId,
+      sender: currentUser.id,
+      sender_username: currentUser.username || "Вы",
+      text: cleanText,
+      file_url: null,
+      created_at: new Date().toISOString(),
+      is_deleted: false,
+      is_pending: true,
+    };
+
+    setMessages((prev) => [...prev, optimisticMessage]);
+
     const formData = new FormData();
-    if (text.trim()) formData.append("text", text.trim());
-    if (file) formData.append("file", file);
+    if (cleanText) {
+      formData.append("text", cleanText);
+    }
+    if (file) {
+      formData.append("file", file);
+    }
+
+    setText("");
+    setFile(null);
 
     try {
       const response = await chatApi.sendMessage(appointmentId, formData);
-      setMessages((prev) => [...prev, response.data]);
-      setText("");
-      setFile(null);
+      setMessages((prev) => {
+        const withoutOptimistic = prev.filter((item) => item.id !== optimisticId);
+        return [...withoutOptimistic, response.data].sort((a, b) => dayjs(a.created_at).valueOf() - dayjs(b.created_at).valueOf());
+      });
       setError("");
     } catch {
+      setMessages((prev) => prev.filter((item) => item.id !== optimisticId));
       setError("Не удалось отправить сообщение");
     }
   };
@@ -82,67 +119,43 @@ export default function ChatPanel({ appointmentId, currentUser }) {
   const onDelete = async (messageId) => {
     try {
       await chatApi.deleteMessage(messageId);
-      setMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, is_deleted: true, text: null, file_url: null } : m)));
+      setMessages((prev) =>
+        prev.map((message) =>
+          message.id === messageId
+            ? { ...message, is_deleted: true, text: null, file_url: null }
+            : message
+        )
+      );
     } catch {
       setError("Не удалось удалить сообщение");
     }
   };
 
   return (
-    <Paper sx={{ p: 2, borderRadius: 3 }}>
-      <Typography variant="h6" mb={2}>Чат по заявке</Typography>
+    <Paper sx={{ p: 2.2 }}>
+      <Typography variant="h3" sx={{ mb: 1.25 }}>
+        Чат по заявке
+      </Typography>
 
-      {error && <Alert severity="error" sx={{ mb: 1 }}>{error}</Alert>}
+      {error ? <Alert severity="error" sx={{ mb: 1 }}>{error}</Alert> : null}
 
-      <Stack spacing={1} sx={{ maxHeight: 360, overflowY: "auto", mb: 2, pr: 1 }}>
-        {messages.map((m) => {
-          const own = m.sender === currentUser.id;
-          const canDelete = own || currentUser.role === "admin";
-          return (
-            <Box
-              key={m.id}
-              sx={{
-                alignSelf: own ? "flex-end" : "flex-start",
-                maxWidth: "85%",
-                bgcolor: own ? "#d9f0ff" : "#f1f3f5",
-                borderRadius: 2,
-                p: 1,
-              }}
-            >
-              <Typography variant="caption" color="text.secondary">
-                {m.sender_username}
-              </Typography>
-              <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
-                {dayjs(m.created_at).format("DD.MM.YYYY HH:mm")}
-              </Typography>
-              <Typography variant="body2">
-                {m.is_deleted ? "Сообщение удалено" : m.text}
-              </Typography>
-              {m.file_url && !m.is_deleted && (
-                <Typography component="a" href={m.file_url} target="_blank" rel="noreferrer" sx={{ display: "block" }}>
-                  Скачать файл
-                </Typography>
-              )}
-              {canDelete && !m.is_deleted && (
-                <IconButton size="small" onClick={() => onDelete(m.id)}>
-                  <DeleteOutlineIcon fontSize="inherit" />
-                </IconButton>
-              )}
-            </Box>
-          );
-        })}
-      </Stack>
+      <ChatThread
+        items={threadItems}
+        currentUserId={currentUser.id}
+        currentUserRole={currentUser.role}
+        onDeleteMessage={onDelete}
+      />
 
-      <Stack spacing={1}>
+      <Stack spacing={1} sx={{ mt: 1.75 }}>
         <TextField
           label="Сообщение"
           multiline
           minRows={2}
           value={text}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => {
-            if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
-              e.preventDefault();
+          onChange={(event) => setText(event.target.value)}
+          onKeyDown={(event) => {
+            if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+              event.preventDefault();
               onSend();
             }
           }}
@@ -151,11 +164,7 @@ export default function ChatPanel({ appointmentId, currentUser }) {
         <Stack direction="row" spacing={1} alignItems="center">
           <Button component="label" variant="outlined" startIcon={<AttachFileIcon />}>
             Файл
-            <input
-              hidden
-              type="file"
-              onChange={(e) => setFile(e.target.files?.[0] || null)}
-            />
+            <input hidden type="file" onChange={(event) => setFile(event.target.files?.[0] || null)} />
           </Button>
           <Typography variant="body2" sx={{ flexGrow: 1 }}>
             {file ? file.name : "Файл не выбран"}

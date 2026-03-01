@@ -498,3 +498,13 @@ No-Go, РµСЃР»Рё:
   - `frontend/src/components/ui/AppointmentCard.jsx`
 - Updated list pages (`client` + `master`) to use the new appointment card presentation with compact status progress.
 - Unified status labels with theme status mapping in `frontend/src/constants/labels.js`.
+### 2026-03-01 (Phase 10, Step 3)
+- Refactored `AppointmentDetailPage` into a central control screen:
+  - top status progress (`StatusStepper`)
+  - single main action (`PrimaryCTA`)
+  - action panels for role-specific operations
+  - trust sidebar with SLA and guidance
+- Upgraded chat UX:
+  - optimistic send
+  - inline system events in chat stream
+  - shared renderer `frontend/src/components/ui/ChatThread.jsx`
