@@ -1,5 +1,6 @@
 ﻿import RefreshIcon from "@mui/icons-material/Refresh";
-import { Alert, Button, Grid, Stack, Typography } from "@mui/material";
+import { Alert, Button, Grid, Paper, Stack, Typography } from "@mui/material";
+import dayjs from "dayjs";
 import { useCallback, useEffect, useState } from "react";
 
 import { appointmentsApi, authApi } from "../../api/client";
@@ -8,6 +9,49 @@ import EmptyState from "../../components/EmptyState";
 import KpiCard from "../../components/KpiCard";
 import AppointmentCardSkeleton from "../../components/ui/skeletons/AppointmentCardSkeleton";
 import useAutoRefresh from "../../hooks/useAutoRefresh";
+
+function computeUrgencyScore(item) {
+  let score = 0;
+  const unread = item.unread_count || 0;
+  score += unread * 1000;
+
+  if (item.sla_breached) {
+    score += 1_000_000;
+  }
+
+  const deadline = item.completion_deadline_at || item.response_deadline_at;
+  if (deadline) {
+    const minutesLeft = dayjs(deadline).diff(dayjs(), "minute");
+    if (minutesLeft <= 0) {
+      score += 800_000;
+    } else if (minutesLeft <= 15) {
+      score += 500_000;
+    } else if (minutesLeft <= 60) {
+      score += 250_000;
+    } else if (minutesLeft <= 180) {
+      score += 120_000;
+    }
+  }
+
+  if (item.status === "PAYMENT_PROOF_UPLOADED") {
+    score += 300_000;
+  }
+  if (item.status === "IN_PROGRESS") {
+    score += 200_000;
+  }
+
+  return score;
+}
+
+function sortByUrgency(items) {
+  return [...items].sort((a, b) => {
+    const scoreDiff = computeUrgencyScore(b) - computeUrgencyScore(a);
+    if (scoreDiff !== 0) {
+      return scoreDiff;
+    }
+    return dayjs(b.updated_at).valueOf() - dayjs(a.updated_at).valueOf();
+  });
+}
 
 export default function MasterActivePage() {
   const [items, setItems] = useState([]);
@@ -24,7 +68,7 @@ export default function MasterActivePage() {
         appointmentsApi.activeList(),
         authApi.dashboardSummary(),
       ]);
-      setItems(appointmentsResponse.data || []);
+      setItems(sortByUrgency(appointmentsResponse.data || []));
       setSummary(summaryData.counts || {});
       setError("");
     } catch {
@@ -67,6 +111,12 @@ export default function MasterActivePage() {
           <KpiCard title="Непрочитанные" value={summary?.unread_total ?? "-"} accent="#7b2cbf" />
         </Grid>
       </Grid>
+
+      <Paper sx={{ p: 1.5 }}>
+        <Typography variant="body2" color="text.secondary">
+          Порядок заявок: сначала риск SLA, затем близость дедлайна и непрочитанные сообщения.
+        </Typography>
+      </Paper>
 
       {error && <Alert severity="error">{error}</Alert>}
 

@@ -537,3 +537,11 @@ No-Go, РµСЃР»Рё:
   - MasterActive
   - AppointmentDetail
 - Continued copy polish in main journey blocks with “Что делать дальше” and reassurance microcopy.
+### 2026-03-01 (Phase 10, Step 8)
+- Mobile-first shell improvements:
+  - added bottom navigation (`AppBottomNav`) for client/master/admin on small screens
+  - added floating primary action button (`AppFab`) for client/master
+- Master active queue now sorted by urgency:
+  - SLA breach first
+  - nearest deadline next
+  - unread chat count as priority signal

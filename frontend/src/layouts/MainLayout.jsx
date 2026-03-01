@@ -18,6 +18,8 @@ import { useMemo, useState } from "react";
 import { Link as RouterLink, useNavigate } from "react-router-dom";
 
 import { useAuth } from "../auth/AuthContext";
+import AppBottomNav from "../components/ui/AppBottomNav";
+import AppFab from "../components/ui/AppFab";
 import NotificationBell from "../components/ui/NotificationBell";
 
 function buildMenu(role) {
@@ -72,7 +74,7 @@ export default function MainLayout({ children }) {
     <Box sx={{ minHeight: "100vh" }}>
       <AppBar position="sticky" color="primary" sx={{ backdropFilter: "blur(8px)" }}>
         <Toolbar>
-          <IconButton color="inherit" edge="start" onClick={() => setOpen(true)} sx={{ mr: 1 }}>
+          <IconButton color="inherit" edge="start" onClick={() => setOpen(true)} sx={{ mr: 1, display: { xs: "none", md: "inline-flex" } }}>
             <MenuIcon />
           </IconButton>
           <Stack direction="row" spacing={1} alignItems="center" sx={{ flexGrow: 1 }}>
@@ -103,9 +105,12 @@ export default function MainLayout({ children }) {
         </Box>
       </Drawer>
 
-      <Container maxWidth="lg" sx={{ py: 3 }}>
+      <Container maxWidth="lg" sx={{ py: 3, pb: { xs: 12, md: 3 } }}>
         {children}
       </Container>
+
+      <AppFab role={user?.role} />
+      <AppBottomNav role={user?.role} />
     </Box>
   );
 }
