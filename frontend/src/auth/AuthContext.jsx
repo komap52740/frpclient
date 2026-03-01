@@ -70,6 +70,23 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
+  const registerWithPassword = useCallback(async (payload) => {
+    const data = await authApi.register(payload);
+    setAccessToken(data.access);
+    if (data.user) {
+      setUser(data.user);
+    }
+
+    try {
+      const me = await authApi.getMe();
+      setUser(me.user);
+      setPaymentSettings(me.payment_settings);
+      return me.user;
+    } catch {
+      return data.user || null;
+    }
+  }, []);
+
   const logout = useCallback(async () => {
     try {
       await authApi.logout();
@@ -88,10 +105,11 @@ export function AuthProvider({ children }) {
       loading,
       loginWithTelegram,
       loginWithPassword,
+      registerWithPassword,
       logout,
       reloadMe: loadMe,
     }),
-    [user, paymentSettings, loading, loginWithTelegram, loginWithPassword, logout, loadMe]
+    [user, paymentSettings, loading, loginWithTelegram, loginWithPassword, registerWithPassword, logout, loadMe]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

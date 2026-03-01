@@ -22,7 +22,7 @@ function getApiErrorMessage(error, fallback) {
 }
 
 export default function LoginPage() {
-  const { loginWithTelegram, loginWithPassword } = useAuth();
+  const { loginWithTelegram, loginWithPassword, registerWithPassword } = useAuth();
   const navigate = useNavigate();
 
   const [loading, setLoading] = useState(false);
@@ -32,6 +32,7 @@ export default function LoginPage() {
   const [authMode, setAuthMode] = useState("password");
 
   const [passwordForm, setPasswordForm] = useState({ username: "", password: "" });
+  const [registerForm, setRegisterForm] = useState({ username: "", password: "", passwordConfirm: "" });
   const [setupForm, setSetupForm] = useState({
     username: "",
     password: "",
@@ -107,6 +108,24 @@ export default function LoginPage() {
       navigate("/", { replace: true });
     } catch (err) {
       setError(getApiErrorMessage(err, "Ошибка входа по логину и паролю"));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const submitRegister = async (event) => {
+    event.preventDefault();
+    setLoading(true);
+    setError("");
+    try {
+      await registerWithPassword({
+        username: registerForm.username,
+        password: registerForm.password,
+        password_confirm: registerForm.passwordConfirm,
+      });
+      navigate("/", { replace: true });
+    } catch (err) {
+      setError(getApiErrorMessage(err, "Ошибка регистрации"));
     } finally {
       setLoading(false);
     }
@@ -204,6 +223,7 @@ export default function LoginPage() {
               <>
                 <Tabs value={authMode} onChange={(_, value) => setAuthMode(value)}>
                   <Tab value="password" label="Логин и пароль" />
+                  <Tab value="register" label="Регистрация" />
                   <Tab value="telegram" label="Telegram" />
                 </Tabs>
 
@@ -225,6 +245,37 @@ export default function LoginPage() {
                       />
                       <Button type="submit" variant="contained" disabled={loading}>
                         {loading ? "Выполняется..." : "Войти"}
+                      </Button>
+                    </Stack>
+                  </Box>
+                ) : authMode === "register" ? (
+                  <Box component="form" onSubmit={submitRegister}>
+                    <Stack spacing={1.5}>
+                      <Typography variant="body2" color="text.secondary">
+                        Зарегистрируйтесь по нику и паролю. Роль по умолчанию — клиент.
+                      </Typography>
+                      <TextField
+                        required
+                        label="Ник"
+                        value={registerForm.username}
+                        onChange={(e) => setRegisterForm((prev) => ({ ...prev, username: e.target.value }))}
+                      />
+                      <TextField
+                        required
+                        type="password"
+                        label="Пароль"
+                        value={registerForm.password}
+                        onChange={(e) => setRegisterForm((prev) => ({ ...prev, password: e.target.value }))}
+                      />
+                      <TextField
+                        required
+                        type="password"
+                        label="Подтверждение пароля"
+                        value={registerForm.passwordConfirm}
+                        onChange={(e) => setRegisterForm((prev) => ({ ...prev, passwordConfirm: e.target.value }))}
+                      />
+                      <Button type="submit" variant="contained" disabled={loading}>
+                        {loading ? "Выполняется..." : "Зарегистрироваться"}
                       </Button>
                     </Stack>
                   </Box>

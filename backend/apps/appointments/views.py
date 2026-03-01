@@ -7,6 +7,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.accounts.models import RoleChoices
+from apps.accounts.notifications import notify_masters_about_new_appointment
 from apps.accounts.permissions import IsAdminRole
 from apps.accounts.services import recalculate_client_stats
 from apps.appointments.access import get_appointment_for_user
@@ -50,6 +51,7 @@ class AppointmentCreateView(APIView):
             actor=request.user,
             payload={"status": appointment.status},
         )
+        notify_masters_about_new_appointment(appointment)
         return Response(AppointmentSerializer(appointment, context={"request": request}).data, status=status.HTTP_201_CREATED)
 
 

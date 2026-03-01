@@ -18,6 +18,7 @@ from .serializers import (
     BootstrapAdminSerializer,
     MeSerializer,
     PasswordLoginSerializer,
+    RegisterSerializer,
     TelegramAuthSerializer,
 )
 
@@ -106,6 +107,24 @@ class PasswordLoginView(APIView):
         if user.is_banned and user.role == RoleChoices.CLIENT:
             return Response({"detail": "Ваш аккаунт заблокирован администратором."}, status=status.HTTP_403_FORBIDDEN)
 
+        user.last_login = timezone.now()
+        user.save(update_fields=["last_login", "updated_at"])
+        return build_auth_response(user)
+
+
+class RegisterView(APIView):
+    permission_classes = (permissions.AllowAny,)
+
+    def post(self, request):
+        serializer = RegisterSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        user = User.objects.create_user(
+            username=data["username"],
+            password=data["password"],
+            role=RoleChoices.CLIENT,
+        )
         user.last_login = timezone.now()
         user.save(update_fields=["last_login", "updated_at"])
         return build_auth_response(user)

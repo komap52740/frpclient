@@ -119,6 +119,27 @@ class PasswordLoginSerializer(serializers.Serializer):
     password = serializers.CharField(max_length=255, trim_whitespace=False)
 
 
+class RegisterSerializer(serializers.Serializer):
+    username = serializers.CharField(max_length=150)
+    password = serializers.CharField(max_length=255, trim_whitespace=False)
+    password_confirm = serializers.CharField(max_length=255, trim_whitespace=False)
+
+    def validate_username(self, value: str) -> str:
+        username = value.strip()
+        if len(username) < 3:
+            raise serializers.ValidationError("Ник должен содержать минимум 3 символа.")
+        if User.objects.filter(username=username).exists():
+            raise serializers.ValidationError("Пользователь с таким ником уже существует.")
+        return username
+
+    def validate(self, attrs):
+        if attrs["password"] != attrs["password_confirm"]:
+            raise serializers.ValidationError({"password_confirm": "Пароли не совпадают."})
+        if len(attrs["password"]) < 8:
+            raise serializers.ValidationError({"password": "Пароль должен содержать минимум 8 символов."})
+        return attrs
+
+
 class BootstrapAdminSerializer(serializers.Serializer):
     username = serializers.CharField(max_length=150)
     password = serializers.CharField(max_length=255, trim_whitespace=False)

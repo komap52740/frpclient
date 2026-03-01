@@ -611,7 +611,9 @@ export default function AppointmentDetailPage() {
 
               <Stack spacing={0.7}>
                 <Typography variant="body2"><b>Мастер:</b> {appointment.master_username || "Пока не назначен"}</Typography>
-                <Typography variant="body2"><b>Риск клиента:</b> {appointment.client_risk_level || "—"} {appointment.client_risk_score != null ? `(${appointment.client_risk_score})` : ""}</Typography>
+                {user.role !== "client" ? (
+                  <Typography variant="body2"><b>Риск клиента:</b> {appointment.client_risk_level || "—"} {appointment.client_risk_score != null ? `(${appointment.client_risk_score})` : ""}</Typography>
+                ) : null}
                 <Typography variant="body2"><b>SLA ответ до:</b> {appointment.response_deadline_at ? dayjs(appointment.response_deadline_at).format("DD.MM.YYYY HH:mm") : "—"}</Typography>
                 <Typography variant="body2"><b>SLA завершение до:</b> {appointment.completion_deadline_at ? dayjs(appointment.completion_deadline_at).format("DD.MM.YYYY HH:mm") : "—"}</Typography>
                 {appointment.sla_breached ? (

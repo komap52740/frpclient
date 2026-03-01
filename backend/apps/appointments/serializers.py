@@ -110,8 +110,6 @@ class AppointmentSerializer(serializers.ModelSerializer):
             return True
         if user.role == "master" and obj.assigned_master_id == user.id:
             return True
-        if user.role == "client" and obj.client_id == user.id:
-            return True
         return False
 
     def get_client_risk_score(self, obj: Appointment) -> int | None:

@@ -50,6 +50,7 @@ api.interceptors.response.use(
     const requestUrl = originalRequest?.url || "";
     const bypassRefresh =
       requestUrl.includes("/auth/login/") ||
+      requestUrl.includes("/auth/register/") ||
       requestUrl.includes("/auth/telegram/") ||
       requestUrl.includes("/auth/logout/") ||
       requestUrl.includes("/auth/bootstrap-admin/") ||
@@ -97,6 +98,10 @@ export const authApi = {
   },
   async passwordLogin(payload) {
     const response = await api.post("/auth/login/", payload);
+    return response.data;
+  },
+  async register(payload) {
+    const response = await api.post("/auth/register/", payload);
     return response.data;
   },
   async telegramAuth(payload) {

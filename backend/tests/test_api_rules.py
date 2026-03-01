@@ -1,5 +1,7 @@
 ﻿from __future__ import annotations
 
+from unittest.mock import patch
+
 import pytest
 from django.core.files.uploadedfile import SimpleUploadedFile
 from rest_framework.test import APIClient
@@ -382,3 +384,61 @@ def test_appointment_events_endpoint(client_user, master_user):
         {"after_id": "abc"},
     )
     assert bad_after_id_response.status_code == 400
+
+
+@pytest.mark.django_db
+def test_register_flow(api_client):
+    payload = {
+        "username": "new_client",
+        "password": "safe-pass-123",
+        "password_confirm": "safe-pass-123",
+    }
+    response = api_client.post("/api/auth/register/", payload, format="json")
+    assert response.status_code == 200
+    assert response.data["user"]["username"] == payload["username"]
+    assert response.data["user"]["role"] == RoleChoices.CLIENT
+    assert "access" in response.data
+
+    duplicate = api_client.post("/api/auth/register/", payload, format="json")
+    assert duplicate.status_code == 400
+
+
+@pytest.mark.django_db
+def test_client_cannot_see_own_risk_in_appointment_detail(client_user, master_user):
+    appointment = Appointment.objects.create(
+        client=client_user,
+        assigned_master=master_user,
+        brand="Samsung",
+        model="A50",
+        lock_type="PIN",
+        has_pc=True,
+        description="desc",
+        status=AppointmentStatusChoices.IN_REVIEW,
+    )
+
+    client_response = auth_as(client_user).get(f"/api/appointments/{appointment.id}/")
+    assert client_response.status_code == 200
+    assert client_response.data["client_risk_score"] is None
+    assert client_response.data["client_risk_level"] is None
+
+    master_response = auth_as(master_user).get(f"/api/appointments/{appointment.id}/")
+    assert master_response.status_code == 200
+    assert master_response.data["client_risk_score"] is not None
+    assert master_response.data["client_risk_level"] in {"low", "medium", "high", "critical"}
+
+
+@pytest.mark.django_db
+def test_create_appointment_calls_master_telegram_notifications(client_user):
+    payload = {
+        "brand": "Samsung",
+        "model": "A50",
+        "lock_type": "PIN",
+        "has_pc": True,
+        "description": "desc",
+    }
+
+    with patch("apps.appointments.views.notify_masters_about_new_appointment") as notify_mock:
+        response = auth_as(client_user).post("/api/appointments/", payload, format="json")
+        assert response.status_code == 201
+        notify_mock.assert_called_once()
+
