@@ -18,6 +18,7 @@ urlpatterns = [
     path("api/", include("apps.reviews.urls")),
     path("api/", include("apps.adminpanel.urls")),
     path("api/", include("apps.common.urls")),
+    path("api/", include("apps.platform.urls")),
 ]
 
 if settings.DEBUG:

@@ -50,8 +50,9 @@ class MessageDeleteView(APIView):
 
         message.is_deleted = True
         message.deleted_at = timezone.now()
+        message.deleted_by = request.user
         message.text = ""
-        message.save(update_fields=["is_deleted", "deleted_at", "text", "updated_at"])
+        message.save(update_fields=["is_deleted", "deleted_at", "deleted_by", "text", "updated_at"])
 
         add_event(
             appointment,

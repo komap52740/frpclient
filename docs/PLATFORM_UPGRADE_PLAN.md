@@ -3,6 +3,17 @@
 Дата: 2026-03-01  
 Статус: Discovery complete, без функциональных изменений.
 
+## Progress Log
+
+- ✅ Phase 0 complete:
+  - repository discovery and compatibility contract documented.
+- ✅ Phase 1 complete:
+  - new `apps.platform` foundation app added.
+  - `PlatformEvent`, `FeatureFlag`, `Notification`, `SoftDeleteAuditMixin` introduced.
+  - notification APIs and admin feature-flag APIs added under legacy `/api/*`.
+  - chat soft-delete harmonized with `deleted_by`.
+  - tests added for event emission, feature flag evaluation, notifications unread flow.
+
 ## 1. Repo Structure Summary
 
 ## 1.1 Monorepo top-level
