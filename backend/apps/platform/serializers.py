@@ -5,7 +5,7 @@ from rest_framework import serializers
 
 from apps.accounts.models import User
 
-from .models import FeatureFlag, Notification, PlatformEvent
+from .models import FeatureFlag, Notification, PlatformEvent, Rule
 
 
 class PlatformEventSerializer(serializers.ModelSerializer):
@@ -80,3 +80,18 @@ class NotificationMarkReadSerializer(serializers.Serializer):
         now = timezone.now()
         updated = queryset.update(is_read=True, read_at=now)
         return updated
+
+
+class RuleSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Rule
+        fields = (
+            "id",
+            "name",
+            "is_active",
+            "trigger_event_type",
+            "condition_json",
+            "action_json",
+            "created_at",
+            "updated_at",
+        )

@@ -6,13 +6,17 @@ from .models import FeatureFlag, Notification, PlatformEvent
 def emit_event(event_type: str, entity, actor=None, payload: dict | None = None) -> PlatformEvent:
     entity_type = entity.__class__.__name__
     entity_id = str(getattr(entity, "id"))
-    return PlatformEvent.objects.create(
+    event = PlatformEvent.objects.create(
         event_type=event_type,
         entity_type=entity_type,
         entity_id=entity_id,
         actor=actor,
         payload=payload or {},
     )
+    from .rules import process_event_rules
+
+    process_event_rules(event)
+    return event
 
 
 def is_feature_enabled(name: str, *, user=None, role: str | None = None) -> bool:

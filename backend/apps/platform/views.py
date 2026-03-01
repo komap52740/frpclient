@@ -12,8 +12,9 @@ from .serializers import (
     NotificationMarkReadSerializer,
     NotificationSerializer,
     PlatformEventSerializer,
+    RuleSerializer,
 )
-from .models import PlatformEvent
+from .models import PlatformEvent, Rule
 
 
 class FeatureFlagListCreateView(generics.ListCreateAPIView):
@@ -76,3 +77,17 @@ class PlatformEventListView(generics.ListAPIView):
         if entity_id:
             queryset = queryset.filter(entity_id=entity_id)
         return queryset[:200]
+
+
+class RuleListCreateView(generics.ListCreateAPIView):
+    permission_classes = (permissions.IsAuthenticated, IsAdminRole)
+    serializer_class = RuleSerializer
+    queryset = Rule.objects.all().order_by("name")
+
+
+class RuleDetailView(generics.RetrieveUpdateDestroyAPIView):
+    permission_classes = (permissions.IsAuthenticated, IsAdminRole)
+    serializer_class = RuleSerializer
+    queryset = Rule.objects.all()
+    lookup_field = "id"
+    lookup_url_kwarg = "rule_id"

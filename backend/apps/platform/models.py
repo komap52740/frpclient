@@ -152,3 +152,22 @@ class Notification(models.Model):
         self.is_read = True
         self.read_at = timezone.now()
         self.save(update_fields=["is_read", "read_at"])
+
+
+class Rule(models.Model):
+    name = models.CharField(max_length=150, unique=True)
+    is_active = models.BooleanField(default=True, db_index=True)
+    trigger_event_type = models.CharField(max_length=120, db_index=True)
+    condition_json = models.JSONField(default=dict, blank=True)
+    action_json = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ("name",)
+        indexes = [
+            models.Index(fields=("is_active", "trigger_event_type")),
+        ]
+
+    def __str__(self) -> str:
+        return self.name

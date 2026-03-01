@@ -112,6 +112,7 @@ class Appointment(TimeStampedModel):
     taken_at = models.DateTimeField(null=True, blank=True)
     started_at = models.DateTimeField(null=True, blank=True)
     completed_at = models.DateTimeField(null=True, blank=True)
+    platform_tags = models.JSONField(default=list, blank=True)
 
     class Meta:
         ordering = ("-created_at",)

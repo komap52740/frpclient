@@ -7,6 +7,8 @@ from .views import (
     NotificationMarkReadView,
     NotificationUnreadCountView,
     PlatformEventListView,
+    RuleDetailView,
+    RuleListCreateView,
 )
 
 urlpatterns = [
@@ -16,4 +18,6 @@ urlpatterns = [
     path("admin/feature-flags/", FeatureFlagListCreateView.as_view(), name="feature-flags-list"),
     path("admin/feature-flags/<int:flag_id>/", FeatureFlagDetailView.as_view(), name="feature-flags-detail"),
     path("v1/events/", PlatformEventListView.as_view(), name="platform-events-list"),
+    path("v1/admin/rules/", RuleListCreateView.as_view(), name="rules-list"),
+    path("v1/admin/rules/<int:rule_id>/", RuleDetailView.as_view(), name="rules-detail"),
 ]

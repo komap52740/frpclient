@@ -18,6 +18,12 @@
   - existing appointment timeline endpoint `/api/appointments/{id}/events/` preserved.
   - admin event inspection endpoint added: `GET /api/v1/events/`.
   - integration tests added for lifecycle/chat/review event emission.
+- ✅ Phase 3 complete:
+  - safe rule engine added (`Rule` model + JSON conditions/actions, no `eval`).
+  - rule execution is triggered synchronously after every `emit_event`.
+  - supported actions: `create_notification`, `change_status` (safe transitions), `assign_tag/assign_flag`, `request_admin_attention`.
+  - admin CRUD API for rules: `/api/v1/admin/rules/`.
+  - management command added: `python manage.py replay_platform_rules --last=200`.
 
 ## 1. Repo Structure Summary
 
