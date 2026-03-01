@@ -86,6 +86,13 @@ function sortItems(items, sortValue) {
   return [...items].sort((a, b) => dayjs(b.updated_at).valueOf() - dayjs(a.updated_at).valueOf());
 }
 
+const DETAIL_FOCUS_BY_ACTION = {
+  open_payment: "payment",
+  open_chat: "chat",
+  open_timeline: "timeline",
+  leave_review: "review",
+};
+
 export default function MyAppointmentsPage() {
   const navigate = useNavigate();
   const [items, setItems] = useState([]);
@@ -161,6 +168,17 @@ export default function MyAppointmentsPage() {
     } catch {
       setError("Не удалось создать повторную заявку");
     }
+  };
+
+  const handleWorkflowAction = (actionKey, item) => {
+    if (actionKey === "create_new") {
+      navigate("/client/create");
+      return;
+    }
+
+    const focus = DETAIL_FOCUS_BY_ACTION[actionKey];
+    const suffix = focus ? `?focus=${focus}` : "";
+    navigate(`/appointments/${item.id}${suffix}`);
   };
 
   return (
@@ -247,7 +265,13 @@ export default function MyAppointmentsPage() {
         <Stack spacing={1.25}>
           {filteredItems.map((item) => (
             <Stack key={item.id} spacing={0.7}>
-              <AppointmentCard item={item} role="client" linkTo={`/appointments/${item.id}`} />
+              <AppointmentCard
+                item={item}
+                role="client"
+                linkTo={`/appointments/${item.id}`}
+                showWorkflowAction
+                onPrimaryAction={handleWorkflowAction}
+              />
               {["COMPLETED", "DECLINED_BY_MASTER", "CANCELLED"].includes(item.status) ? (
                 <Button
                   variant="text"

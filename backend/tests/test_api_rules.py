@@ -11,6 +11,7 @@ from apps.accounts.models import RoleChoices, User
 from apps.appointments.models import Appointment, AppointmentStatusChoices
 from apps.chat.models import Message
 from apps.platform.models import Notification
+from apps.reviews.models import Review, ReviewTypeChoices
 
 
 @pytest.fixture
@@ -603,4 +604,71 @@ def test_create_appointment_calls_master_telegram_notifications(client_user):
         response = auth_as(client_user).post("/api/appointments/", payload, format="json")
         assert response.status_code == 201
         notify_mock.assert_called_once()
+
+
+@pytest.mark.django_db
+def test_master_can_list_own_reviews(client_user, master_user):
+    appointment = Appointment.objects.create(
+        client=client_user,
+        assigned_master=master_user,
+        brand="Samsung",
+        model="A50",
+        lock_type="PIN",
+        has_pc=True,
+        description="desc",
+        status=AppointmentStatusChoices.COMPLETED,
+    )
+    Review.objects.create(
+        appointment=appointment,
+        author=client_user,
+        target=master_user,
+        review_type=ReviewTypeChoices.MASTER_REVIEW,
+        rating=5,
+        comment="Отлично",
+    )
+
+    response = auth_as(master_user).get("/api/reviews/my/")
+    assert response.status_code == 200
+    assert len(response.data) == 1
+    assert response.data[0]["target"] == master_user.id
+    assert response.data[0]["review_type"] == ReviewTypeChoices.MASTER_REVIEW
+
+
+@pytest.mark.django_db
+def test_admin_can_list_all_reviews_with_filters(client_user, master_user, admin_user):
+    appointment = Appointment.objects.create(
+        client=client_user,
+        assigned_master=master_user,
+        brand="Samsung",
+        model="A50",
+        lock_type="PIN",
+        has_pc=True,
+        description="desc",
+        status=AppointmentStatusChoices.COMPLETED,
+    )
+    Review.objects.create(
+        appointment=appointment,
+        author=client_user,
+        target=master_user,
+        review_type=ReviewTypeChoices.MASTER_REVIEW,
+        rating=5,
+        comment="Супер",
+    )
+    Review.objects.create(
+        appointment=appointment,
+        author=master_user,
+        target=client_user,
+        review_type=ReviewTypeChoices.CLIENT_REVIEW,
+        rating=3,
+        comment="Ок",
+    )
+
+    response = auth_as(admin_user).get("/api/admin/reviews/")
+    assert response.status_code == 200
+    assert len(response.data) == 2
+
+    filtered = auth_as(admin_user).get("/api/admin/reviews/", {"review_type": ReviewTypeChoices.MASTER_REVIEW})
+    assert filtered.status_code == 200
+    assert len(filtered.data) == 1
+    assert filtered.data[0]["review_type"] == ReviewTypeChoices.MASTER_REVIEW
 

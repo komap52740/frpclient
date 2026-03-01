@@ -42,6 +42,7 @@ const AdminMastersPage = lazyWithRetry(() => import("./pages/admin/AdminMastersP
 const AdminSystemPage = lazyWithRetry(() => import("./pages/admin/AdminSystemPage"));
 const AdminUsersPage = lazyWithRetry(() => import("./pages/admin/AdminUsersPage"));
 const AdminRulesPage = lazyWithRetry(() => import("./pages/admin/AdminRulesPage"));
+const AdminReviewsPage = lazyWithRetry(() => import("./pages/admin/AdminReviewsPage"));
 const AppointmentDetailPage = lazyWithRetry(() => import("./pages/AppointmentDetailPage"));
 const BannedPage = lazyWithRetry(() => import("./pages/BannedPage"));
 const LoginPage = lazyWithRetry(() => import("./pages/auth/LoginPage"));
@@ -51,6 +52,7 @@ const CreateAppointmentPage = lazyWithRetry(() => import("./pages/client/CreateA
 const MyAppointmentsPage = lazyWithRetry(() => import("./pages/client/MyAppointmentsPage"));
 const MasterActivePage = lazyWithRetry(() => import("./pages/master/MasterActivePage"));
 const MasterNewPage = lazyWithRetry(() => import("./pages/master/MasterNewPage"));
+const MasterReviewsPage = lazyWithRetry(() => import("./pages/master/MasterReviewsPage"));
 
 function RouteFallback() {
   return (
@@ -187,6 +189,14 @@ function AuthenticatedLayout() {
               </ProtectedRoute>
             }
           />
+          <Route
+            path="/master/reviews"
+            element={
+              <ProtectedRoute roles={["master"]}>
+                <MasterReviewsPage />
+              </ProtectedRoute>
+            }
+          />
 
           <Route
             path="/admin/appointments"
@@ -233,6 +243,14 @@ function AuthenticatedLayout() {
             element={
               <ProtectedRoute roles={["admin"]}>
                 <AdminRulesPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/reviews"
+            element={
+              <ProtectedRoute roles={["admin"]}>
+                <AdminReviewsPage />
               </ProtectedRoute>
             }
           />

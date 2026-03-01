@@ -5,6 +5,7 @@ import ListAltRoundedIcon from "@mui/icons-material/ListAltRounded";
 import ManageAccountsRoundedIcon from "@mui/icons-material/ManageAccountsRounded";
 import NewReleasesRoundedIcon from "@mui/icons-material/NewReleasesRounded";
 import PersonRoundedIcon from "@mui/icons-material/PersonRounded";
+import ReviewsRoundedIcon from "@mui/icons-material/ReviewsRounded";
 import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
 import {
   BottomNavigation,
@@ -26,12 +27,14 @@ function getActions(role) {
     return [
       { label: "Новые", to: "/master/new", icon: <NewReleasesRoundedIcon /> },
       { label: "Активные", to: "/master/active", icon: <DashboardRoundedIcon /> },
+      { label: "Отзывы", to: "/master/reviews", icon: <ReviewsRoundedIcon /> },
     ];
   }
   if (role === "admin") {
     return [
       { label: "Система", to: "/admin/system", icon: <SettingsRoundedIcon /> },
       { label: "Заявки", to: "/admin/appointments", icon: <ListAltRoundedIcon /> },
+      { label: "Отзывы", to: "/admin/reviews", icon: <ReviewsRoundedIcon /> },
       { label: "Правила", to: "/admin/rules", icon: <GavelRoundedIcon /> },
       { label: "Польз.", to: "/admin/users", icon: <ManageAccountsRoundedIcon /> },
     ];

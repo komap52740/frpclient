@@ -35,6 +35,7 @@ function buildMenu(role) {
     return [
       { label: "Новые заявки", to: "/master/new" },
       { label: "Активные", to: "/master/active" },
+      { label: "Мои отзывы", to: "/master/reviews" },
     ];
   }
   if (role === "admin") {
@@ -42,6 +43,7 @@ function buildMenu(role) {
       { label: "Система", to: "/admin/system" },
       { label: "Заявки", to: "/admin/appointments" },
       { label: "Правила", to: "/admin/rules" },
+      { label: "Отзывы", to: "/admin/reviews" },
       { label: "Пользователи", to: "/admin/users" },
       { label: "Клиенты", to: "/admin/clients" },
       { label: "Мастера", to: "/admin/masters" },

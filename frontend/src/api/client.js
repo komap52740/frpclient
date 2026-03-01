@@ -215,6 +215,9 @@ export const chatApi = {
 };
 
 export const reviewsApi = {
+  my(params = {}) {
+    return api.get("/reviews/my/", { params });
+  },
   reviewMaster(id, payload) {
     return api.post(`/appointments/${id}/review-master/`, payload);
   },
@@ -274,6 +277,9 @@ export const adminApi = {
   },
   rules() {
     return api.get("/v1/admin/rules/");
+  },
+  reviews(params = {}) {
+    return api.get("/admin/reviews/", { params });
   },
   createRule(payload) {
     return api.post("/v1/admin/rules/", payload);

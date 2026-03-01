@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 from django.db import transaction
-from rest_framework import permissions, status
+from rest_framework import generics, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.accounts.models import RoleChoices
-from apps.accounts.permissions import IsAuthenticatedAndNotBanned
+from apps.accounts.permissions import IsAdminRole, IsAuthenticatedAndNotBanned
 from apps.accounts.services import recalculate_client_stats, recalculate_master_stats
 from apps.appointments.access import get_appointment_for_user
 from apps.appointments.models import AppointmentStatusChoices
@@ -94,4 +94,43 @@ class ReviewClientView(APIView):
         )
         recalculate_client_stats(appointment.client)
         return Response(ReviewSerializer(review).data, status=status.HTTP_201_CREATED)
+
+
+class MyReviewsView(generics.ListAPIView):
+    permission_classes = (IsAuthenticatedAndNotBanned,)
+    serializer_class = ReviewSerializer
+
+    def get_queryset(self):
+        return (
+            Review.objects.filter(target=self.request.user)
+            .select_related("appointment", "author", "target")
+            .prefetch_related("behavior_flags")
+            .order_by("-id")
+        )
+
+
+class AdminReviewListView(generics.ListAPIView):
+    permission_classes = (IsAuthenticatedAndNotBanned, IsAdminRole)
+    serializer_class = ReviewSerializer
+
+    def get_queryset(self):
+        queryset = (
+            Review.objects.select_related("appointment", "author", "target")
+            .prefetch_related("behavior_flags")
+            .order_by("-id")
+        )
+
+        review_type = self.request.query_params.get("review_type")
+        if review_type in ReviewTypeChoices.values:
+            queryset = queryset.filter(review_type=review_type)
+
+        target_role = self.request.query_params.get("target_role")
+        if target_role in RoleChoices.values:
+            queryset = queryset.filter(target__role=target_role)
+
+        target_id = self.request.query_params.get("target_id")
+        if target_id and str(target_id).isdigit():
+            queryset = queryset.filter(target_id=int(target_id))
+
+        return queryset
 

@@ -54,6 +54,28 @@ const STATUS_PRIORITY = {
   CANCELLED: 5,
 };
 
+const WAITING_TIPS = {
+  payment: [
+    "Оплатите и сразу загрузите чек — это ускоряет старт работы мастера.",
+    "Если реквизиты не копируются, откройте заявку и скопируйте вручную из блока оплаты.",
+    "После загрузки чека держите чат открытым: мастер может уточнить детали.",
+  ],
+  review: [
+    "Мастер проверяет заявку. Если есть уточнение — напишите одно короткое сообщение в чат.",
+    "Проверьте готовность ПК: питание, интернет и удаленный доступ.",
+    "Чем быстрее ответы в чате, тем быстрее переход к следующему шагу.",
+  ],
+  progress: [
+    "Работа уже идет. Не закрывайте чат, чтобы не пропустить важный вопрос мастера.",
+    "Если связь прервалась, сразу напишите в чат заявки — это фиксируется в истории.",
+    "После завершения проверьте устройство и оставьте отзыв — это помогает качеству сервиса.",
+  ],
+  idle: [
+    "Все ключевые действия по заявке находятся на одном экране.",
+    "Фокус-заявки ниже покажут, где нужно ваше внимание прямо сейчас.",
+  ],
+};
+
 function loadChecklistState() {
   try {
     const parsed = JSON.parse(localStorage.getItem(CHECKLIST_STORAGE_KEY) || "{}");
@@ -88,6 +110,20 @@ function pickPriorityAppointment(items) {
   return sorted[0];
 }
 
+function buildAppointmentLink(appointmentId, focus) {
+  if (!focus) {
+    return `/appointments/${appointmentId}`;
+  }
+  return `/appointments/${appointmentId}?focus=${focus}`;
+}
+
+function formatEtaMinutes(minutes) {
+  if (minutes == null) return "";
+  if (minutes <= 0) return "срок уже наступил";
+  if (minutes < 60) return `~${minutes} мин`;
+  return `~${Math.ceil(minutes / 60)} ч`;
+}
+
 function resolveScenario(appointment) {
   if (!appointment) {
     return {
@@ -96,6 +132,8 @@ function resolveScenario(appointment) {
       ctaLabel: "Создать заявку",
       to: "/client/create",
       tone: "#0d6e9f",
+      eta: "",
+      tips: WAITING_TIPS.idle,
     };
   }
 
@@ -104,28 +142,45 @@ function resolveScenario(appointment) {
       title: `Заявка #${appointment.id}: требуется оплата`,
       helper: "Оплатите и прикрепите чек. Это самый быстрый путь к старту работ.",
       ctaLabel: "Перейти к оплате",
-      to: `/appointments/${appointment.id}`,
+      to: buildAppointmentLink(appointment.id, "payment"),
       tone: "#d1890f",
+      eta: "",
+      tips: WAITING_TIPS.payment,
     };
   }
 
   if (appointment.status === "PAYMENT_PROOF_UPLOADED") {
+    const responseEta = appointment.response_deadline_at
+      ? dayjs(appointment.response_deadline_at).diff(dayjs(), "minute")
+      : null;
     return {
       title: `Заявка #${appointment.id}: чек на проверке`,
       helper: "Проверка обычно занимает 1-5 минут. Если есть вопрос — откройте чат.",
       ctaLabel: "Открыть заявку",
-      to: `/appointments/${appointment.id}`,
+      to: buildAppointmentLink(appointment.id, "chat"),
       tone: "#b8740f",
+      eta: responseEta != null ? `Проверка: ${formatEtaMinutes(responseEta)}` : "Проверка: 1-5 мин",
+      tips: WAITING_TIPS.payment,
     };
   }
 
   if (appointment.status === "IN_PROGRESS" || appointment.status === "IN_REVIEW") {
+    const targetMinutes =
+      appointment.status === "IN_REVIEW"
+        ? appointment.response_deadline_at
+          ? dayjs(appointment.response_deadline_at).diff(dayjs(), "minute")
+          : null
+        : appointment.completion_deadline_at
+          ? dayjs(appointment.completion_deadline_at).diff(dayjs(), "minute")
+          : null;
     return {
       title: `Заявка #${appointment.id}: работа уже идет`,
       helper: "Следите за лентой событий и держите чат открытым для быстрых уточнений.",
       ctaLabel: "Открыть чат и статус",
-      to: `/appointments/${appointment.id}`,
+      to: buildAppointmentLink(appointment.id, "chat"),
       tone: "#0a567c",
+      eta: targetMinutes != null ? `Ожидание: ${formatEtaMinutes(targetMinutes)}` : "",
+      tips: WAITING_TIPS.progress,
     };
   }
 
@@ -134,8 +189,10 @@ function resolveScenario(appointment) {
       title: `Заявка #${appointment.id}: есть новые сообщения`,
       helper: "Ответьте мастеру, чтобы ускорить завершение заявки.",
       ctaLabel: "Перейти к диалогу",
-      to: `/appointments/${appointment.id}`,
+      to: buildAppointmentLink(appointment.id, "chat"),
       tone: "#7b2cbf",
+      eta: "",
+      tips: WAITING_TIPS.review,
     };
   }
 
@@ -143,8 +200,10 @@ function resolveScenario(appointment) {
     title: `Заявка #${appointment.id}: продолжайте по шагам`,
     helper: "Все ключевые действия доступны на странице заявки в одном экране.",
     ctaLabel: "Открыть заявку",
-    to: `/appointments/${appointment.id}`,
+    to: buildAppointmentLink(appointment.id, "timeline"),
     tone: "#0d6e9f",
+    eta: "",
+    tips: WAITING_TIPS.idle,
   };
 }
 
@@ -156,6 +215,7 @@ export default function ClientHomePage() {
   const [loading, setLoading] = useState(false);
   const [attentionOnly, setAttentionOnly] = useState(false);
   const [checklistState, setChecklistState] = useState(() => loadChecklistState());
+  const [tipIndex, setTipIndex] = useState(0);
 
   const loadData = useCallback(async ({ silent = false, withLoading = true } = {}) => {
     if (withLoading) {
@@ -192,6 +252,21 @@ export default function ClientHomePage() {
 
   const prioritizedAppointment = useMemo(() => pickPriorityAppointment(items), [items]);
   const scenario = useMemo(() => resolveScenario(prioritizedAppointment), [prioritizedAppointment]);
+  const activeTip = scenario.tips?.[tipIndex] || "";
+
+  useEffect(() => {
+    setTipIndex(0);
+  }, [scenario.title]);
+
+  useEffect(() => {
+    if (!scenario.tips || scenario.tips.length <= 1) {
+      return undefined;
+    }
+    const timer = setInterval(() => {
+      setTipIndex((prev) => (prev + 1) % scenario.tips.length);
+    }, 5500);
+    return () => clearInterval(timer);
+  }, [scenario.tips]);
 
   const checklistProgress = useMemo(() => {
     const done = CHECKLIST_ITEMS.filter((item) => checklistState[item.key]).length;
@@ -276,6 +351,37 @@ export default function ClientHomePage() {
               <Typography variant="body2" color="text.secondary">
                 {scenario.helper}
               </Typography>
+              {(scenario.eta || activeTip) && (
+                <Stack spacing={1}>
+                  {scenario.eta && (
+                    <Chip
+                      size="small"
+                      label={scenario.eta}
+                      sx={{
+                        alignSelf: "flex-start",
+                        bgcolor: `${scenario.tone}22`,
+                        color: scenario.tone,
+                        fontWeight: 700,
+                      }}
+                    />
+                  )}
+                  {activeTip && (
+                    <Alert
+                      severity="info"
+                      icon={false}
+                      sx={{
+                        py: 0.5,
+                        borderRadius: 2,
+                        border: `1px solid ${scenario.tone}33`,
+                        bgcolor: `${scenario.tone}10`,
+                        color: scenario.tone,
+                      }}
+                    >
+                      {activeTip}
+                    </Alert>
+                  )}
+                </Stack>
+              )}
 
               <Button
                 component={RouterLink}
