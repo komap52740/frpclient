@@ -51,7 +51,7 @@ docker compose -f docker-compose.prod.yml up -d --build
 ```
 
 Порт:
-- `80` frontend + proxy `/api`, `/django-admin`, `/healthz`.
+- `127.0.0.1:8080` frontend + proxy `/api`, `/django-admin`, `/healthz`.
 
 Django admin доступен по пути: `/django-admin/`.
 
@@ -72,14 +72,15 @@ cd /var/www/FRPclient
 git pull --ff-only origin main
 
 # первый запуск
+cp .env.example .env
 cp backend/.env.example backend/.env
-cp frontend/.env.example frontend/.env
+cp frontend/.env.example frontend/.env   # только для dev-сборки frontend
+nano .env
 nano backend/.env
-nano frontend/.env
 
 # production запуск
-# если нужен Telegram login на фронте:
-# export VITE_TELEGRAM_BOT_USERNAME=your_bot_username
+# для Telegram login на фронте:
+# в .env задайте VITE_TELEGRAM_BOT_USERNAME=ClientFRP_bot
 # если нужны Telegram-уведомления мастерам:
 # убедитесь, что в backend/.env задан TELEGRAM_BOT_TOKEN
 docker compose -f docker-compose.prod.yml up -d --build
@@ -95,6 +96,13 @@ docker compose -f docker-compose.prod.yml --profile bot up -d --build telegram-b
 ```bash
 TELEGRAM_BOT_TOKEN=ваш_токен_бота
 TELEGRAM_CLIENT_BOT_FRONTEND_URL=https://client.androidmultitool.ru
+```
+
+В `/.env` (в корне проекта):
+
+```bash
+VITE_TELEGRAM_BOT_USERNAME=ClientFRP_bot
+FRONTEND_PORT_BIND=127.0.0.1:8080:80
 ```
 
 Бот авторизует пользователя по `telegram_id` уже привязанного аккаунта. Сначала зайдите на сайт через Telegram-вход.
@@ -125,9 +133,44 @@ python manage.py run_client_telegram_bot --frontend-url https://client.androidmu
 
 ```bash
 docker compose -f docker-compose.prod.yml ps
-curl -I http://127.0.0.1/healthz
-curl -I http://127.0.0.1/api/health/
+curl -I http://127.0.0.1:8080/
+curl -I http://127.0.0.1:8080/api/health/
 ```
+
+Проверка, что Telegram-бот вшит в фронтовый бандл:
+
+```bash
+ASSET_LOCAL=$(curl -s http://127.0.0.1:8080/ | grep -oE '/assets/index-[^"]+\.js' | head -n1)
+ASSET_DOMAIN=$(curl -ks https://client.androidmultitool.ru/ | grep -oE '/assets/index-[^"]+\.js' | head -n1)
+echo "LOCAL=$ASSET_LOCAL"
+echo "DOMAIN=$ASSET_DOMAIN"
+
+curl -s "http://127.0.0.1:8080${ASSET_LOCAL}" | grep -ao "ClientFRP_bot" | head -n1
+curl -ks "https://client.androidmultitool.ru${ASSET_DOMAIN}" | grep -ao "ClientFRP_bot" | head -n1
+```
+
+Если на домене нет `ClientFRP_bot`, проверьте system nginx (`proxy_pass http://127.0.0.1:8080;`) и выполните:
+
+```bash
+nginx -t && systemctl reload nginx
+```
+
+## Telegram Login: Bot domain invalid
+
+В `@BotFather`:
+
+```text
+/setdomain
+@ClientFRP_bot
+client.androidmultitool.ru
+```
+
+Вводите только домен, без `https://`, `/`, портов и путей.
+
+Если `Bot domain invalid` повторяется:
+- проверьте HTTPS доступность домена;
+- попробуйте root-домен: `androidmultitool.ru`;
+- открывайте страницу логина с домена, который принят BotFather.
 
 ## Полезные команды
 
