@@ -21,6 +21,7 @@ from .serializers import (
     ReadStateSerializer,
 )
 from .services import notify_client_about_chat_message
+from .services import notify_master_about_client_chat_message
 
 
 def apply_master_quick_reply(user, text: str) -> str:
@@ -75,6 +76,7 @@ class AppointmentMessagesView(APIView):
             payload={"appointment_id": appointment.id},
         )
         notify_client_about_chat_message(message)
+        notify_master_about_client_chat_message(message)
         data = MessageSerializer(message, context={"request": request}).data
         return Response(data, status=status.HTTP_201_CREATED)
 

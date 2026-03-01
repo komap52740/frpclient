@@ -18,6 +18,7 @@ from apps.appointments.client_actions import (
 from apps.appointments.models import Appointment
 from apps.appointments.services import initialize_response_deadline
 from apps.chat.models import Message
+from apps.chat.services import notify_master_about_client_chat_message
 from apps.platform.services import create_notification, emit_event
 
 from .models import RoleChoices, User
@@ -505,6 +506,7 @@ class ClientTelegramBot:
                 message="Клиент отправил сообщение через Telegram-бот.",
                 payload={"appointment_id": appointment.id},
             )
+        notify_master_about_client_chat_message(message)
         self.send_message(chat_id, f"Сообщение отправлено в заявку #{appointment.id}.")
 
     def _process_signal(self, *, chat_id: int, user: User, appointment_id: int, signal_code: str, comment: str = "") -> None:

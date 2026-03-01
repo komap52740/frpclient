@@ -50,7 +50,10 @@ def test_bot_text_message_creates_chat_message_for_active_appointment(client_use
     bot = ClientTelegramBot(token="test-token")
     bot.active_appointments[client_user.telegram_id] = appointment.id
 
-    with patch.object(bot, "send_message") as send_mock:
+    with (
+        patch.object(bot, "send_message") as send_mock,
+        patch("apps.accounts.telegram_bot.notify_master_about_client_chat_message", return_value=True) as master_tg_mock,
+    ):
         bot._handle_message(
             {
                 "chat": {"id": client_user.telegram_id},
@@ -66,6 +69,7 @@ def test_bot_text_message_creates_chat_message_for_active_appointment(client_use
     assert notification is not None
     assert notification.payload["appointment_id"] == appointment.id
     assert send_mock.called
+    master_tg_mock.assert_called_once()
 
 
 @pytest.mark.django_db
@@ -77,6 +81,7 @@ def test_bot_document_message_creates_chat_message_with_file(client_user, master
     with (
         patch.object(bot, "_download_telegram_file", return_value=("payment-proof.pdf", b"%PDF-1.7 mock")),
         patch.object(bot, "send_message") as send_mock,
+        patch("apps.accounts.telegram_bot.notify_master_about_client_chat_message", return_value=True) as master_tg_mock,
     ):
         bot._handle_message(
             {
@@ -93,6 +98,7 @@ def test_bot_document_message_creates_chat_message_with_file(client_user, master
     assert message.text == "Чек об оплате"
     assert message.file.name.endswith(".pdf")
     assert send_mock.called
+    master_tg_mock.assert_called_once()
 
 
 @pytest.mark.django_db

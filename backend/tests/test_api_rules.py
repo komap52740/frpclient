@@ -249,6 +249,35 @@ def test_master_message_is_forwarded_to_client_telegram(client_user, master_user
 
 
 @pytest.mark.django_db
+def test_client_message_is_forwarded_to_master_telegram(client_user, master_user):
+    master_user.telegram_id = 987654321
+    master_user.save(update_fields=["telegram_id", "updated_at"])
+
+    appointment = Appointment.objects.create(
+        client=client_user,
+        assigned_master=master_user,
+        brand="Honor",
+        model="X",
+        lock_type="PIN",
+        has_pc=True,
+        description="desc",
+        status=AppointmentStatusChoices.IN_PROGRESS,
+    )
+
+    with patch("apps.chat.services.send_telegram_message", return_value=True) as telegram_mock:
+        response = auth_as(client_user).post(
+            f"/api/appointments/{appointment.id}/messages/",
+            {"text": "Здравствуйте, готов к подключению"},
+            format="json",
+        )
+        assert response.status_code == 201
+        telegram_mock.assert_called()
+        args, _ = telegram_mock.call_args
+        assert args[0] == 987654321
+        assert f"заявке #{appointment.id}".lower() in args[1].lower()
+
+
+@pytest.mark.django_db
 def test_permissions_scope(client_user, client_user_2, master_user, master_user_2):
     appointment = Appointment.objects.create(
         client=client_user,
