@@ -1,5 +1,5 @@
-﻿import { lazy, Suspense } from "react";
-import { Box, CircularProgress, Typography } from "@mui/material";
+﻿import { Component, lazy, Suspense } from "react";
+import { Alert, Box, Button, CircularProgress, Stack, Typography } from "@mui/material";
 import { Navigate, Route, Routes } from "react-router-dom";
 
 import { useAuth } from "./auth/AuthContext";
@@ -40,6 +40,50 @@ function RouteFallback() {
       </Typography>
     </Box>
   );
+}
+
+class RouteErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error) {
+    // Keep console logging for diagnostics in production.
+    // eslint-disable-next-line no-console
+    console.error("Route render/load failed:", error);
+  }
+
+  render() {
+    if (!this.state.hasError) {
+      return this.props.children;
+    }
+
+    return (
+      <Box
+        sx={{
+          minHeight: "55vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          p: 2,
+        }}
+      >
+        <Stack spacing={1.5} sx={{ width: "100%", maxWidth: 540 }}>
+          <Alert severity="error">
+            Не удалось загрузить экран. Обычно это решается обновлением страницы.
+          </Alert>
+          <Button variant="contained" onClick={() => window.location.reload()}>
+            Обновить страницу
+          </Button>
+        </Stack>
+      </Box>
+    );
+  }
 }
 
 function AuthenticatedLayout() {
@@ -160,11 +204,13 @@ export default function App() {
   const { user } = useAuth();
 
   return (
-    <Suspense fallback={<RouteFallback />}>
-      <Routes>
-        <Route path="/login" element={user ? <Navigate to="/" replace /> : <LoginPage />} />
-        <Route path="/*" element={<AuthenticatedLayout />} />
-      </Routes>
-    </Suspense>
+    <RouteErrorBoundary>
+      <Suspense fallback={<RouteFallback />}>
+        <Routes>
+          <Route path="/login" element={user ? <Navigate to="/" replace /> : <LoginPage />} />
+          <Route path="/*" element={<AuthenticatedLayout />} />
+        </Routes>
+      </Suspense>
+    </RouteErrorBoundary>
   );
 }

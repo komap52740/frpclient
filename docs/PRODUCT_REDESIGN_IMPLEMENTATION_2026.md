@@ -567,3 +567,9 @@ No-Go, РµСЃР»Рё:
   - `ChatPanel`: added quick message templates by role, attachment validation, and clearer send-state microcopy.
 - Visual hierarchy of cards improved:
   - `AppointmentCard`: now shows “what to do next” hint and stronger state emphasis for attention-driving actions.
+### 2026-03-01 (Hotfix)
+- Added route-level `ErrorBoundary` in SPA (`frontend/src/App.jsx`) to prevent white-screen failures on lazy route load/runtime errors.
+- Improved frontend nginx cache behavior (`frontend/nginx/default.conf`):
+  - `index.html` now no-cache/no-store
+  - `/assets/*` now immutable cache
+- This reduces post-deploy chunk mismatch issues and gives users a clear reload action instead of a blank page.
