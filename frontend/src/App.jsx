@@ -1,23 +1,46 @@
-﻿import { Navigate, Route, Routes } from "react-router-dom";
+﻿import { lazy, Suspense } from "react";
+import { Box, CircularProgress, Typography } from "@mui/material";
+import { Navigate, Route, Routes } from "react-router-dom";
 
 import { useAuth } from "./auth/AuthContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import RoleHomeRedirect from "./components/RoleHomeRedirect";
 import MainLayout from "./layouts/MainLayout";
-import AdminAppointmentsPage from "./pages/admin/AdminAppointmentsPage";
-import AdminClientsPage from "./pages/admin/AdminClientsPage";
-import AdminMastersPage from "./pages/admin/AdminMastersPage";
-import AdminSystemPage from "./pages/admin/AdminSystemPage";
-import AdminUsersPage from "./pages/admin/AdminUsersPage";
-import AdminRulesPage from "./pages/admin/AdminRulesPage";
-import AppointmentDetailPage from "./pages/AppointmentDetailPage";
-import LoginPage from "./pages/auth/LoginPage";
-import ClientHomePage from "./pages/client/ClientHomePage";
-import ClientProfilePage from "./pages/client/ClientProfilePage";
-import CreateAppointmentPage from "./pages/client/CreateAppointmentPage";
-import MyAppointmentsPage from "./pages/client/MyAppointmentsPage";
-import MasterActivePage from "./pages/master/MasterActivePage";
-import MasterNewPage from "./pages/master/MasterNewPage";
+
+const AdminAppointmentsPage = lazy(() => import("./pages/admin/AdminAppointmentsPage"));
+const AdminClientsPage = lazy(() => import("./pages/admin/AdminClientsPage"));
+const AdminMastersPage = lazy(() => import("./pages/admin/AdminMastersPage"));
+const AdminSystemPage = lazy(() => import("./pages/admin/AdminSystemPage"));
+const AdminUsersPage = lazy(() => import("./pages/admin/AdminUsersPage"));
+const AdminRulesPage = lazy(() => import("./pages/admin/AdminRulesPage"));
+const AppointmentDetailPage = lazy(() => import("./pages/AppointmentDetailPage"));
+const LoginPage = lazy(() => import("./pages/auth/LoginPage"));
+const ClientHomePage = lazy(() => import("./pages/client/ClientHomePage"));
+const ClientProfilePage = lazy(() => import("./pages/client/ClientProfilePage"));
+const CreateAppointmentPage = lazy(() => import("./pages/client/CreateAppointmentPage"));
+const MyAppointmentsPage = lazy(() => import("./pages/client/MyAppointmentsPage"));
+const MasterActivePage = lazy(() => import("./pages/master/MasterActivePage"));
+const MasterNewPage = lazy(() => import("./pages/master/MasterNewPage"));
+
+function RouteFallback() {
+  return (
+    <Box
+      sx={{
+        minHeight: "40vh",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 1.5,
+      }}
+    >
+      <CircularProgress size={28} />
+      <Typography variant="body2" color="text.secondary">
+        Загружаем экран...
+      </Typography>
+    </Box>
+  );
+}
 
 function AuthenticatedLayout() {
   return (
@@ -137,9 +160,11 @@ export default function App() {
   const { user } = useAuth();
 
   return (
-    <Routes>
-      <Route path="/login" element={user ? <Navigate to="/" replace /> : <LoginPage />} />
-      <Route path="/*" element={<AuthenticatedLayout />} />
-    </Routes>
+    <Suspense fallback={<RouteFallback />}>
+      <Routes>
+        <Route path="/login" element={user ? <Navigate to="/" replace /> : <LoginPage />} />
+        <Route path="/*" element={<AuthenticatedLayout />} />
+      </Routes>
+    </Suspense>
   );
 }

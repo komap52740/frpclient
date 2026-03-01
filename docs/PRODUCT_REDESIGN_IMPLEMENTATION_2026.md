@@ -545,3 +545,12 @@ No-Go, РµСЃР»Рё:
   - SLA breach first
   - nearest deadline next
   - unread chat count as priority signal
+### 2026-03-01 (Phase 10, Step 9)
+- Optimized initial frontend loading by switching route pages in `frontend/src/App.jsx` to lazy loading (`React.lazy + Suspense`).
+- Added a shared route fallback state (`Загружаем экран...`) to keep perceived performance stable while chunks are loading.
+- Kept all existing routes and protected-role flows unchanged.
+### 2026-03-01 (Phase 10, Step 10)
+- Added manual vendor chunk strategy in `frontend/vite.config.js`:
+  - `vendor-core`, `vendor-axios`, `vendor-dayjs`.
+- Goal: reduce startup pressure on the main app chunk and improve initial route responsiveness in production.
+- Set `chunkSizeWarningLimit` to `700` to align warning threshold with the new vendor split profile.
