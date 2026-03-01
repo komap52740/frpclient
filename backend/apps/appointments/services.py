@@ -5,6 +5,7 @@ from django.utils import timezone
 from rest_framework.exceptions import PermissionDenied, ValidationError
 
 from apps.accounts.models import RoleChoices, User
+from apps.platform.services import emit_event
 
 from .models import (
     Appointment,
@@ -63,6 +64,16 @@ def transition_status(appointment: Appointment, actor: User, to_status: str, not
         to_status=to_status,
         note=note,
     )
+    emit_event(
+        "appointment.status_changed",
+        appointment,
+        actor=actor,
+        payload={
+            "from_status": from_status,
+            "to_status": to_status,
+            "note": note,
+        },
+    )
     return appointment
 
 
@@ -79,4 +90,11 @@ def take_appointment(appointment_id: int, master: User) -> Appointment:
 
     appointment.assigned_master = master
     appointment.save(update_fields=["assigned_master", "updated_at"])
-    return transition_status(appointment, master, AppointmentStatusChoices.IN_REVIEW, note="Заявка взята мастером")
+    updated_appointment = transition_status(appointment, master, AppointmentStatusChoices.IN_REVIEW, note="Заявка взята мастером")
+    emit_event(
+        "appointment.master_taken",
+        updated_appointment,
+        actor=master,
+        payload={"assigned_master_id": master.id},
+    )
+    return updated_appointment

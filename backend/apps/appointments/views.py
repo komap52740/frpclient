@@ -10,6 +10,7 @@ from apps.accounts.models import RoleChoices
 from apps.accounts.permissions import IsAdminRole
 from apps.accounts.services import recalculate_client_stats
 from apps.appointments.access import get_appointment_for_user
+from apps.platform.services import emit_event
 
 from .models import Appointment, AppointmentEventType, AppointmentStatusChoices
 from .serializers import (
@@ -36,6 +37,12 @@ class AppointmentCreateView(APIView):
         serializer = AppointmentCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         appointment = serializer.save(client=request.user)
+        emit_event(
+            "appointment.created",
+            appointment,
+            actor=request.user,
+            payload={"status": appointment.status},
+        )
         return Response(AppointmentSerializer(appointment, context={"request": request}).data, status=status.HTTP_201_CREATED)
 
 
@@ -86,6 +93,12 @@ class UploadPaymentProofView(APIView):
         serializer.is_valid(raise_exception=True)
         serializer.save()
         add_event(appointment, request.user, AppointmentEventType.PAYMENT_PROOF_UPLOADED)
+        emit_event(
+            "appointment.payment_proof_uploaded",
+            appointment,
+            actor=request.user,
+            payload={"status": appointment.status},
+        )
         return Response(AppointmentSerializer(appointment, context={"request": request}).data)
 
 
@@ -113,6 +126,12 @@ class MarkPaidView(APIView):
             request.user,
             AppointmentEventType.PAYMENT_MARKED,
             metadata={"payment_method": appointment.payment_method},
+        )
+        emit_event(
+            "appointment.payment_marked",
+            appointment,
+            actor=request.user,
+            payload={"payment_method": appointment.payment_method},
         )
         return Response(AppointmentSerializer(appointment, context={"request": request}).data)
 
@@ -195,6 +214,12 @@ class MasterSetPriceView(APIView):
             AppointmentEventType.PRICE_SET,
             metadata={"total_price": appointment.total_price},
         )
+        emit_event(
+            "appointment.price_set",
+            appointment,
+            actor=request.user,
+            payload={"total_price": appointment.total_price},
+        )
         transition_status(appointment, request.user, AppointmentStatusChoices.AWAITING_PAYMENT)
         return Response(AppointmentSerializer(appointment, context={"request": request}).data)
 
@@ -215,6 +240,12 @@ class ConfirmPaymentMixin:
         appointment.save(update_fields=["payment_confirmed_by", "payment_confirmed_at", "updated_at"])
         transition_status(appointment, request.user, AppointmentStatusChoices.PAID)
         add_event(appointment, request.user, AppointmentEventType.PAYMENT_CONFIRMED)
+        emit_event(
+            "appointment.payment_confirmed",
+            appointment,
+            actor=request.user,
+            payload={"confirmed_by": request.user.id},
+        )
         return Response(AppointmentSerializer(appointment, context={"request": request}).data)
 
 
@@ -237,6 +268,12 @@ class MasterStartView(APIView):
             return Response({"detail": "Старт доступен только после PAID"}, status=status.HTTP_400_BAD_REQUEST)
 
         transition_status(appointment, request.user, AppointmentStatusChoices.IN_PROGRESS)
+        emit_event(
+            "appointment.work_started",
+            appointment,
+            actor=request.user,
+            payload={"status": AppointmentStatusChoices.IN_PROGRESS},
+        )
         return Response(AppointmentSerializer(appointment, context={"request": request}).data)
 
 
@@ -252,6 +289,12 @@ class MasterCompleteView(APIView):
             return Response({"detail": "Завершение доступно только в IN_PROGRESS"}, status=status.HTTP_400_BAD_REQUEST)
 
         transition_status(appointment, request.user, AppointmentStatusChoices.COMPLETED)
+        emit_event(
+            "appointment.work_completed",
+            appointment,
+            actor=request.user,
+            payload={"status": AppointmentStatusChoices.COMPLETED},
+        )
         recalculate_client_stats(appointment.client)
         return Response(AppointmentSerializer(appointment, context={"request": request}).data)
 

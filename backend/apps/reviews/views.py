@@ -9,6 +9,7 @@ from apps.accounts.models import RoleChoices
 from apps.accounts.services import recalculate_client_stats
 from apps.appointments.access import get_appointment_for_user
 from apps.appointments.models import AppointmentStatusChoices
+from apps.platform.services import emit_event
 
 from .models import BehaviorFlag, BehaviorFlagCode, Review, ReviewTypeChoices
 from .serializers import ReviewClientCreateSerializer, ReviewMasterCreateSerializer, ReviewSerializer
@@ -42,6 +43,12 @@ class ReviewMasterView(APIView):
             review_type=ReviewTypeChoices.MASTER_REVIEW,
             rating=serializer.validated_data["rating"],
             comment=serializer.validated_data.get("comment", ""),
+        )
+        emit_event(
+            "review.master_created",
+            review,
+            actor=request.user,
+            payload={"appointment_id": appointment.id, "rating": review.rating},
         )
         return Response(ReviewSerializer(review).data, status=status.HTTP_201_CREATED)
 
@@ -77,5 +84,11 @@ class ReviewClientView(APIView):
             flags = list(BehaviorFlag.objects.filter(code__in=flag_codes, is_active=True))
             review.behavior_flags.set(flags)
 
+        emit_event(
+            "review.client_created",
+            review,
+            actor=request.user,
+            payload={"appointment_id": appointment.id, "rating": review.rating, "behavior_flags": flag_codes},
+        )
         recalculate_client_stats(appointment.client)
         return Response(ReviewSerializer(review).data, status=status.HTTP_201_CREATED)

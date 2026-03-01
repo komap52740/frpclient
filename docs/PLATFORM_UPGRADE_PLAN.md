@@ -13,6 +13,11 @@
   - notification APIs and admin feature-flag APIs added under legacy `/api/*`.
   - chat soft-delete harmonized with `deleted_by`.
   - tests added for event emission, feature flag evaluation, notifications unread flow.
+- ✅ Phase 2 complete:
+  - platform events integrated into appointment lifecycle, chat and reviews.
+  - existing appointment timeline endpoint `/api/appointments/{id}/events/` preserved.
+  - admin event inspection endpoint added: `GET /api/v1/events/`.
+  - integration tests added for lifecycle/chat/review event emission.
 
 ## 1. Repo Structure Summary
 

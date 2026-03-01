@@ -10,6 +10,7 @@ from apps.accounts.models import RoleChoices
 from apps.appointments.access import get_appointment_for_user
 from apps.appointments.models import AppointmentEventType
 from apps.appointments.services import add_event
+from apps.platform.services import emit_event
 
 from .models import Message, ReadState
 from .serializers import MessageCreateSerializer, MessageSerializer, ReadStateSerializer
@@ -33,6 +34,12 @@ class AppointmentMessagesView(APIView):
         serializer = MessageCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         message = serializer.save(appointment=appointment, sender=request.user)
+        emit_event(
+            "chat.message_sent",
+            message,
+            actor=request.user,
+            payload={"appointment_id": appointment.id},
+        )
         data = MessageSerializer(message, context={"request": request}).data
         return Response(data, status=status.HTTP_201_CREATED)
 
@@ -59,6 +66,12 @@ class MessageDeleteView(APIView):
             request.user,
             AppointmentEventType.MESSAGE_DELETED,
             note=f"message_id={message.id}",
+        )
+        emit_event(
+            "chat.message_deleted",
+            message,
+            actor=request.user,
+            payload={"appointment_id": appointment.id},
         )
         return Response(status=status.HTTP_204_NO_CONTENT)
 
