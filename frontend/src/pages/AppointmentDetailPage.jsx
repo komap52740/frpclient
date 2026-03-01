@@ -258,6 +258,20 @@ export default function AppointmentDetailPage() {
     intervalMs: 3500,
   });
 
+  const timelineEvents = useMemo(
+    () => (events.length ? events : buildFallbackEvents(appointment)),
+    [events, appointment]
+  );
+
+  const mappedSystemEvents = useMemo(
+    () =>
+      timelineEvents.map((event) => ({
+        ...event,
+        title: getEventTitle(event),
+      })),
+    [timelineEvents]
+  );
+
   const runAction = async (action) => {
     try {
       await action();
@@ -289,17 +303,7 @@ export default function AppointmentDetailPage() {
   const showAdminControls = user.role === "admin";
   const showAdminPaymentConfirm = showAdminControls && appointment.status === "PAYMENT_PROOF_UPLOADED";
 
-  const timelineEvents = events.length ? events : buildFallbackEvents(appointment);
   const statusUi = resolveStatusUI(appointment.status, appointment.sla_breached);
-
-  const mappedSystemEvents = useMemo(
-    () =>
-      timelineEvents.map((event) => ({
-        ...event,
-        title: getEventTitle(event),
-      })),
-    [timelineEvents]
-  );
 
   const handlePrimaryAction = async (actionKey) => {
     if (actionKey === "open_payment") {
