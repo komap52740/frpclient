@@ -374,14 +374,22 @@ export default function AppointmentDetailPage() {
     [events, appointment]
   );
 
-  const mappedSystemEvents = useMemo(
-    () =>
-      timelineEvents.map((event) => ({
-        ...event,
-        title: getEventTitle(event),
-      })),
-    [timelineEvents]
-  );
+  const mappedSystemEvents = useMemo(() => {
+    const normalized = timelineEvents.map((event) => ({
+      ...event,
+      title: getEventTitle(event),
+    }));
+    if (user.role !== "client") {
+      return normalized;
+    }
+    const allowedTypes = new Set([
+      "status_changed",
+      "price_set",
+      "payment_proof_uploaded",
+      "payment_confirmed",
+    ]);
+    return normalized.filter((event) => allowedTypes.has(event.event_type)).slice(-6);
+  }, [timelineEvents, user.role]);
 
   const runAction = async (action) => {
     try {
@@ -443,15 +451,14 @@ export default function AppointmentDetailPage() {
     return <AppointmentDetailSkeleton />;
   }
 
+  const isClient = user.role === "client";
   const isMasterAssigned = user.role === "master" && appointment.assigned_master === user.id;
 
   const showClientPaymentActions =
     user.role === "client" &&
     ["AWAITING_PAYMENT", "PAYMENT_PROOF_UPLOADED"].includes(appointment.status);
   const showClientReview = user.role === "client" && appointment.status === "COMPLETED";
-  const showClientSignals =
-    user.role === "client" &&
-    !["COMPLETED", "CANCELLED", "DECLINED_BY_MASTER"].includes(appointment.status);
+  const showClientSignals = false;
   const showClientRepeat =
     user.role === "client" &&
     ["COMPLETED", "CANCELLED", "DECLINED_BY_MASTER"].includes(appointment.status);
@@ -490,6 +497,7 @@ export default function AppointmentDetailPage() {
     return 0;
   })();
   const lastSyncLabel = dayjs(lastSyncedAt).format("HH:mm:ss");
+  const visibleTimelineEvents = isClient ? timelineEvents.slice(0, 8) : timelineEvents;
 
   const statusUi = resolveStatusUI(appointment.status, appointment.sla_breached);
 
@@ -599,7 +607,7 @@ export default function AppointmentDetailPage() {
             <Typography variant="caption" color="text.secondary">
               {isRefreshing ? "РћР±РЅРѕРІР»СЏРµРј СЃС‚Р°С‚СѓСЃ Рё С‡Р°С‚..." : `РџРѕСЃР»РµРґРЅРµРµ РѕР±РЅРѕРІР»РµРЅРёРµ: ${lastSyncLabel}`}
             </Typography>
-            {user.role === "client" ? (
+            {user.role !== "client" ? (
               <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
                 <Button size="small" variant="text" onClick={() => handlePrimaryAction("open_payment")}>
                   Рљ РѕРїР»Р°С‚Рµ
@@ -639,19 +647,27 @@ export default function AppointmentDetailPage() {
             <Paper sx={{ p: 2.2 }}>
               <Typography variant="h3" sx={{ mb: 1 }}>Р”Р°РЅРЅС‹Рµ Р·Р°СЏРІРєРё</Typography>
               <Stack spacing={0.7}>
-                <Typography variant="body2"><b>Р•СЃС‚СЊ РџРљ:</b> {appointment.has_pc ? "Р”Р°" : "РќРµС‚"}</Typography>
-                <Typography variant="body2"><b>РћРїРёСЃР°РЅРёРµ:</b> {appointment.description || "вЂ”"}</Typography>
-                <Typography variant="body2"><b>РљР»РёРµРЅС‚:</b> {appointment.client_username || appointment.client}</Typography>
-                <Typography variant="body2"><b>РњР°СЃС‚РµСЂ:</b> {appointment.master_username || appointment.assigned_master || "вЂ”"}</Typography>
-                <Typography variant="body2"><b>Р¦РµРЅР°:</b> {appointment.total_price ? `${appointment.total_price} СЂСѓР±.` : "РќРµ РІС‹СЃС‚Р°РІР»РµРЅР°"}</Typography>
+                <Typography variant="body2"><b>Устройство:</b> {appointment.brand} {appointment.model}</Typography>
+                <Typography variant="body2"><b>Тип блокировки:</b> {getLockTypeLabel(appointment.lock_type)}</Typography>
+                <Typography variant="body2"><b>Цена:</b> {appointment.total_price ? `${appointment.total_price} руб.` : "Не выставлена"}</Typography>
+                <Typography variant="body2"><b>Мастер:</b> {appointment.master_username || appointment.assigned_master || "Пока не назначен"}</Typography>
+                {appointment.description ? (
+                  <Typography variant="body2"><b>Комментарий:</b> {appointment.description}</Typography>
+                ) : null}
+                {!isClient ? (
+                  <>
+                    <Typography variant="body2"><b>Есть ПК:</b> {appointment.has_pc ? "Да" : "Нет"}</Typography>
+                    <Typography variant="body2"><b>Клиент:</b> {appointment.client_username || appointment.client}</Typography>
+                  </>
+                ) : null}
                 {appointment.photo_lock_screen_url ? (
                   <Typography variant="body2">
-                    <a href={appointment.photo_lock_screen_url} target="_blank" rel="noreferrer">Р¤РѕС‚Рѕ СЌРєСЂР°РЅР° Р±Р»РѕРєРёСЂРѕРІРєРё</a>
+                    <a href={appointment.photo_lock_screen_url} target="_blank" rel="noreferrer">Фото экрана блокировки</a>
                   </Typography>
                 ) : null}
                 {appointment.payment_proof_url ? (
                   <Typography variant="body2">
-                    <a href={appointment.payment_proof_url} target="_blank" rel="noreferrer">Р§РµРє/СЃРєСЂРёРЅ РѕРїР»Р°С‚С‹</a>
+                    <a href={appointment.payment_proof_url} target="_blank" rel="noreferrer">Чек/скрин оплаты</a>
                   </Typography>
                 ) : null}
               </Stack>
@@ -982,10 +998,14 @@ export default function AppointmentDetailPage() {
                   <Alert severity="warning">SLA РЅР°СЂСѓС€РµРЅ. РњС‹ СѓР¶Рµ СѓРІРµРґРѕРјРёР»Рё Р°РґРјРёРЅРёСЃС‚СЂР°С‚РѕСЂР°.</Alert>
                 ) : null}
 
-                <Divider sx={{ my: 0.7 }} />
-                <Typography variant="caption">Р§С‚Рѕ РґРµР»Р°С‚СЊ РґР°Р»СЊС€Рµ: РѕСЂРёРµРЅС‚РёСЂСѓР№С‚РµСЃСЊ РЅР° С€Р°РіРё СЃРІРµСЂС…Сѓ Рё РёСЃРїРѕР»СЊР·СѓР№С‚Рµ С‡Р°С‚ РґР»СЏ РІСЃРµС… СѓС‚РѕС‡РЅРµРЅРёР№.</Typography>
-                <Typography variant="caption">РћР±С‹С‡РЅРѕ РЅР°Р·РЅР°С‡РµРЅРёРµ РјР°СЃС‚РµСЂР° Р·Р°РЅРёРјР°РµС‚ 5-15 РјРёРЅСѓС‚.</Typography>
-                <Typography variant="caption">Р•СЃР»Рё РЅРµ РїРѕР»СѓС‡Р°РµС‚СЃСЏ вЂ” РЅР°РїРёС€РёС‚Рµ РІ С‡Р°С‚, РјС‹ РїРѕРґРєР»СЋС‡РёРјСЃСЏ.</Typography>
+                {!isClient ? (
+                  <>
+                    <Divider sx={{ my: 0.7 }} />
+                    <Typography variant="caption">Р§С‚Рѕ РґРµР»Р°С‚СЊ РґР°Р»СЊС€Рµ: РѕСЂРёРµРЅС‚РёСЂСѓР№С‚РµСЃСЊ РЅР° С€Р°РіРё СЃРІРµСЂС…Сѓ Рё РёСЃРїРѕР»СЊР·СѓР№С‚Рµ С‡Р°С‚ РґР»СЏ РІСЃРµС… СѓС‚РѕС‡РЅРµРЅРёР№.</Typography>
+                    <Typography variant="caption">РћР±С‹С‡РЅРѕ РЅР°Р·РЅР°С‡РµРЅРёРµ РјР°СЃС‚РµСЂР° Р·Р°РЅРёРјР°РµС‚ 5-15 РјРёРЅСѓС‚.</Typography>
+                    <Typography variant="caption">Р•СЃР»Рё РЅРµ РїРѕР»СѓС‡Р°РµС‚СЃСЏ вЂ” РЅР°РїРёС€РёС‚Рµ РІ С‡Р°С‚, РјС‹ РїРѕРґРєР»СЋС‡РёРјСЃСЏ.</Typography>
+                  </>
+                ) : null}
               </Stack>
             </Paper>
 
@@ -998,22 +1018,27 @@ export default function AppointmentDetailPage() {
                 РћР±РЅРѕРІР»СЏРµС‚СЃСЏ Р°РІС‚РѕРјР°С‚РёС‡РµСЃРєРё РєР°Р¶РґС‹Рµ 3-4 СЃРµРєСѓРЅРґС‹
               </Typography>
 
-              {timelineEvents.length ? (
+              {visibleTimelineEvents.length ? (
                 <Stack spacing={1}>
-                  {timelineEvents.map((event, index) => (
+                  {visibleTimelineEvents.map((event, index) => (
                     <Stack key={event.id} spacing={0.35}>
                       <Typography variant="body2" sx={{ fontWeight: 700 }}>{getEventTitle(event)}</Typography>
                       {event.note ? <Typography variant="caption" color="text.secondary">{event.note}</Typography> : null}
                       <Typography variant="caption" color="text.secondary">
                         {event.actor_username || "РЎРёСЃС‚РµРјР°"} вЂў {dayjs(event.created_at).format("DD.MM.YYYY HH:mm")}
                       </Typography>
-                      {index < timelineEvents.length - 1 ? <Divider /> : null}
+                      {index < visibleTimelineEvents.length - 1 ? <Divider /> : null}
                     </Stack>
                   ))}
                 </Stack>
               ) : (
                 <Typography variant="body2" color="text.secondary">РЎРѕР±С‹С‚РёСЏ РїРѕРєР° РѕС‚СЃСѓС‚СЃС‚РІСѓСЋС‚.</Typography>
               )}
+              {isClient && timelineEvents.length > visibleTimelineEvents.length ? (
+                <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1 }}>
+                  Показаны последние события. Полная история доступна администратору.
+                </Typography>
+              ) : null}
             </Paper>
           </Stack>
         </Grid>

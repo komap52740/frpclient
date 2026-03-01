@@ -74,24 +74,41 @@ export default function MainLayout({ children }) {
 
   return (
     <Box sx={{ minHeight: "100vh" }}>
-      <AppBar position="sticky" color="primary" sx={{ backdropFilter: "blur(8px)" }}>
+      <AppBar
+        position="sticky"
+        color="transparent"
+        elevation={0}
+        sx={{
+          backdropFilter: "blur(18px) saturate(140%)",
+        }}
+      >
         <Toolbar>
           <IconButton color="inherit" edge="start" onClick={() => setOpen(true)} sx={{ mr: 1, display: { xs: "none", md: "inline-flex" } }}>
             <MenuIcon />
           </IconButton>
           <Stack direction="row" spacing={1} alignItems="center" sx={{ flexGrow: 1 }}>
-            <Typography sx={{ fontWeight: 800 }}>FRP Клиент</Typography>
-            <Chip size="small" label={roleLabel} sx={{ bgcolor: "rgba(255,255,255,0.2)", color: "#fff" }} />
+            <Typography sx={{ fontWeight: 800, letterSpacing: "-0.01em" }}>FRP Клиент</Typography>
+            <Chip size="small" label={roleLabel} sx={{ bgcolor: "rgba(0,122,255,0.12)", color: "primary.main" }} />
           </Stack>
           <NotificationBell />
-          <Typography sx={{ mr: 2, display: { xs: "none", sm: "block" } }}>{user?.username}</Typography>
-          <Button color="inherit" onClick={onLogout}>
+          <Typography sx={{ mr: 2, display: { xs: "none", sm: "block" }, color: "text.secondary" }}>{user?.username}</Typography>
+          <Button color="inherit" onClick={onLogout} sx={{ color: "text.primary" }}>
             Выйти
           </Button>
         </Toolbar>
       </AppBar>
 
-      <Drawer open={open} onClose={() => setOpen(false)}>
+      <Drawer
+        open={open}
+        onClose={() => setOpen(false)}
+        PaperProps={{
+          sx: {
+            backdropFilter: "blur(18px) saturate(130%)",
+            backgroundColor: "rgba(255,255,255,0.88)",
+            borderRight: "1px solid rgba(15,23,42,0.08)",
+          },
+        }}
+      >
         <Box sx={{ width: 280 }} role="presentation" onClick={() => setOpen(false)}>
           <Box sx={{ p: 2, borderBottom: "1px solid #eceff1" }}>
             <Typography variant="subtitle2" color="text.secondary">Навигация</Typography>

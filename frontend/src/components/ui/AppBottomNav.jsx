@@ -7,11 +7,7 @@ import NewReleasesRoundedIcon from "@mui/icons-material/NewReleasesRounded";
 import PersonRoundedIcon from "@mui/icons-material/PersonRounded";
 import ReviewsRoundedIcon from "@mui/icons-material/ReviewsRounded";
 import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
-import {
-  BottomNavigation,
-  BottomNavigationAction,
-  Paper,
-} from "@mui/material";
+import { BottomNavigation, BottomNavigationAction, Paper } from "@mui/material";
 import { useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
@@ -63,23 +59,32 @@ export default function AppBottomNav({ role }) {
         right: 8,
         bottom: "calc(env(safe-area-inset-bottom, 0px) + 8px)",
         zIndex: 1300,
-        borderRadius: 3,
-        border: "1px solid #dce6f0",
+        borderRadius: 4,
+        border: "1px solid rgba(15,23,42,0.08)",
+        backgroundColor: "rgba(255,255,255,0.86)",
+        backdropFilter: "blur(16px) saturate(130%)",
         overflow: "hidden",
+        boxShadow: "0 10px 28px rgba(15,23,42,0.12)",
       }}
     >
       <BottomNavigation
         value={selected}
         onChange={(_, value) => navigate(value)}
         showLabels
+        sx={{
+          minHeight: 58,
+          "& .MuiBottomNavigationAction-root": {
+            minWidth: 56,
+            color: "text.secondary",
+          },
+          "& .Mui-selected": {
+            color: "primary.main",
+            fontWeight: 700,
+          },
+        }}
       >
         {actions.map((action) => (
-          <BottomNavigationAction
-            key={action.to}
-            value={action.to}
-            label={action.label}
-            icon={action.icon}
-          />
+          <BottomNavigationAction key={action.to} value={action.to} label={action.label} icon={action.icon} />
         ))}
       </BottomNavigation>
     </Paper>

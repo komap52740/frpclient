@@ -91,8 +91,13 @@ export const appTheme = createTheme({
   components: {
     MuiCssBaseline: {
       styleOverrides: {
+        "*": {
+          WebkitFontSmoothing: "antialiased",
+          MozOsxFontSmoothing: "grayscale",
+        },
         body: {
-          background: "radial-gradient(1300px 620px at 10% -20%, #e4f1fc 0%, #f3f7fb 46%, #f5f9fd 100%)",
+          background:
+            "radial-gradient(1200px 560px at -10% -20%, #e9f3ff 0%, #f5f7fb 40%, #f2f2f7 100%)",
         },
         "#root": {
           minHeight: "100vh",
@@ -125,7 +130,9 @@ export const appTheme = createTheme({
           borderRadius: appTokens.radius.md,
           border: `1px solid ${appTokens.colors.borderSoft}`,
           boxShadow: appTokens.shadows.card,
+          backgroundColor: appTokens.colors.bgElevated,
           backgroundImage: "none",
+          backdropFilter: "blur(18px) saturate(130%)",
         },
       },
     },
@@ -135,6 +142,28 @@ export const appTheme = createTheme({
           borderRadius: appTokens.radius.lg,
           border: `1px solid ${appTokens.colors.borderSoft}`,
           boxShadow: appTokens.shadows.card,
+          backgroundColor: "rgba(255,255,255,0.88)",
+          backdropFilter: "blur(14px) saturate(125%)",
+        },
+      },
+    },
+    MuiAppBar: {
+      styleOverrides: {
+        root: {
+          backgroundColor: "rgba(255,255,255,0.72)",
+          color: appTokens.colors.textMain,
+          borderBottom: `1px solid ${appTokens.colors.borderSoft}`,
+          boxShadow: "0 4px 24px rgba(15, 23, 42, 0.07)",
+          backdropFilter: "blur(18px) saturate(140%)",
+        },
+      },
+    },
+    MuiDialog: {
+      styleOverrides: {
+        paper: {
+          borderRadius: appTokens.radius.lg,
+          backgroundColor: "rgba(255,255,255,0.92)",
+          backdropFilter: "blur(18px) saturate(130%)",
         },
       },
     },

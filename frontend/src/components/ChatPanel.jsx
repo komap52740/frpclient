@@ -123,6 +123,7 @@ export default function ChatPanel({ appointmentId, currentUser, systemEvents = [
   const threadRef = useRef(null);
 
   const isMaster = currentUser.role === "master";
+  const isClient = currentUser.role === "client";
   const quickTemplates = QUICK_TEMPLATES[currentUser.role] || QUICK_TEMPLATES.client;
 
   const quickReplyMap = useMemo(() => {
@@ -396,35 +397,43 @@ export default function ChatPanel({ appointmentId, currentUser, systemEvents = [
   };
 
   return (
-    <Paper sx={{ p: 2.2 }}>
+    <Paper
+      sx={{
+        p: 2.2,
+        borderRadius: 3,
+        background: "linear-gradient(160deg, rgba(255,255,255,0.9) 0%, rgba(250,252,255,0.86) 100%)",
+      }}
+    >
       <Typography variant="h3" sx={{ mb: 1.25 }}>
         Чат по заявке
       </Typography>
 
-      <Stack direction="row" spacing={0.7} flexWrap="wrap" useFlexGap sx={{ mb: 1.1 }}>
-        {quickTemplates.map((template) => (
-          <Chip
-            key={template}
-            label={template}
-            variant="outlined"
-            onClick={() => applyTemplate(template)}
-            sx={{ cursor: "pointer" }}
-          />
-        ))}
+      {!isClient ? (
+        <Stack direction="row" spacing={0.7} flexWrap="wrap" useFlexGap sx={{ mb: 1.1 }}>
+          {quickTemplates.map((template) => (
+            <Chip
+              key={template}
+              label={template}
+              variant="outlined"
+              onClick={() => applyTemplate(template)}
+              sx={{ cursor: "pointer" }}
+            />
+          ))}
 
-        {isMaster
-          ? quickReplies.map((item) => (
-              <Chip
-                key={item.id}
-                label={item.title ? `/${item.command} — ${item.title}` : `/${item.command}`}
-                color="primary"
-                variant="outlined"
-                onClick={() => applyQuickReplyCommand(item.command)}
-                sx={{ cursor: "pointer" }}
-              />
-            ))
-          : null}
-      </Stack>
+          {isMaster
+            ? quickReplies.map((item) => (
+                <Chip
+                  key={item.id}
+                  label={item.title ? `/${item.command} — ${item.title}` : `/${item.command}`}
+                  color="primary"
+                  variant="outlined"
+                  onClick={() => applyQuickReplyCommand(item.command)}
+                  sx={{ cursor: "pointer" }}
+                />
+              ))
+            : null}
+        </Stack>
+      ) : null}
 
       {isMaster ? (
         <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
@@ -485,7 +494,7 @@ export default function ChatPanel({ appointmentId, currentUser, systemEvents = [
               ? "Сообщение готово к отправке. Ctrl+Enter для быстрой отправки"
               : isMaster
                 ? "Можно писать /команда (пример: /1). Ctrl+Enter для быстрой отправки"
-                : "Выберите шаблон или напишите вручную. Ctrl+Enter для быстрой отправки"
+                : "Напишите мастеру коротко и по делу. Ctrl+Enter для быстрой отправки"
           }
         />
         <Stack direction="row" spacing={1} alignItems="center">
