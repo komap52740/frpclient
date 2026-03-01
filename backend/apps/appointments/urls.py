@@ -5,6 +5,7 @@ from .views import (
     AppointmentCreateView,
     AppointmentDetailView,
     AppointmentEventsView,
+    ClientSignalView,
     MarkPaidView,
     MasterActiveAppointmentsView,
     MasterCompleteView,
@@ -15,6 +16,7 @@ from .views import (
     MasterStartView,
     MasterTakeView,
     MyAppointmentsView,
+    RepeatAppointmentView,
     UploadPaymentProofView,
 )
 
@@ -25,6 +27,8 @@ urlpatterns = [
     path("appointments/active/", MasterActiveAppointmentsView.as_view(), name="appointments-active"),
     path("appointments/<int:appointment_id>/", AppointmentDetailView.as_view(), name="appointments-detail"),
     path("appointments/<int:appointment_id>/events/", AppointmentEventsView.as_view(), name="appointments-events"),
+    path("appointments/<int:appointment_id>/client-signal/", ClientSignalView.as_view(), name="appointments-client-signal"),
+    path("appointments/<int:appointment_id>/repeat/", RepeatAppointmentView.as_view(), name="appointments-repeat"),
     path("appointments/<int:appointment_id>/upload-payment-proof/", UploadPaymentProofView.as_view(), name="appointments-upload-payment-proof"),
     path("appointments/<int:appointment_id>/mark-paid/", MarkPaidView.as_view(), name="appointments-mark-paid"),
     path("appointments/<int:appointment_id>/take/", MasterTakeView.as_view(), name="appointments-take"),

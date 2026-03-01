@@ -10,6 +10,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from apps.accounts.models import RoleChoices, User
 from apps.appointments.models import Appointment, AppointmentStatusChoices
 from apps.chat.models import Message
+from apps.platform.models import Notification
 
 
 @pytest.fixture
@@ -384,6 +385,67 @@ def test_appointment_events_endpoint(client_user, master_user):
         {"after_id": "abc"},
     )
     assert bad_after_id_response.status_code == 400
+
+
+@pytest.mark.django_db
+def test_client_signal_creates_event_and_master_notification(client_user, master_user):
+    appointment = Appointment.objects.create(
+        client=client_user,
+        assigned_master=master_user,
+        brand="Google",
+        model="Pixel",
+        lock_type="PIN",
+        has_pc=True,
+        description="desc",
+        status=AppointmentStatusChoices.IN_REVIEW,
+    )
+
+    response = auth_as(client_user).post(
+        f"/api/appointments/{appointment.id}/client-signal/",
+        {"signal": "need_help", "comment": "Не понимаю следующий шаг"},
+        format="json",
+    )
+    assert response.status_code == 200
+    assert response.data["ok"] is True
+
+    events_response = auth_as(client_user).get(f"/api/appointments/{appointment.id}/events/")
+    assert events_response.status_code == 200
+    assert any(item["event_type"] == "client_signal" for item in events_response.data)
+
+    note = events_response.data[0]["note"]
+    assert "Клиент просит помощь" in note
+
+    notification = Notification.objects.filter(user=master_user).order_by("-id").first()
+    assert notification is not None
+    assert notification.payload["appointment_id"] == appointment.id
+    assert notification.payload["signal"] == "need_help"
+
+
+@pytest.mark.django_db
+def test_client_can_repeat_appointment(client_user):
+    source = Appointment.objects.create(
+        client=client_user,
+        brand="Samsung",
+        model="A50",
+        lock_type="PIN",
+        has_pc=True,
+        description="Повторная диагностика",
+        status=AppointmentStatusChoices.COMPLETED,
+    )
+
+    with patch("apps.appointments.views.notify_masters_about_new_appointment") as notify_mock:
+        response = auth_as(client_user).post(f"/api/appointments/{source.id}/repeat/")
+        assert response.status_code == 201
+        notify_mock.assert_called_once()
+
+    repeated_id = response.data["id"]
+    assert repeated_id != source.id
+    repeated = Appointment.objects.get(id=repeated_id)
+    assert repeated.client_id == client_user.id
+    assert repeated.brand == source.brand
+    assert repeated.model == source.model
+    assert repeated.lock_type == source.lock_type
+    assert repeated.status == AppointmentStatusChoices.NEW
 
 
 @pytest.mark.django_db

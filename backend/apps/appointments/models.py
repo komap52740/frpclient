@@ -128,6 +128,7 @@ class AppointmentEventType(models.TextChoices):
     PAYMENT_MARKED = "payment_marked", "Payment marked"
     PAYMENT_CONFIRMED = "payment_confirmed", "Payment confirmed"
     MESSAGE_DELETED = "message_deleted", "Message deleted"
+    CLIENT_SIGNAL = "client_signal", "Client signal"
 
 
 class AppointmentEvent(TimeStampedModel):

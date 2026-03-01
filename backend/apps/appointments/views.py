@@ -11,12 +11,13 @@ from apps.accounts.notifications import notify_masters_about_new_appointment
 from apps.accounts.permissions import IsAdminRole
 from apps.accounts.services import recalculate_client_stats
 from apps.appointments.access import get_appointment_for_user
-from apps.platform.services import emit_event
+from apps.platform.services import create_notification, emit_event
 
 from .models import Appointment, AppointmentEventType, AppointmentStatusChoices
 from .serializers import (
     AdminManualStatusSerializer,
     AppointmentCreateSerializer,
+    ClientSignalSerializer,
     AppointmentEventSerializer,
     AppointmentSerializer,
     MarkPaidSerializer,
@@ -30,6 +31,33 @@ from .services import (
     take_appointment,
     transition_status,
 )
+
+CLIENT_SIGNAL_META = {
+    "ready_for_session": {
+        "title": "Клиент готов к подключению",
+        "message": "Клиент подтвердил готовность к удаленному подключению.",
+    },
+    "need_help": {
+        "title": "Клиент просит помощь",
+        "message": "Клиент просит пошаговую помощь по текущей заявке.",
+    },
+    "payment_issue": {
+        "title": "Проблема с оплатой",
+        "message": "Клиент сообщил о проблеме с оплатой и ожидает подсказку.",
+    },
+    "need_reschedule": {
+        "title": "Нужно перенести сессию",
+        "message": "Клиент просит перенести время подключения.",
+    },
+}
+
+
+def can_client_signal(appointment: Appointment) -> bool:
+    return appointment.status not in (
+        AppointmentStatusChoices.COMPLETED,
+        AppointmentStatusChoices.CANCELLED,
+        AppointmentStatusChoices.DECLINED_BY_MASTER,
+    )
 
 
 class AppointmentCreateView(APIView):
@@ -152,6 +180,96 @@ class MarkPaidView(APIView):
             payload={"payment_method": appointment.payment_method},
         )
         return Response(AppointmentSerializer(appointment, context={"request": request}).data)
+
+
+class ClientSignalView(APIView):
+    permission_classes = (permissions.IsAuthenticated,)
+
+    def post(self, request, appointment_id: int):
+        appointment = get_appointment_for_user(request.user, appointment_id)
+        if request.user.role != RoleChoices.CLIENT or appointment.client_id != request.user.id:
+            return Response({"detail": "Только клиент заявки"}, status=status.HTTP_403_FORBIDDEN)
+        if not can_client_signal(appointment):
+            return Response({"detail": "Сигналы недоступны для текущего статуса"}, status=status.HTTP_400_BAD_REQUEST)
+
+        serializer = ClientSignalSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        signal_code = serializer.validated_data["signal"]
+        signal_meta = CLIENT_SIGNAL_META[signal_code]
+        comment = serializer.validated_data.get("comment", "").strip()
+
+        note = signal_meta["title"]
+        if comment:
+            note = f"{note}. Комментарий: {comment}"
+
+        add_event(
+            appointment,
+            request.user,
+            AppointmentEventType.CLIENT_SIGNAL,
+            note=note,
+            metadata={"signal": signal_code, "comment": comment},
+        )
+        emit_event(
+            "appointment.client_signal",
+            appointment,
+            actor=request.user,
+            payload={"signal": signal_code, "comment": comment},
+        )
+
+        if appointment.assigned_master_id:
+            create_notification(
+                user=appointment.assigned_master,
+                type="appointment",
+                title=f"Сигнал по заявке #{appointment.id}",
+                message=signal_meta["message"],
+                payload={"appointment_id": appointment.id, "signal": signal_code},
+            )
+
+        return Response(
+            {
+                "ok": True,
+                "detail": "Сигнал отправлен мастеру",
+                "signal": signal_code,
+            }
+        )
+
+
+class RepeatAppointmentView(APIView):
+    permission_classes = (permissions.IsAuthenticated,)
+
+    def post(self, request, appointment_id: int):
+        source = get_appointment_for_user(request.user, appointment_id)
+        if request.user.role != RoleChoices.CLIENT or source.client_id != request.user.id:
+            return Response({"detail": "Только клиент заявки"}, status=status.HTTP_403_FORBIDDEN)
+        if request.user.is_banned:
+            return Response({"detail": "Клиент забанен"}, status=status.HTTP_403_FORBIDDEN)
+
+        repeated = Appointment.objects.create(
+            client=request.user,
+            brand=source.brand,
+            model=source.model,
+            lock_type=source.lock_type,
+            has_pc=source.has_pc,
+            description=source.description,
+        )
+        initialize_response_deadline(repeated)
+        emit_event(
+            "appointment.created",
+            repeated,
+            actor=request.user,
+            payload={
+                "status": repeated.status,
+                "source_appointment_id": source.id,
+                "created_via": "repeat",
+            },
+        )
+        notify_masters_about_new_appointment(repeated)
+
+        return Response(
+            AppointmentSerializer(repeated, context={"request": request}).data,
+            status=status.HTTP_201_CREATED,
+        )
 
 
 class MasterNewAppointmentsView(APIView):

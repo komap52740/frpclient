@@ -152,6 +152,18 @@ class MarkPaidSerializer(serializers.Serializer):
     payment_method = serializers.ChoiceField(choices=PaymentMethodChoices.choices)
 
 
+class ClientSignalSerializer(serializers.Serializer):
+    signal = serializers.ChoiceField(
+        choices=[
+            ("ready_for_session", "Готов к подключению"),
+            ("need_help", "Нужна помощь"),
+            ("payment_issue", "Проблема с оплатой"),
+            ("need_reschedule", "Нужно перенести сессию"),
+        ]
+    )
+    comment = serializers.CharField(required=False, allow_blank=True, max_length=500)
+
+
 class AppointmentEventSerializer(serializers.ModelSerializer):
     actor_username = serializers.CharField(source="actor.username", read_only=True)
 

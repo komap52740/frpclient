@@ -1,4 +1,5 @@
-﻿import RefreshIcon from "@mui/icons-material/Refresh";
+import ReplayRoundedIcon from "@mui/icons-material/ReplayRounded";
+import RefreshIcon from "@mui/icons-material/Refresh";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import {
   Alert,
@@ -153,6 +154,15 @@ export default function MyAppointmentsPage() {
     return sortItems(base, sortValue);
   }, [activeFilter, items, onlyUnread, search, sortValue]);
 
+  const repeatAppointment = async (appointmentId) => {
+    try {
+      const response = await appointmentsApi.repeat(appointmentId);
+      navigate(`/appointments/${response.data.id}`);
+    } catch {
+      setError("Не удалось создать повторную заявку");
+    }
+  };
+
   return (
     <Stack spacing={2}>
       <Stack
@@ -236,7 +246,19 @@ export default function MyAppointmentsPage() {
       ) : filteredItems.length ? (
         <Stack spacing={1.25}>
           {filteredItems.map((item) => (
-            <AppointmentCard key={item.id} item={item} role="client" linkTo={`/appointments/${item.id}`} />
+            <Stack key={item.id} spacing={0.7}>
+              <AppointmentCard item={item} role="client" linkTo={`/appointments/${item.id}`} />
+              {["COMPLETED", "DECLINED_BY_MASTER", "CANCELLED"].includes(item.status) ? (
+                <Button
+                  variant="text"
+                  startIcon={<ReplayRoundedIcon fontSize="small" />}
+                  onClick={() => repeatAppointment(item.id)}
+                  sx={{ alignSelf: "flex-start" }}
+                >
+                  Создать похожую заявку
+                </Button>
+              ) : null}
+            </Stack>
           ))}
         </Stack>
       ) : (

@@ -132,8 +132,14 @@ export const appointmentsApi = {
   detail(id) {
     return api.get(`/appointments/${id}/`);
   },
+  repeat(id) {
+    return api.post(`/appointments/${id}/repeat/`);
+  },
   events(id, params = {}) {
     return api.get(`/appointments/${id}/events/`, { params });
+  },
+  clientSignal(id, payload) {
+    return api.post(`/appointments/${id}/client-signal/`, payload);
   },
   newList() {
     return api.get("/appointments/new/");

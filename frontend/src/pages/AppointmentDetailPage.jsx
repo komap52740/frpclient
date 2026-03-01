@@ -1,4 +1,7 @@
-﻿import ShieldRoundedIcon from "@mui/icons-material/ShieldRounded";
+import CampaignRoundedIcon from "@mui/icons-material/CampaignRounded";
+import ContentCopyRoundedIcon from "@mui/icons-material/ContentCopyRounded";
+import ReplayRoundedIcon from "@mui/icons-material/ReplayRounded";
+import ShieldRoundedIcon from "@mui/icons-material/ShieldRounded";
 import TimelineRoundedIcon from "@mui/icons-material/TimelineRounded";
 import {
   Alert,
@@ -16,7 +19,7 @@ import {
 import dayjs from "dayjs";
 import "dayjs/locale/ru";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 
 import { adminApi, appointmentsApi, reviewsApi } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
@@ -45,6 +48,29 @@ const behaviorFlags = [
   { code: "well_prepared", label: "Подготовлен заранее" },
 ];
 
+const CLIENT_SIGNAL_OPTIONS = [
+  {
+    value: "ready_for_session",
+    label: "Готов к подключению",
+    helper: "Сообщить мастеру, что ПК и интернет уже готовы.",
+  },
+  {
+    value: "need_help",
+    label: "Нужна помощь по шагам",
+    helper: "Если не получается пройти шаги самостоятельно.",
+  },
+  {
+    value: "payment_issue",
+    label: "Проблема с оплатой",
+    helper: "Если оплата не проходит или есть вопрос по реквизитам.",
+  },
+  {
+    value: "need_reschedule",
+    label: "Нужно перенести сессию",
+    helper: "Если подключение нужно на другое время.",
+  },
+];
+
 const EVENT_LABELS = {
   status_changed: "Смена статуса",
   price_set: "Назначена цена",
@@ -52,9 +78,14 @@ const EVENT_LABELS = {
   payment_marked: "Клиент отметил оплату",
   payment_confirmed: "Оплата подтверждена",
   message_deleted: "Удалено сообщение",
+  client_signal: "Сигнал клиента",
 };
 
 function getEventTitle(event) {
+  if (event.event_type === "client_signal") {
+    const signalLabel = CLIENT_SIGNAL_OPTIONS.find((option) => option.value === event.metadata?.signal)?.label;
+    return signalLabel ? `${EVENT_LABELS.client_signal}: ${signalLabel}` : EVENT_LABELS.client_signal;
+  }
   if (event.event_type === "status_changed") {
     if (event.from_status && event.to_status) {
       return `${EVENT_LABELS.status_changed}: ${getStatusLabel(event.from_status)} -> ${getStatusLabel(event.to_status)}`;
@@ -149,6 +180,7 @@ function getLatestEventId(eventItems = []) {
 }
 
 export default function AppointmentDetailPage() {
+  const navigate = useNavigate();
   const { id } = useParams();
   const { user, paymentSettings } = useAuth();
 
@@ -168,6 +200,8 @@ export default function AppointmentDetailPage() {
 
   const [manualStatus, setManualStatus] = useState("NEW");
   const [manualNote, setManualNote] = useState("");
+  const [clientSignal, setClientSignal] = useState("need_help");
+  const [clientSignalComment, setClientSignalComment] = useState("");
 
   const paymentRef = useRef(null);
   const chatRef = useRef(null);
@@ -278,9 +312,50 @@ export default function AppointmentDetailPage() {
       await loadData({ preserveDrafts: true, silent: true });
       setSuccess("Действие выполнено");
       setError("");
+      return true;
     } catch (err) {
       setSuccess("");
       setError(err.response?.data?.detail || "Ошибка выполнения действия");
+      return false;
+    }
+  };
+
+  const sendClientSignal = async () => {
+    const selectedSignal = CLIENT_SIGNAL_OPTIONS.find((option) => option.value === clientSignal);
+    const ok = await runAction(async () => {
+      await appointmentsApi.clientSignal(id, {
+        signal: clientSignal,
+        comment: clientSignalComment.trim(),
+      });
+    });
+    if (ok) {
+      setClientSignalComment("");
+    }
+    if (ok && selectedSignal) {
+      setSuccess(`Сигнал отправлен: ${selectedSignal.label}`);
+    }
+  };
+
+  const repeatAppointment = async () => {
+    try {
+      const response = await appointmentsApi.repeat(id);
+      navigate(`/appointments/${response.data.id}`);
+    } catch (err) {
+      setError(err.response?.data?.detail || "Не удалось создать повторную заявку");
+    }
+  };
+
+  const copyToClipboard = async (value) => {
+    const text = (value || "").trim();
+    if (!text) {
+      setError("Реквизиты пока не заполнены администратором");
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(text);
+      setSuccess("Скопировано в буфер обмена");
+    } catch {
+      setError("Не удалось скопировать автоматически. Скопируйте текст вручную.");
     }
   };
 
@@ -292,6 +367,12 @@ export default function AppointmentDetailPage() {
 
   const showClientPaymentActions = user.role === "client" && appointment.status === "AWAITING_PAYMENT";
   const showClientReview = user.role === "client" && appointment.status === "COMPLETED";
+  const showClientSignals =
+    user.role === "client" &&
+    !["COMPLETED", "CANCELLED", "DECLINED_BY_MASTER"].includes(appointment.status);
+  const showClientRepeat =
+    user.role === "client" &&
+    ["COMPLETED", "CANCELLED", "DECLINED_BY_MASTER"].includes(appointment.status);
 
   const showMasterTake = user.role === "master" && appointment.status === "NEW";
   const showMasterReviewAndPrice = isMasterAssigned && appointment.status === "IN_REVIEW";
@@ -319,7 +400,7 @@ export default function AppointmentDetailPage() {
       return;
     }
     if (actionKey === "create_new") {
-      window.location.href = "/client/create";
+      navigate("/client/create");
       return;
     }
 
@@ -482,6 +563,24 @@ export default function AppointmentDetailPage() {
                   <Typography variant="body2" color="text.secondary">
                     {paymentSettings?.instructions || "Если не получается — напишите в чат."}
                   </Typography>
+                  <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+                    <Button
+                      variant="text"
+                      size="small"
+                      startIcon={<ContentCopyRoundedIcon fontSize="small" />}
+                      onClick={() => copyToClipboard(paymentSettings?.bank_requisites)}
+                    >
+                      Скопировать реквизиты банка
+                    </Button>
+                    <Button
+                      variant="text"
+                      size="small"
+                      startIcon={<ContentCopyRoundedIcon fontSize="small" />}
+                      onClick={() => copyToClipboard(paymentSettings?.crypto_requisites)}
+                    >
+                      Скопировать реквизиты крипто
+                    </Button>
+                  </Stack>
                 </Stack>
 
                 <Stack spacing={1}>
@@ -512,6 +611,66 @@ export default function AppointmentDetailPage() {
 
                   <Button variant="outlined" onClick={() => runAction(() => appointmentsApi.markPaid(id, paymentMethod))}>
                     Я оплатил
+                  </Button>
+                </Stack>
+              </Paper>
+            ) : null}
+
+            {showClientSignals ? (
+              <Paper sx={{ p: 2.2 }}>
+                <Stack spacing={1.1}>
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <CampaignRoundedIcon color="primary" fontSize="small" />
+                    <Typography variant="h3">Быстрый сигнал мастеру</Typography>
+                  </Stack>
+                  <Typography variant="body2" color="text.secondary">
+                    Один клик, чтобы мастер понял ваш текущий контекст. Это ускоряет ответ и снижает паузы.
+                  </Typography>
+
+                  <TextField
+                    select
+                    label="Что сейчас важно"
+                    value={clientSignal}
+                    onChange={(event) => setClientSignal(event.target.value)}
+                    helperText={CLIENT_SIGNAL_OPTIONS.find((option) => option.value === clientSignal)?.helper || ""}
+                  >
+                    {CLIENT_SIGNAL_OPTIONS.map((option) => (
+                      <MenuItem key={option.value} value={option.value}>
+                        {option.label}
+                      </MenuItem>
+                    ))}
+                  </TextField>
+
+                  <TextField
+                    label="Комментарий (опционально)"
+                    placeholder="Например: код ошибки, удобное время, что уже попробовали"
+                    multiline
+                    minRows={2}
+                    value={clientSignalComment}
+                    onChange={(event) => setClientSignalComment(event.target.value)}
+                  />
+
+                  <Button variant="outlined" onClick={sendClientSignal}>
+                    Отправить сигнал
+                  </Button>
+                </Stack>
+              </Paper>
+            ) : null}
+
+            {showClientRepeat ? (
+              <Paper sx={{ p: 2.2 }}>
+                <Stack spacing={1}>
+                  <Typography variant="h3">Нужна похожая заявка?</Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Создадим новую заявку с теми же параметрами устройства. Останется только уточнить детали.
+                  </Typography>
+                  <Button
+                    variant="outlined"
+                    startIcon={<ReplayRoundedIcon />}
+                    onClick={repeatAppointment}
+                    sx={{ alignSelf: "flex-start" }}
+                  >
+                    Повторить заявку
                   </Button>
                 </Stack>
               </Paper>
