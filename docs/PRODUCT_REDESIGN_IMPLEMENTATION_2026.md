@@ -491,3 +491,10 @@ No-Go, РµСЃР»Рё:
 - Kept app compatibility by using `frontend/src/theme/` as the canonical theme import path.
 - Validated by production build:
   - `cd frontend && npm run build` (passed).
+### 2026-03-01 (Phase 10, Step 2)
+- Added shared UI components:
+  - `frontend/src/components/ui/StatusStepper.jsx`
+  - `frontend/src/components/ui/PrimaryCTA.jsx`
+  - `frontend/src/components/ui/AppointmentCard.jsx`
+- Updated list pages (`client` + `master`) to use the new appointment card presentation with compact status progress.
+- Unified status labels with theme status mapping in `frontend/src/constants/labels.js`.

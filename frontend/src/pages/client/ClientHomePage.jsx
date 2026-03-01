@@ -88,7 +88,7 @@ export default function ClientHomePage() {
         {latestAppointments.length ? (
           <Stack spacing={1.25}>
             {latestAppointments.map((item) => (
-              <AppointmentCard key={item.id} item={item} linkTo={`/appointments/${item.id}`} />
+              <AppointmentCard key={item.id} item={item} role="client" linkTo={`/appointments/${item.id}`} />
             ))}
           </Stack>
         ) : (

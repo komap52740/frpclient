@@ -1,4 +1,6 @@
-﻿export const APPOINTMENT_STATUS_OPTIONS = [
+﻿import { STATUS_UI } from "../theme/status";
+
+export const APPOINTMENT_STATUS_OPTIONS = [
   "NEW",
   "IN_REVIEW",
   "AWAITING_PAYMENT",
@@ -10,17 +12,10 @@
   "CANCELLED",
 ];
 
-export const STATUS_LABELS = {
-  NEW: "Новая",
-  IN_REVIEW: "На проверке",
-  AWAITING_PAYMENT: "Ожидает оплату",
-  PAYMENT_PROOF_UPLOADED: "Чек загружен",
-  PAID: "Оплачено",
-  IN_PROGRESS: "В работе",
-  COMPLETED: "Завершено",
-  DECLINED_BY_MASTER: "Отклонено мастером",
-  CANCELLED: "Отменено",
-};
+export const STATUS_LABELS = APPOINTMENT_STATUS_OPTIONS.reduce((acc, status) => {
+  acc[status] = STATUS_UI[status]?.label || status;
+  return acc;
+}, {});
 
 export const LOCK_TYPE_LABELS = {
   PIN: "PIN-код",
@@ -41,8 +36,19 @@ export const CLIENT_LEVEL_LABELS = {
   problematic: "Проблемный",
 };
 
+export const RISK_LEVEL_LABELS = {
+  low: "Низкий риск",
+  medium: "Средний риск",
+  high: "Высокий риск",
+  critical: "Критический риск",
+};
+
 export function getStatusLabel(status) {
   return STATUS_LABELS[status] || status || "-";
+}
+
+export function getStatusHint(status) {
+  return STATUS_UI[status]?.hint || "";
 }
 
 export function getLockTypeLabel(lockType) {
@@ -55,4 +61,8 @@ export function getPaymentMethodLabel(paymentMethod) {
 
 export function getClientLevelLabel(level) {
   return CLIENT_LEVEL_LABELS[level] || level || "-";
+}
+
+export function getRiskLevelLabel(level) {
+  return RISK_LEVEL_LABELS[level] || level || "-";
 }

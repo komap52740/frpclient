@@ -75,7 +75,7 @@ export default function MasterNewPage() {
       {items.length ? (
         <Stack spacing={1.25}>
           {items.map((item) => (
-            <AppointmentCard key={item.id} item={item} linkTo={`/appointments/${item.id}`} />
+            <AppointmentCard key={item.id} item={item} role="master" linkTo={`/appointments/${item.id}`} />
           ))}
         </Stack>
       ) : (
