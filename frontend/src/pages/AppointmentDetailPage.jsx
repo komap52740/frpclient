@@ -45,46 +45,46 @@ import { resolveStatusUI } from "../theme/status";
 dayjs.locale("ru");
 
 const behaviorFlags = [
-  { code: "bad_internet", label: "РџСЂРѕР±Р»РµРјРЅС‹Р№ РёРЅС‚РµСЂРЅРµС‚" },
-  { code: "weak_pc", label: "РЎР»Р°Р±С‹Р№ РџРљ" },
-  { code: "difficult_client", label: "РЎР»РѕР¶РЅС‹Р№ РєР»РёРµРЅС‚" },
-  { code: "did_not_follow_instructions", label: "РќРµ СЃР»РµРґРѕРІР°Р» РёРЅСЃС‚СЂСѓРєС†РёСЏРј" },
-  { code: "late_to_session", label: "РћРїРѕР·РґР°Р» Рє РїРѕРґРєР»СЋС‡РµРЅРёСЋ" },
-  { code: "good_connection", label: "РћС‚Р»РёС‡РЅР°СЏ СЃРІСЏР·СЊ" },
-  { code: "well_prepared", label: "РџРѕРґРіРѕС‚РѕРІР»РµРЅ Р·Р°СЂР°РЅРµРµ" },
+  { code: "bad_internet", label: "Проблемный интернет" },
+  { code: "weak_pc", label: "Слабый ПК" },
+  { code: "difficult_client", label: "Сложный клиент" },
+  { code: "did_not_follow_instructions", label: "Не следовал инструкциям" },
+  { code: "late_to_session", label: "Опоздал к подключению" },
+  { code: "good_connection", label: "Отличная связь" },
+  { code: "well_prepared", label: "Подготовлен заранее" },
 ];
 
 const CLIENT_SIGNAL_OPTIONS = [
   {
     value: "ready_for_session",
-    label: "Р“РѕС‚РѕРІ Рє РїРѕРґРєР»СЋС‡РµРЅРёСЋ",
-    helper: "РЎРѕРѕР±С‰РёС‚СЊ РјР°СЃС‚РµСЂСѓ, С‡С‚Рѕ РџРљ Рё РёРЅС‚РµСЂРЅРµС‚ СѓР¶Рµ РіРѕС‚РѕРІС‹.",
+    label: "Готов к подключению",
+    helper: "Сообщить мастеру, что ПК и интернет уже готовы.",
   },
   {
     value: "need_help",
-    label: "РќСѓР¶РЅР° РїРѕРјРѕС‰СЊ РїРѕ С€Р°РіР°Рј",
-    helper: "Р•СЃР»Рё РЅРµ РїРѕР»СѓС‡Р°РµС‚СЃСЏ РїСЂРѕР№С‚Рё С€Р°РіРё СЃР°РјРѕСЃС‚РѕСЏС‚РµР»СЊРЅРѕ.",
+    label: "Нужна помощь по шагам",
+    helper: "Если не получается пройти шаги самостоятельно.",
   },
   {
     value: "payment_issue",
-    label: "РџСЂРѕР±Р»РµРјР° СЃ РѕРїР»Р°С‚РѕР№",
-    helper: "Р•СЃР»Рё РѕРїР»Р°С‚Р° РЅРµ РїСЂРѕС…РѕРґРёС‚ РёР»Рё РµСЃС‚СЊ РІРѕРїСЂРѕСЃ РїРѕ СЂРµРєРІРёР·РёС‚Р°Рј.",
+    label: "Проблема с оплатой",
+    helper: "Если оплата не проходит или есть вопрос по реквизитам.",
   },
   {
     value: "need_reschedule",
-    label: "РќСѓР¶РЅРѕ РїРµСЂРµРЅРµСЃС‚Рё СЃРµСЃСЃРёСЋ",
-    helper: "Р•СЃР»Рё РїРѕРґРєР»СЋС‡РµРЅРёРµ РЅСѓР¶РЅРѕ РЅР° РґСЂСѓРіРѕРµ РІСЂРµРјСЏ.",
+    label: "Нужно перенести сессию",
+    helper: "Если подключение нужно на другое время.",
   },
 ];
 
 const EVENT_LABELS = {
-  status_changed: "РЎРјРµРЅР° СЃС‚Р°С‚СѓСЃР°",
-  price_set: "РќР°Р·РЅР°С‡РµРЅР° С†РµРЅР°",
-  payment_proof_uploaded: "Р—Р°РіСЂСѓР¶РµРЅ С‡РµРє",
-  payment_marked: "РљР»РёРµРЅС‚ РѕС‚РјРµС‚РёР» РѕРїР»Р°С‚Сѓ",
-  payment_confirmed: "РћРїР»Р°С‚Р° РїРѕРґС‚РІРµСЂР¶РґРµРЅР°",
-  message_deleted: "РЈРґР°Р»РµРЅРѕ СЃРѕРѕР±С‰РµРЅРёРµ",
-  client_signal: "РЎРёРіРЅР°Р» РєР»РёРµРЅС‚Р°",
+  status_changed: "Смена статуса",
+  price_set: "Назначена цена",
+  payment_proof_uploaded: "Загружен чек",
+  payment_marked: "Клиент отметил оплату",
+  payment_confirmed: "Оплата подтверждена",
+  message_deleted: "Удалено сообщение",
+  client_signal: "Сигнал клиента",
 };
 
 function getEventTitle(event) {
@@ -132,13 +132,13 @@ function buildFallbackEvents(appointment) {
   push("status_changed", appointment.created_at, {
     to_status: "NEW",
     actor: appointment.client || null,
-    actor_username: appointment.client_username || "РљР»РёРµРЅС‚",
-    note: "Р—Р°СЏРІРєР° СЃРѕР·РґР°РЅР°",
+    actor_username: appointment.client_username || "Клиент",
+    note: "Заявка создана",
   });
   push("status_changed", appointment.taken_at, {
     from_status: "NEW",
     to_status: "IN_REVIEW",
-    note: "Р—Р°СЏРІРєР° РІР·СЏС‚Р° РјР°СЃС‚РµСЂРѕРј",
+    note: "Заявка взята мастером",
   });
   push("price_set", appointment.updated_at, {
     note: appointment.total_price ? `total_price=${appointment.total_price}` : "",
@@ -150,7 +150,7 @@ function buildFallbackEvents(appointment) {
   push("status_changed", appointment.completed_at, { to_status: "COMPLETED" });
   push("status_changed", appointment.updated_at, {
     to_status: appointment.status || "",
-    note: "РўРµРєСѓС‰РµРµ СЃРѕСЃС‚РѕСЏРЅРёРµ Р·Р°СЏРІРєРё",
+    note: "Текущее состояние заявки",
   });
 
   return events
@@ -165,15 +165,15 @@ function buildFallbackEvents(appointment) {
 
 function validatePaymentFile(file) {
   if (!file) {
-    return "Р’С‹Р±РµСЂРёС‚Рµ С„Р°Р№Р» С‡РµРєР°";
+    return "Выберите файл чека";
   }
   const ext = (file.name.split(".").pop() || "").toLowerCase();
   const allowed = ["jpg", "jpeg", "png", "pdf"];
   if (!allowed.includes(ext)) {
-    return "Р¤РѕСЂРјР°С‚ С„Р°Р№Р»Р°: jpg, jpeg, png РёР»Рё pdf";
+    return "Формат файла: jpg, jpeg, png или pdf";
   }
   if (file.size > 10 * 1024 * 1024) {
-    return "Р Р°Р·РјРµСЂ С„Р°Р№Р»Р° РЅРµ РґРѕР»Р¶РµРЅ РїСЂРµРІС‹С€Р°С‚СЊ 10 РњР‘";
+    return "Размер файла не должен превышать 10 МБ";
   }
   return "";
 }
@@ -265,7 +265,7 @@ export default function AppointmentDetailPage() {
       setError("");
     } catch {
       if (!silent) {
-        setError("РќРµ СѓРґР°Р»РѕСЃСЊ Р·Р°РіСЂСѓР·РёС‚СЊ Р·Р°СЏРІРєСѓ");
+        setError("Не удалось загрузить заявку");
       }
     }
   }, [id]);
@@ -291,7 +291,7 @@ export default function AppointmentDetailPage() {
         setLastSyncedAt(dayjs());
       } catch {
         if (!silent) {
-          setError("РќРµ СѓРґР°Р»РѕСЃСЊ Р·Р°РіСЂСѓР·РёС‚СЊ Р»РµРЅС‚Сѓ СЃРѕР±С‹С‚РёР№");
+          setError("Не удалось загрузить ленту событий");
         }
       }
     },
@@ -395,14 +395,14 @@ export default function AppointmentDetailPage() {
     try {
       await action();
       await loadData({ preserveDrafts: true, silent: true });
-      setSuccess("Р”РµР№СЃС‚РІРёРµ РІС‹РїРѕР»РЅРµРЅРѕ");
+      setSuccess("Действие выполнено");
       setError("");
-      setToast({ open: true, severity: "success", message: "Р”РµР№СЃС‚РІРёРµ РІС‹РїРѕР»РЅРµРЅРѕ" });
+      setToast({ open: true, severity: "success", message: "Действие выполнено" });
       return true;
     } catch (err) {
-      const detailMessage = err.response?.data?.detail || "РћС€РёР±РєР° РІС‹РїРѕР»РЅРµРЅРёСЏ РґРµР№СЃС‚РІРёСЏ";
+      const detailMessage = err.response?.data?.detail || "Ошибка выполнения действия";
       setSuccess("");
-      setError(err.response?.data?.detail || "РћС€РёР±РєР° РІС‹РїРѕР»РЅРµРЅРёСЏ РґРµР№СЃС‚РІРёСЏ");
+      setError(err.response?.data?.detail || "Ошибка выполнения действия");
       setToast({ open: true, severity: "error", message: detailMessage });
       return false;
     }
@@ -420,7 +420,7 @@ export default function AppointmentDetailPage() {
       setClientSignalComment("");
     }
     if (ok && selectedSignal) {
-      setSuccess(`РЎРёРіРЅР°Р» РѕС‚РїСЂР°РІР»РµРЅ: ${selectedSignal.label}`);
+      setSuccess(`Сигнал отправлен: ${selectedSignal.label}`);
     }
   };
 
@@ -429,21 +429,21 @@ export default function AppointmentDetailPage() {
       const response = await appointmentsApi.repeat(id);
       navigate(`/appointments/${response.data.id}`);
     } catch (err) {
-      setError(err.response?.data?.detail || "РќРµ СѓРґР°Р»РѕСЃСЊ СЃРѕР·РґР°С‚СЊ РїРѕРІС‚РѕСЂРЅСѓСЋ Р·Р°СЏРІРєСѓ");
+      setError(err.response?.data?.detail || "Не удалось создать повторную заявку");
     }
   };
 
   const copyToClipboard = async (value) => {
     const text = (value || "").trim();
     if (!text) {
-      setError("Р РµРєРІРёР·РёС‚С‹ РїРѕРєР° РЅРµ Р·Р°РїРѕР»РЅРµРЅС‹ Р°РґРјРёРЅРёСЃС‚СЂР°С‚РѕСЂРѕРј");
+      setError("Реквизиты пока не заполнены администратором");
       return;
     }
     try {
       await navigator.clipboard.writeText(text);
-      setSuccess("РЎРєРѕРїРёСЂРѕРІР°РЅРѕ РІ Р±СѓС„РµСЂ РѕР±РјРµРЅР°");
+      setSuccess("Скопировано в буфер обмена");
     } catch {
-      setError("РќРµ СѓРґР°Р»РѕСЃСЊ СЃРєРѕРїРёСЂРѕРІР°С‚СЊ Р°РІС‚РѕРјР°С‚РёС‡РµСЃРєРё. РЎРєРѕРїРёСЂСѓР№С‚Рµ С‚РµРєСЃС‚ РІСЂСѓС‡РЅСѓСЋ.");
+      setError("Не удалось скопировать автоматически. Скопируйте текст вручную.");
     }
   };
 
@@ -529,7 +529,7 @@ export default function AppointmentDetailPage() {
     }
     if (actionKey === "set_price") {
       if (!Number(price) || Number(price) <= 0) {
-        setError("РЈРєР°Р¶РёС‚Рµ С†РµРЅСѓ РІ СЂСѓР±Р»СЏС…");
+        setError("Укажите цену в рублях");
         return;
       }
       await runAction(() => appointmentsApi.setPrice(id, Number(price)));
@@ -567,7 +567,7 @@ export default function AppointmentDetailPage() {
         await appointmentsApi.uploadPaymentProof(id, formData);
       });
       if (ok) {
-        setToast({ open: true, severity: "success", message: "Р§РµРє Р·Р°РіСЂСѓР¶РµРЅ. РџСЂРѕРІРµСЂСЏРµРј РѕРїР»Р°С‚Сѓ" });
+        setToast({ open: true, severity: "success", message: "Чек загружен. Проверяем оплату" });
         setPaymentUploadedDialogOpen(true);
       }
     } finally {
@@ -581,9 +581,9 @@ export default function AppointmentDetailPage() {
         <Stack spacing={1.4}>
           <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" spacing={1.1}>
             <Box>
-              <Typography variant="h2">Р—Р°СЏРІРєР° #{appointment.id}</Typography>
+              <Typography variant="h2">Заявка #{appointment.id}</Typography>
               <Typography variant="body2" color="text.secondary">
-                {appointment.brand} {appointment.model} вЂў {getLockTypeLabel(appointment.lock_type)}
+                {appointment.brand} {appointment.model} • {getLockTypeLabel(appointment.lock_type)}
               </Typography>
             </Box>
             <Chip
@@ -605,18 +605,18 @@ export default function AppointmentDetailPage() {
             alignItems={{ xs: "flex-start", sm: "center" }}
           >
             <Typography variant="caption" color="text.secondary">
-              {isRefreshing ? "РћР±РЅРѕРІР»СЏРµРј СЃС‚Р°С‚СѓСЃ Рё С‡Р°С‚..." : `РџРѕСЃР»РµРґРЅРµРµ РѕР±РЅРѕРІР»РµРЅРёРµ: ${lastSyncLabel}`}
+              {isRefreshing ? "Обновляем статус и чат..." : `Последнее обновление: ${lastSyncLabel}`}
             </Typography>
             {user.role !== "client" ? (
               <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
                 <Button size="small" variant="text" onClick={() => handlePrimaryAction("open_payment")}>
-                  Рљ РѕРїР»Р°С‚Рµ
+                  К оплате
                 </Button>
                 <Button size="small" variant="text" onClick={() => handlePrimaryAction("open_chat")}>
-                  Рљ С‡Р°С‚Сѓ
+                  К чату
                 </Button>
                 <Button size="small" variant="text" onClick={() => handlePrimaryAction("open_timeline")}>
-                  Рљ Р»РµРЅС‚Рµ
+                  К ленте
                 </Button>
               </Stack>
             ) : null}
@@ -631,13 +631,13 @@ export default function AppointmentDetailPage() {
           severity={appointment.status === "AWAITING_PAYMENT" ? "warning" : "info"}
           action={
             <Button color="inherit" size="small" onClick={() => handlePrimaryAction("open_payment")}>
-              РџРµСЂРµР№С‚Рё
+              Перейти
             </Button>
           }
         >
           {appointment.status === "AWAITING_PAYMENT"
-            ? "РЎРµР№С‡Р°СЃ РіР»Р°РІРЅС‹Р№ С€Р°Рі: РѕРїР»Р°С‚Р° Рё Р·Р°РіСЂСѓР·РєР° С‡РµРєР°. РџРѕСЃР»Рµ СЌС‚РѕРіРѕ РјР°СЃС‚РµСЂ СЃСЂР°Р·Сѓ РїСЂРѕРґРѕР»Р¶РёС‚ СЂР°Р±РѕС‚Сѓ."
-            : "Р§РµРє Р·Р°РіСЂСѓР¶РµРЅ Рё СѓР¶Рµ РЅР° РїСЂРѕРІРµСЂРєРµ. РћР±С‹С‡РЅРѕ СЌС‚Рѕ Р·Р°РЅРёРјР°РµС‚ 1-5 РјРёРЅСѓС‚."}
+            ? "Сейчас главный шаг: оплата и загрузка чека. После этого мастер сразу продолжит работу."
+            : "Чек загружен и уже на проверке. Обычно это занимает 1-5 минут."}
         </Alert>
       ) : null}
 
@@ -645,7 +645,7 @@ export default function AppointmentDetailPage() {
         <Grid item xs={12} lg={8}>
           <Stack spacing={2}>
             <Paper sx={{ p: 2.2 }}>
-              <Typography variant="h3" sx={{ mb: 1 }}>Р”Р°РЅРЅС‹Рµ Р·Р°СЏРІРєРё</Typography>
+              <Typography variant="h3" sx={{ mb: 1 }}>Данные заявки</Typography>
               <Stack spacing={0.7}>
                 <Typography variant="body2"><b>Устройство:</b> {appointment.brand} {appointment.model}</Typography>
                 <Typography variant="body2"><b>Тип блокировки:</b> {getLockTypeLabel(appointment.lock_type)}</Typography>
@@ -675,18 +675,18 @@ export default function AppointmentDetailPage() {
 
             {showMasterReviewAndPrice ? (
               <Paper sx={{ p: 2.2 }}>
-                <Typography variant="h3" sx={{ mb: 1 }}>РџР°РЅРµР»СЊ РґРµР№СЃС‚РІРёР№ РјР°СЃС‚РµСЂР°</Typography>
+                <Typography variant="h3" sx={{ mb: 1 }}>Панель действий мастера</Typography>
                 <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
                   <TextField
-                    label="Р¦РµРЅР° (СЂСѓР±.)"
+                    label="Цена (руб.)"
                     type="number"
                     value={price}
                     onChange={(event) => setPrice(event.target.value)}
-                    helperText="РћР±С‹С‡РЅРѕ Р·Р°РЅРёРјР°РµС‚ 1-2 РјРёРЅСѓС‚С‹"
+                    helperText="Обычно занимает 1-2 минуты"
                   />
-                  <Button variant="outlined" onClick={() => handlePrimaryAction("set_price")}>РЎРѕС…СЂР°РЅРёС‚СЊ С†РµРЅСѓ</Button>
+                  <Button variant="outlined" onClick={() => handlePrimaryAction("set_price")}>Сохранить цену</Button>
                   <Button color="warning" variant="outlined" onClick={() => runAction(() => appointmentsApi.decline(id))}>
-                    РћС‚РєР»РѕРЅРёС‚СЊ
+                    Отклонить
                   </Button>
                 </Stack>
               </Paper>
@@ -694,35 +694,35 @@ export default function AppointmentDetailPage() {
 
             {showMasterConfirmPayment ? (
               <Paper sx={{ p: 2.2 }}>
-                <Typography variant="h3" sx={{ mb: 1 }}>РћРїР»Р°С‚Р° РєР»РёРµРЅС‚Р°</Typography>
+                <Typography variant="h3" sx={{ mb: 1 }}>Оплата клиента</Typography>
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                  РџСЂРѕРІРµСЂСЊС‚Рµ С‡РµРє Рё РїРѕРґС‚РІРµСЂРґРёС‚Рµ РѕРїР»Р°С‚Сѓ. Р•СЃР»Рё РЅРµ РїРѕР»СѓС‡Р°РµС‚СЃСЏ вЂ” РЅР°РїРёС€РёС‚Рµ РєР»РёРµРЅС‚Сѓ РІ С‡Р°С‚.
+                  Проверьте чек и подтвердите оплату. Если не получается — напишите клиенту в чат.
                 </Typography>
-                <Button variant="outlined" onClick={() => handlePrimaryAction("confirm_payment")}>РџРѕРґС‚РІРµСЂРґРёС‚СЊ РѕРїР»Р°С‚Сѓ</Button>
+                <Button variant="outlined" onClick={() => handlePrimaryAction("confirm_payment")}>Подтвердить оплату</Button>
               </Paper>
             ) : null}
 
             {showMasterStart ? (
               <Paper sx={{ p: 2.2 }}>
-                <Typography variant="h3" sx={{ mb: 1 }}>Р—Р°РїСѓСЃРє СЂР°Р±РѕС‚С‹</Typography>
-                <Button variant="outlined" onClick={() => handlePrimaryAction("start_work")}>РќР°С‡Р°С‚СЊ СЂР°Р±РѕС‚Сѓ</Button>
+                <Typography variant="h3" sx={{ mb: 1 }}>Запуск работы</Typography>
+                <Button variant="outlined" onClick={() => handlePrimaryAction("start_work")}>Начать работу</Button>
               </Paper>
             ) : null}
 
             {showMasterComplete ? (
               <Paper sx={{ p: 2.2 }}>
-                <Typography variant="h3" sx={{ mb: 1 }}>Р—Р°РІРµСЂС€РµРЅРёРµ</Typography>
-                <Button variant="outlined" color="success" onClick={() => handlePrimaryAction("complete_work")}>Р—Р°РІРµСЂС€РёС‚СЊ СЂР°Р±РѕС‚Сѓ</Button>
+                <Typography variant="h3" sx={{ mb: 1 }}>Завершение</Typography>
+                <Button variant="outlined" color="success" onClick={() => handlePrimaryAction("complete_work")}>Завершить работу</Button>
               </Paper>
             ) : null}
 
             {showMasterTake ? (
               <Paper sx={{ p: 2.2 }}>
-                <Typography variant="h3" sx={{ mb: 1 }}>РќРѕРІР°СЏ Р·Р°СЏРІРєР°</Typography>
+                <Typography variant="h3" sx={{ mb: 1 }}>Новая заявка</Typography>
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                  Р§С‚Рѕ РґРµР»Р°С‚СЊ РґР°Р»СЊС€Рµ: РІРѕР·СЊРјРёС‚Рµ Р·Р°СЏРІРєСѓ, С‡С‚РѕР±С‹ Р·Р°РєСЂРµРїРёС‚СЊ РµРµ Р·Р° СЃРѕР±РѕР№.
+                  Что делать дальше: возьмите заявку, чтобы закрепить ее за собой.
                 </Typography>
-                <Button variant="outlined" onClick={() => handlePrimaryAction("take")}>Р’Р·СЏС‚СЊ Р·Р°СЏРІРєСѓ</Button>
+                <Button variant="outlined" onClick={() => handlePrimaryAction("take")}>Взять заявку</Button>
               </Paper>
             ) : null}
 
@@ -830,15 +830,15 @@ export default function AppointmentDetailPage() {
                 <Stack spacing={1.1}>
                   <Stack direction="row" spacing={1} alignItems="center">
                     <CampaignRoundedIcon color="primary" fontSize="small" />
-                    <Typography variant="h3">Р‘С‹СЃС‚СЂС‹Р№ СЃРёРіРЅР°Р» РјР°СЃС‚РµСЂСѓ</Typography>
+                    <Typography variant="h3">Быстрый сигнал мастеру</Typography>
                   </Stack>
                   <Typography variant="body2" color="text.secondary">
-                    РћРґРёРЅ РєР»РёРє, С‡С‚РѕР±С‹ РјР°СЃС‚РµСЂ РїРѕРЅСЏР» РІР°С€ С‚РµРєСѓС‰РёР№ РєРѕРЅС‚РµРєСЃС‚. Р­С‚Рѕ СѓСЃРєРѕСЂСЏРµС‚ РѕС‚РІРµС‚ Рё СЃРЅРёР¶Р°РµС‚ РїР°СѓР·С‹.
+                    Один клик, чтобы мастер понял ваш текущий контекст. Это ускоряет ответ и снижает паузы.
                   </Typography>
 
                   <TextField
                     select
-                    label="Р§С‚Рѕ СЃРµР№С‡Р°СЃ РІР°Р¶РЅРѕ"
+                    label="Что сейчас важно"
                     value={clientSignal}
                     onChange={(event) => setClientSignal(event.target.value)}
                     helperText={CLIENT_SIGNAL_OPTIONS.find((option) => option.value === clientSignal)?.helper || ""}
@@ -851,8 +851,8 @@ export default function AppointmentDetailPage() {
                   </TextField>
 
                   <TextField
-                    label="РљРѕРјРјРµРЅС‚Р°СЂРёР№ (РѕРїС†РёРѕРЅР°Р»СЊРЅРѕ)"
-                    placeholder="РќР°РїСЂРёРјРµСЂ: РєРѕРґ РѕС€РёР±РєРё, СѓРґРѕР±РЅРѕРµ РІСЂРµРјСЏ, С‡С‚Рѕ СѓР¶Рµ РїРѕРїСЂРѕР±РѕРІР°Р»Рё"
+                    label="Комментарий (опционально)"
+                    placeholder="Например: код ошибки, удобное время, что уже попробовали"
                     multiline
                     minRows={2}
                     value={clientSignalComment}
@@ -860,7 +860,7 @@ export default function AppointmentDetailPage() {
                   />
 
                   <Button variant="outlined" onClick={sendClientSignal}>
-                    РћС‚РїСЂР°РІРёС‚СЊ СЃРёРіРЅР°Р»
+                    Отправить сигнал
                   </Button>
                 </Stack>
               </Paper>
@@ -869,9 +869,9 @@ export default function AppointmentDetailPage() {
             {showClientRepeat ? (
               <Paper sx={{ p: 2.2 }}>
                 <Stack spacing={1}>
-                  <Typography variant="h3">РќСѓР¶РЅР° РїРѕС…РѕР¶Р°СЏ Р·Р°СЏРІРєР°?</Typography>
+                  <Typography variant="h3">Нужна похожая заявка?</Typography>
                   <Typography variant="body2" color="text.secondary">
-                    РЎРѕР·РґР°РґРёРј РЅРѕРІСѓСЋ Р·Р°СЏРІРєСѓ СЃ С‚РµРјРё Р¶Рµ РїР°СЂР°РјРµС‚СЂР°РјРё СѓСЃС‚СЂРѕР№СЃС‚РІР°. РћСЃС‚Р°РЅРµС‚СЃСЏ С‚РѕР»СЊРєРѕ СѓС‚РѕС‡РЅРёС‚СЊ РґРµС‚Р°Р»Рё.
+                    Создадим новую заявку с теми же параметрами устройства. Останется только уточнить детали.
                   </Typography>
                   <Button
                     variant="outlined"
@@ -879,7 +879,7 @@ export default function AppointmentDetailPage() {
                     onClick={repeatAppointment}
                     sx={{ alignSelf: "flex-start" }}
                   >
-                    РџРѕРІС‚РѕСЂРёС‚СЊ Р·Р°СЏРІРєСѓ
+                    Повторить заявку
                   </Button>
                 </Stack>
               </Paper>
@@ -887,22 +887,22 @@ export default function AppointmentDetailPage() {
 
             {showAdminControls ? (
               <Paper sx={{ p: 2.2 }}>
-                <Typography variant="h3" sx={{ mb: 1 }}>РЈРїСЂР°РІР»РµРЅРёРµ Р·Р°СЏРІРєРѕР№ (Р°РґРјРёРЅ)</Typography>
+                <Typography variant="h3" sx={{ mb: 1 }}>Управление заявкой (админ)</Typography>
                 <Stack spacing={1}>
                   {showAdminPaymentConfirm ? (
                     <Button variant="outlined" onClick={() => handlePrimaryAction("confirm_payment_admin")}>
-                      РџРѕРґС‚РІРµСЂРґРёС‚СЊ РѕРїР»Р°С‚Сѓ
+                      Подтвердить оплату
                     </Button>
                   ) : null}
                   <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
-                    <TextField select label="РЎРјРµРЅРёС‚СЊ СЃС‚Р°С‚СѓСЃ" value={manualStatus} onChange={(event) => setManualStatus(event.target.value)}>
+                    <TextField select label="Сменить статус" value={manualStatus} onChange={(event) => setManualStatus(event.target.value)}>
                       {APPOINTMENT_STATUS_OPTIONS.map((status) => (
                         <MenuItem key={status} value={status}>{getStatusLabel(status)}</MenuItem>
                       ))}
                     </TextField>
-                    <TextField label="РљРѕРјРјРµРЅС‚Р°СЂРёР№" value={manualNote} onChange={(event) => setManualNote(event.target.value)} />
+                    <TextField label="Комментарий" value={manualNote} onChange={(event) => setManualNote(event.target.value)} />
                     <Button variant="outlined" onClick={() => runAction(() => adminApi.setStatus(id, { status: manualStatus, note: manualNote }))}>
-                      РџСЂРёРјРµРЅРёС‚СЊ
+                      Применить
                     </Button>
                   </Stack>
                 </Stack>
@@ -911,12 +911,12 @@ export default function AppointmentDetailPage() {
 
             {showClientReview ? (
               <Paper ref={reviewRef} sx={{ p: 2.2 }}>
-                <Typography variant="h3" sx={{ mb: 1 }}>РћС†РµРЅРёС‚Рµ СЂР°Р±РѕС‚Сѓ РјР°СЃС‚РµСЂР°</Typography>
+                <Typography variant="h3" sx={{ mb: 1 }}>Оцените работу мастера</Typography>
                 <Stack spacing={1}>
-                  <TextField type="number" label="Р РµР№С‚РёРЅРі 1-5" value={reviewRating} onChange={(event) => setReviewRating(Number(event.target.value))} />
-                  <TextField label="РљРѕРјРјРµРЅС‚Р°СЂРёР№" multiline minRows={2} value={reviewComment} onChange={(event) => setReviewComment(event.target.value)} />
+                  <TextField type="number" label="Рейтинг 1-5" value={reviewRating} onChange={(event) => setReviewRating(Number(event.target.value))} />
+                  <TextField label="Комментарий" multiline minRows={2} value={reviewComment} onChange={(event) => setReviewComment(event.target.value)} />
                   <Button variant="outlined" onClick={() => runAction(() => reviewsApi.reviewMaster(id, { rating: reviewRating, comment: reviewComment }))}>
-                    РћС‚РїСЂР°РІРёС‚СЊ РѕС‚Р·С‹РІ
+                    Отправить отзыв
                   </Button>
                 </Stack>
               </Paper>
@@ -924,12 +924,12 @@ export default function AppointmentDetailPage() {
 
             {showMasterReviewClient ? (
               <Paper ref={reviewRef} sx={{ p: 2.2 }}>
-                <Typography variant="h3" sx={{ mb: 1 }}>РћС†РµРЅРєР° РєР»РёРµРЅС‚Р°</Typography>
+                <Typography variant="h3" sx={{ mb: 1 }}>Оценка клиента</Typography>
                 <Stack spacing={1}>
-                  <TextField type="number" label="Р РµР№С‚РёРЅРі 1-5" value={reviewRating} onChange={(event) => setReviewRating(Number(event.target.value))} />
+                  <TextField type="number" label="Рейтинг 1-5" value={reviewRating} onChange={(event) => setReviewRating(Number(event.target.value))} />
                   <TextField
                     select
-                    label="Р¤Р»Р°РіРё РїРѕРІРµРґРµРЅРёСЏ"
+                    label="Флаги поведения"
                     SelectProps={{ multiple: true }}
                     value={clientReviewFlags}
                     onChange={(event) =>
@@ -944,7 +944,7 @@ export default function AppointmentDetailPage() {
                       <MenuItem key={flag.code} value={flag.code}>{flag.label}</MenuItem>
                     ))}
                   </TextField>
-                  <TextField label="РљРѕРјРјРµРЅС‚Р°СЂРёР№" multiline minRows={2} value={reviewComment} onChange={(event) => setReviewComment(event.target.value)} />
+                  <TextField label="Комментарий" multiline minRows={2} value={reviewComment} onChange={(event) => setReviewComment(event.target.value)} />
                   <Button
                     variant="outlined"
                     onClick={() =>
@@ -957,7 +957,7 @@ export default function AppointmentDetailPage() {
                       )
                     }
                   >
-                    РЎРѕС…СЂР°РЅРёС‚СЊ РѕС†РµРЅРєСѓ РєР»РёРµРЅС‚Р°
+                    Сохранить оценку клиента
                   </Button>
                 </Stack>
               </Paper>
@@ -974,16 +974,16 @@ export default function AppointmentDetailPage() {
             <Paper sx={{ p: 2.2 }}>
               <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}>
                 <ShieldRoundedIcon color="primary" fontSize="small" />
-                <Typography variant="h3">Р”РѕРІРµСЂРёРµ Рё РїСЂРѕР·СЂР°С‡РЅРѕСЃС‚СЊ</Typography>
+                <Typography variant="h3">Доверие и прозрачность</Typography>
               </Stack>
 
               <Stack spacing={0.7}>
-                <Typography variant="body2"><b>РњР°СЃС‚РµСЂ:</b> {appointment.master_username || "РџРѕРєР° РЅРµ РЅР°Р·РЅР°С‡РµРЅ"}</Typography>
+                <Typography variant="body2"><b>Мастер:</b> {appointment.master_username || "Пока не назначен"}</Typography>
                 {user.role !== "client" ? (
-                  <Typography variant="body2"><b>Р РёСЃРє РєР»РёРµРЅС‚Р°:</b> {appointment.client_risk_level || "вЂ”"} {appointment.client_risk_score != null ? `(${appointment.client_risk_score})` : ""}</Typography>
+                  <Typography variant="body2"><b>Риск клиента:</b> {appointment.client_risk_level || "—"} {appointment.client_risk_score != null ? `(${appointment.client_risk_score})` : ""}</Typography>
                 ) : null}
-                <Typography variant="body2"><b>SLA РѕС‚РІРµС‚ РґРѕ:</b> {appointment.response_deadline_at ? dayjs(appointment.response_deadline_at).format("DD.MM.YYYY HH:mm") : "вЂ”"}</Typography>
-                <Typography variant="body2"><b>SLA Р·Р°РІРµСЂС€РµРЅРёРµ РґРѕ:</b> {appointment.completion_deadline_at ? dayjs(appointment.completion_deadline_at).format("DD.MM.YYYY HH:mm") : "вЂ”"}</Typography>
+                <Typography variant="body2"><b>SLA ответ до:</b> {appointment.response_deadline_at ? dayjs(appointment.response_deadline_at).format("DD.MM.YYYY HH:mm") : "—"}</Typography>
+                <Typography variant="body2"><b>SLA завершение до:</b> {appointment.completion_deadline_at ? dayjs(appointment.completion_deadline_at).format("DD.MM.YYYY HH:mm") : "—"}</Typography>
                 {["NEW", "IN_REVIEW"].includes(appointment.status) && responseEtaMinutes != null ? (
                   <Alert severity={responseEtaMinutes <= 0 ? "warning" : "info"} sx={{ py: 0 }}>
                     Ожидаем ответ мастера: {formatEtaMinutes(responseEtaMinutes)}
@@ -995,15 +995,15 @@ export default function AppointmentDetailPage() {
                   </Alert>
                 ) : null}
                 {appointment.sla_breached ? (
-                  <Alert severity="warning">SLA РЅР°СЂСѓС€РµРЅ. РњС‹ СѓР¶Рµ СѓРІРµРґРѕРјРёР»Рё Р°РґРјРёРЅРёСЃС‚СЂР°С‚РѕСЂР°.</Alert>
+                  <Alert severity="warning">SLA нарушен. Мы уже уведомили администратора.</Alert>
                 ) : null}
 
                 {!isClient ? (
                   <>
                     <Divider sx={{ my: 0.7 }} />
-                    <Typography variant="caption">Р§С‚Рѕ РґРµР»Р°С‚СЊ РґР°Р»СЊС€Рµ: РѕСЂРёРµРЅС‚РёСЂСѓР№С‚РµСЃСЊ РЅР° С€Р°РіРё СЃРІРµСЂС…Сѓ Рё РёСЃРїРѕР»СЊР·СѓР№С‚Рµ С‡Р°С‚ РґР»СЏ РІСЃРµС… СѓС‚РѕС‡РЅРµРЅРёР№.</Typography>
-                    <Typography variant="caption">РћР±С‹С‡РЅРѕ РЅР°Р·РЅР°С‡РµРЅРёРµ РјР°СЃС‚РµСЂР° Р·Р°РЅРёРјР°РµС‚ 5-15 РјРёРЅСѓС‚.</Typography>
-                    <Typography variant="caption">Р•СЃР»Рё РЅРµ РїРѕР»СѓС‡Р°РµС‚СЃСЏ вЂ” РЅР°РїРёС€РёС‚Рµ РІ С‡Р°С‚, РјС‹ РїРѕРґРєР»СЋС‡РёРјСЃСЏ.</Typography>
+                    <Typography variant="caption">Что делать дальше: ориентируйтесь на шаги сверху и используйте чат для всех уточнений.</Typography>
+                    <Typography variant="caption">Обычно назначение мастера занимает 5-15 минут.</Typography>
+                    <Typography variant="caption">Если не получается — напишите в чат, мы подключимся.</Typography>
                   </>
                 ) : null}
               </Stack>
@@ -1012,10 +1012,10 @@ export default function AppointmentDetailPage() {
             <Paper ref={timelineRef} sx={{ p: 2.2 }}>
               <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}>
                 <TimelineRoundedIcon color="primary" fontSize="small" />
-                <Typography variant="h3">Р›РµРЅС‚Р° СЃРѕР±С‹С‚РёР№</Typography>
+                <Typography variant="h3">Лента событий</Typography>
               </Stack>
               <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1 }}>
-                РћР±РЅРѕРІР»СЏРµС‚СЃСЏ Р°РІС‚РѕРјР°С‚РёС‡РµСЃРєРё РєР°Р¶РґС‹Рµ 3-4 СЃРµРєСѓРЅРґС‹
+                Обновляется автоматически каждые 3-4 секунды
               </Typography>
 
               {visibleTimelineEvents.length ? (
@@ -1025,14 +1025,14 @@ export default function AppointmentDetailPage() {
                       <Typography variant="body2" sx={{ fontWeight: 700 }}>{getEventTitle(event)}</Typography>
                       {event.note ? <Typography variant="caption" color="text.secondary">{event.note}</Typography> : null}
                       <Typography variant="caption" color="text.secondary">
-                        {event.actor_username || "РЎРёСЃС‚РµРјР°"} вЂў {dayjs(event.created_at).format("DD.MM.YYYY HH:mm")}
+                        {event.actor_username || "Система"} • {dayjs(event.created_at).format("DD.MM.YYYY HH:mm")}
                       </Typography>
                       {index < visibleTimelineEvents.length - 1 ? <Divider /> : null}
                     </Stack>
                   ))}
                 </Stack>
               ) : (
-                <Typography variant="body2" color="text.secondary">РЎРѕР±С‹С‚РёСЏ РїРѕРєР° РѕС‚СЃСѓС‚СЃС‚РІСѓСЋС‚.</Typography>
+                <Typography variant="body2" color="text.secondary">События пока отсутствуют.</Typography>
               )}
               {isClient && timelineEvents.length > visibleTimelineEvents.length ? (
                 <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1 }}>
@@ -1252,4 +1252,3 @@ export default function AppointmentDetailPage() {
     </Stack>
   );
 }
-
