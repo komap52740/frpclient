@@ -112,6 +112,9 @@ class Appointment(TimeStampedModel):
     taken_at = models.DateTimeField(null=True, blank=True)
     started_at = models.DateTimeField(null=True, blank=True)
     completed_at = models.DateTimeField(null=True, blank=True)
+    response_deadline_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    completion_deadline_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    sla_breached = models.BooleanField(default=False, db_index=True)
     platform_tags = models.JSONField(default=list, blank=True)
 
     class Meta:

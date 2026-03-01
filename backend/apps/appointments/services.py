@@ -1,5 +1,7 @@
 ﻿from __future__ import annotations
 
+from datetime import timedelta
+
 from django.db import transaction
 from django.utils import timezone
 from rest_framework.exceptions import PermissionDenied, ValidationError
@@ -40,6 +42,50 @@ def assert_master_assigned(appointment: Appointment, user: User) -> None:
         raise PermissionDenied("Заявка не закреплена за этим мастером")
 
 
+def initialize_response_deadline(appointment: Appointment) -> None:
+    if appointment.response_deadline_at:
+        return
+    from apps.accounts.models import SiteSettings
+
+    settings_obj = SiteSettings.load()
+    base_time = appointment.created_at or timezone.now()
+    appointment.response_deadline_at = base_time + timedelta(minutes=max(1, settings_obj.sla_response_minutes))
+    appointment.save(update_fields=["response_deadline_at", "updated_at"])
+
+
+def _set_completion_deadline_from_paid(appointment: Appointment) -> None:
+    from apps.accounts.models import SiteSettings
+
+    settings_obj = SiteSettings.load()
+    appointment.completion_deadline_at = timezone.now() + timedelta(hours=max(1, settings_obj.sla_completion_hours))
+
+
+def mark_sla_breach(appointment: Appointment, actor: User | None, reason: str, metadata: dict | None = None) -> None:
+    if appointment.sla_breached:
+        return
+    appointment.sla_breached = True
+    appointment.save(update_fields=["sla_breached", "updated_at"])
+    emit_event(
+        "sla.breached",
+        appointment,
+        actor=actor,
+        payload={"reason": reason, **(metadata or {})},
+    )
+
+
+def evaluate_response_sla(appointment: Appointment, actor: User | None) -> None:
+    if appointment.response_deadline_at and timezone.now() > appointment.response_deadline_at:
+        mark_sla_breach(appointment, actor, reason="response_timeout")
+
+
+def evaluate_completion_sla(appointment: Appointment, actor: User | None) -> None:
+    if not appointment.completed_at or not appointment.completion_deadline_at:
+        return
+    if appointment.completed_at > appointment.completion_deadline_at:
+        overtime_seconds = int((appointment.completed_at - appointment.completion_deadline_at).total_seconds())
+        mark_sla_breach(appointment, actor, reason="completion_timeout", metadata={"overtime_seconds": overtime_seconds})
+
+
 def transition_status(appointment: Appointment, actor: User, to_status: str, note: str = "") -> Appointment:
     from_status = appointment.status
     appointment.status = to_status
@@ -51,6 +97,9 @@ def transition_status(appointment: Appointment, actor: User, to_status: str, not
     if to_status == AppointmentStatusChoices.IN_PROGRESS and not appointment.started_at:
         appointment.started_at = timezone.now()
         update_fields.append("started_at")
+    if to_status == AppointmentStatusChoices.PAID:
+        _set_completion_deadline_from_paid(appointment)
+        update_fields.append("completion_deadline_at")
     if to_status == AppointmentStatusChoices.COMPLETED and not appointment.completed_at:
         appointment.completed_at = timezone.now()
         update_fields.append("completed_at")
@@ -74,6 +123,10 @@ def transition_status(appointment: Appointment, actor: User, to_status: str, not
             "note": note,
         },
     )
+    if to_status == AppointmentStatusChoices.IN_REVIEW:
+        evaluate_response_sla(appointment, actor)
+    if to_status == AppointmentStatusChoices.COMPLETED:
+        evaluate_completion_sla(appointment, actor)
     if appointment.assigned_master_id:
         from apps.accounts.services import recalculate_master_stats
 

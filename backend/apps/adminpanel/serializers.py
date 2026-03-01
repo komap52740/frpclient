@@ -46,6 +46,8 @@ class AdminSystemSettingsSerializer(serializers.ModelSerializer):
             "bank_requisites",
             "crypto_requisites",
             "instructions",
+            "sla_response_minutes",
+            "sla_completion_hours",
         )
 
 

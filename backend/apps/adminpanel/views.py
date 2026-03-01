@@ -238,6 +238,10 @@ class AdminSystemStatusView(APIView):
                 "crypto_requisites_configured": bool(settings_obj.crypto_requisites.strip()),
                 "instructions_configured": bool(settings_obj.instructions.strip()),
             },
+            "sla": {
+                "response_minutes": settings_obj.sla_response_minutes,
+                "completion_hours": settings_obj.sla_completion_hours,
+            },
             "counts": {
                 "users_total": User.objects.count(),
                 "clients_total": User.objects.filter(role=RoleChoices.CLIENT).count(),

@@ -22,7 +22,13 @@ from .serializers import (
     SetPriceSerializer,
     UploadPaymentProofSerializer,
 )
-from .services import add_event, assert_master_assigned, take_appointment, transition_status
+from .services import (
+    add_event,
+    assert_master_assigned,
+    initialize_response_deadline,
+    take_appointment,
+    transition_status,
+)
 
 
 class AppointmentCreateView(APIView):
@@ -37,6 +43,7 @@ class AppointmentCreateView(APIView):
         serializer = AppointmentCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         appointment = serializer.save(client=request.user)
+        initialize_response_deadline(appointment)
         emit_event(
             "appointment.created",
             appointment,

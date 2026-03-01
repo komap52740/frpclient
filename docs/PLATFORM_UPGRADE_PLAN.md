@@ -39,6 +39,12 @@
     - `python manage.py compute_daily_metrics --date=YYYY-MM-DD`
     - `python manage.py compute_daily_metrics --from=YYYY-MM-DD --to=YYYY-MM-DD`
   - admin metrics API added: `GET /api/v1/admin/metrics/daily?from=...&to=...`.
+- ✅ Phase 7 complete:
+  - SLA fields added to appointments: `response_deadline_at`, `completion_deadline_at`, `sla_breached`.
+  - SLA config added to `SiteSettings`: `sla_response_minutes`, `sla_completion_hours`.
+  - response/completion breach detection implemented in lifecycle actions.
+  - breach emits `sla.breached` platform event.
+  - default rule seeded to notify admins on SLA breach via rule engine.
 
 ## 1. Repo Structure Summary
 

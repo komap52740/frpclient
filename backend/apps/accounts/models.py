@@ -100,6 +100,8 @@ class SiteSettings(TimeStampedModel):
     bank_requisites = models.TextField(blank=True)
     crypto_requisites = models.TextField(blank=True)
     instructions = models.TextField(blank=True)
+    sla_response_minutes = models.PositiveIntegerField(default=15)
+    sla_completion_hours = models.PositiveIntegerField(default=24)
 
     class Meta:
         verbose_name = "Настройки оплаты"
@@ -113,6 +115,8 @@ class SiteSettings(TimeStampedModel):
                 "bank_requisites": settings.DEFAULT_ADMIN_PAYMENT_BANK,
                 "crypto_requisites": settings.DEFAULT_ADMIN_PAYMENT_CRYPTO,
                 "instructions": settings.DEFAULT_ADMIN_PAYMENT_INSTRUCTIONS,
+                "sla_response_minutes": settings.DEFAULT_SLA_RESPONSE_MINUTES,
+                "sla_completion_hours": settings.DEFAULT_SLA_COMPLETION_HOURS,
             },
         )
         return obj

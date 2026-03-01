@@ -9,7 +9,7 @@ from rest_framework.views import APIView
 from apps.accounts.models import RoleChoices
 from apps.appointments.access import get_appointment_for_user
 from apps.appointments.models import AppointmentEventType
-from apps.appointments.services import add_event
+from apps.appointments.services import add_event, evaluate_response_sla
 from apps.platform.services import emit_event
 
 from .models import Message, ReadState
@@ -34,6 +34,8 @@ class AppointmentMessagesView(APIView):
         serializer = MessageCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         message = serializer.save(appointment=appointment, sender=request.user)
+        if request.user.role == RoleChoices.MASTER and appointment.assigned_master_id == request.user.id:
+            evaluate_response_sla(appointment, request.user)
         emit_event(
             "chat.message_sent",
             message,
