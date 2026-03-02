@@ -2,8 +2,11 @@
 import LockOpenRoundedIcon from "@mui/icons-material/LockOpenRounded";
 import {
   Alert,
+  Box,
   Button,
+  Chip,
   FormControlLabel,
+  LinearProgress,
   MenuItem,
   Paper,
   Stack,
@@ -140,6 +143,14 @@ export default function CreateAppointmentPage() {
   const showRustdeskPasswordError = touched.rustdesk_password && Boolean(rustdeskPasswordError);
 
   const canSubmit = !submitting && !deviceError && !rustdeskIdError && !rustdeskPasswordError;
+  const requiredDoneCount = useMemo(() => {
+    let done = 0;
+    if (!deviceError && form.device.trim()) done += 1;
+    if (!rustdeskIdError && normalizeRustdeskId(form.rustdesk_id)) done += 1;
+    if (!rustdeskPasswordError && form.rustdesk_password.trim()) done += 1;
+    return done;
+  }, [deviceError, form.device, form.rustdesk_id, form.rustdesk_password, rustdeskIdError, rustdeskPasswordError]);
+  const requiredProgress = Math.round((requiredDoneCount / 3) * 100);
 
   const updateField = (key, value) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -219,6 +230,22 @@ export default function CreateAppointmentPage() {
         <Typography variant="body2" color="text.secondary">
           Быстрый режим: заполните 3 поля и отправьте. Остальное добавится автоматически.
         </Typography>
+        <Stack direction="row" spacing={0.8} flexWrap="wrap" useFlexGap>
+          <Chip size="small" color={requiredDoneCount >= 1 ? "success" : "default"} label="1. Устройство" variant={requiredDoneCount >= 1 ? "filled" : "outlined"} />
+          <Chip size="small" color={requiredDoneCount >= 2 ? "success" : "default"} label="2. ID RuDesktop" variant={requiredDoneCount >= 2 ? "filled" : "outlined"} />
+          <Chip size="small" color={requiredDoneCount >= 3 ? "success" : "default"} label="3. Код доступа" variant={requiredDoneCount >= 3 ? "filled" : "outlined"} />
+        </Stack>
+        <Stack spacing={0.5}>
+          <Typography variant="caption" color="text.secondary">
+            Готовность заявки: {requiredDoneCount}/3
+          </Typography>
+          <LinearProgress
+            variant="determinate"
+            value={requiredProgress}
+            color={requiredDoneCount === 3 ? "success" : "primary"}
+            sx={{ borderRadius: 999, height: 6 }}
+          />
+        </Stack>
       </Stack>
 
       {hasStoredAccess ? (
@@ -249,7 +276,7 @@ export default function CreateAppointmentPage() {
           label="ID RuDesktop"
           placeholder="Например: 123456789"
           value={form.rustdesk_id}
-          onChange={(event) => updateField("rustdesk_id", event.target.value)}
+          onChange={(event) => updateField("rustdesk_id", event.target.value.replace(/[^\d\s-]/g, ""))}
           onBlur={() => markTouched("rustdesk_id")}
           onFocus={unlockRuInputs}
           onPointerDown={unlockRuInputs}
@@ -310,7 +337,9 @@ export default function CreateAppointmentPage() {
           }}
         />
 
-        <Alert severity="info">Автошаблон заявки: {autoTemplate}</Alert>
+        <Typography variant="caption" color="text.secondary">
+          Автошаблон будет добавлен автоматически. Вам не нужно заполнять длинное описание вручную.
+        </Typography>
 
         <Button
           variant={showAdvanced ? "outlined" : "text"}
@@ -361,16 +390,26 @@ export default function CreateAppointmentPage() {
           </Stack>
         ) : null}
 
-        <Button
-          type="submit"
-          variant="contained"
-          size="large"
-          disabled={!canSubmit}
-          startIcon={<LockOpenRoundedIcon />}
-          sx={{ minHeight: 50, borderRadius: 2.4, fontWeight: 800 }}
+        <Box
+          sx={{
+            position: { xs: "sticky", md: "static" },
+            bottom: { xs: 8, md: "auto" },
+            zIndex: 2,
+            pt: 0.4,
+          }}
         >
-          {submitting ? "Отправляем заявку..." : "Создать заявку"}
-        </Button>
+          <Button
+            type="submit"
+            variant="contained"
+            size="large"
+            fullWidth
+            disabled={!canSubmit}
+            startIcon={<LockOpenRoundedIcon />}
+            sx={{ minHeight: 52, borderRadius: 2.4, fontWeight: 800 }}
+          >
+            {submitting ? "Отправляем заявку..." : "Создать заявку"}
+          </Button>
+        </Box>
       </Stack>
     </Paper>
   );

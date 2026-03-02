@@ -712,12 +712,12 @@ export default function AppointmentDetailPage() {
 
   const showAdminControls = user.role === "admin";
   const showAdminPaymentConfirm = showAdminControls && appointment.status === "PAYMENT_PROOF_UPLOADED";
-  const showClientPaymentHighlight = false;
+  const showClientPaymentHighlight = isClient && showClientPaymentActions;
   const isClientCompact = isClient && clientCompactView;
   const clientDetailsTabEnabled = !isClientCompact;
   const showClientDesktopSidebar = false;
-  const showClientPaymentDock = false;
-  const showClientFloatingActionBar = false;
+  const showClientPaymentDock = isClient && !isMobile && showClientPaymentActions;
+  const showClientFloatingActionBar = isClient && isMobile && showClientPaymentActions;
   const showClientQuickRail = false;
   const clientPaymentTabDisabled = !showClientPaymentActions;
   const showClientDataCard = isClient
@@ -1417,6 +1417,15 @@ export default function AppointmentDetailPage() {
                         ) : null}
                         <Typography variant="body2"><b>Есть ПК:</b> {appointment.has_pc ? "Да" : "Нет"}</Typography>
                         <Typography variant="body2"><b>Клиент:</b> {normalizeRuText(appointment.client_username) || appointment.client}</Typography>
+                        {appointment.is_wholesale_request ? (
+                          <Chip
+                            size="small"
+                            color="primary"
+                            variant="outlined"
+                            label="Оптовый клиент"
+                            sx={{ alignSelf: "flex-start" }}
+                          />
+                        ) : null}
                         {appointment.photo_lock_screen_url ? (
                           <Typography variant="body2">
                             <a href={appointment.photo_lock_screen_url} target="_blank" rel="noreferrer">Фото экрана блокировки</a>
@@ -1873,6 +1882,9 @@ export default function AppointmentDetailPage() {
                   <Stack spacing={0.7}>
                     <Typography variant="body2"><b>Мастер:</b> {normalizeRuText(appointment.master_username) || "Пока не назначен"}</Typography>
                     <Typography variant="body2"><b>Риск клиента:</b> {appointment.client_risk_level || "—"} {appointment.client_risk_score != null ? `(${appointment.client_risk_score})` : ""}</Typography>
+                    {appointment.is_wholesale_request ? (
+                      <Typography variant="body2"><b>Клиент:</b> Оптовый</Typography>
+                    ) : null}
                     <Typography variant="body2"><b>SLA ответ до:</b> {appointment.response_deadline_at ? dayjs(appointment.response_deadline_at).format("DD.MM.YYYY HH:mm") : "—"}</Typography>
                     <Typography variant="body2"><b>SLA завершение до:</b> {appointment.completion_deadline_at ? dayjs(appointment.completion_deadline_at).format("DD.MM.YYYY HH:mm") : "—"}</Typography>
                     {["NEW", "IN_REVIEW"].includes(appointment.status) && responseEtaMinutes != null ? (

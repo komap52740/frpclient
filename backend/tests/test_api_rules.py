@@ -922,7 +922,7 @@ def test_admin_can_review_wholesale_request(admin_user, client_user):
 
 
 @pytest.mark.django_db
-def test_set_price_applies_wholesale_discount_for_approved_service(client_user, master_user):
+def test_set_price_does_not_apply_wholesale_discount_automatically(client_user, master_user):
     client_user.is_service_center = True
     client_user.wholesale_status = WholesaleStatusChoices.APPROVED
     client_user.wholesale_discount_percent = 25
@@ -949,9 +949,9 @@ def test_set_price_applies_wholesale_discount_for_approved_service(client_user, 
     assert response.status_code == 200
 
     appointment.refresh_from_db()
-    assert appointment.wholesale_base_price == 10000
-    assert appointment.wholesale_discount_percent_applied == 25
-    assert appointment.total_price == 7500
+    assert appointment.wholesale_base_price is None
+    assert appointment.wholesale_discount_percent_applied == 0
+    assert appointment.total_price == 10000
     assert appointment.status == AppointmentStatusChoices.AWAITING_PAYMENT
 
 

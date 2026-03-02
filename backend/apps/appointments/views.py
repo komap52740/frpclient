@@ -283,19 +283,12 @@ class MasterSetPriceView(APIView):
         serializer = SetPriceSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         base_price = int(serializer.validated_data["total_price"])
+        # Wholesale discount is no longer auto-applied at price setting time.
+        # Master sees wholesale marker in UI and decides pricing manually.
         discount_percent = 0
-        client_user = appointment.client
-        if (
-            appointment.is_wholesale_request
-            and client_user.is_service_center
-            and client_user.wholesale_status == WholesaleStatusChoices.APPROVED
-        ):
-            discount_percent = min(max(int(client_user.wholesale_discount_percent or 0), 0), 90)
-
-        discounted_price = max(1, round(base_price * (100 - discount_percent) / 100))
-        appointment.wholesale_base_price = base_price if discount_percent > 0 else None
-        appointment.wholesale_discount_percent_applied = discount_percent
-        appointment.total_price = discounted_price
+        appointment.wholesale_base_price = None
+        appointment.wholesale_discount_percent_applied = 0
+        appointment.total_price = base_price
         appointment.save(
             update_fields=[
                 "wholesale_base_price",

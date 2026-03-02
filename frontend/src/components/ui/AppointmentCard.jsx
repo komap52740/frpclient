@@ -1,6 +1,7 @@
 import ChatBubbleOutlineRoundedIcon from "@mui/icons-material/ChatBubbleOutlineRounded";
 import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
 import ScheduleRoundedIcon from "@mui/icons-material/ScheduleRounded";
+import StorefrontRoundedIcon from "@mui/icons-material/StorefrontRounded";
 import WarningAmberRoundedIcon from "@mui/icons-material/WarningAmberRounded";
 import { Badge, Box, Button, Card, CardContent, Chip, Stack, Typography } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
@@ -85,7 +86,7 @@ export default function AppointmentCard({
                 Заявка #{item.id}
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                {normalizeRuText(item.brand)} {normalizeRuText(item.model)} · {getLockTypeLabel(item.lock_type)}
+                {normalizeRuText(item.brand)} {normalizeRuText(item.model)} • {getLockTypeLabel(item.lock_type)}
               </Typography>
             </Box>
             <Chip
@@ -123,6 +124,15 @@ export default function AppointmentCard({
                 icon={<WarningAmberRoundedIcon sx={{ color: riskUi.color }} />}
                 label={riskUi.label}
                 sx={{ bgcolor: riskUi.bg, color: riskUi.color }}
+              />
+            ) : null}
+            {role === "master" && item.is_wholesale_request ? (
+              <Chip
+                size="small"
+                icon={<StorefrontRoundedIcon fontSize="small" />}
+                label="Оптовый клиент"
+                color="primary"
+                variant="outlined"
               />
             ) : null}
           </Stack>

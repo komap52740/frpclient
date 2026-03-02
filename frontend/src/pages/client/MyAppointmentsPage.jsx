@@ -97,8 +97,8 @@ function resolveAttentionAction(item) {
   if (item.status === "AWAITING_PAYMENT") {
     return {
       actionKey: "open_payment",
-      title: `Заявка #${item.id}: нужно оплатить`,
-      helper: "Оплатите и загрузите чек, чтобы мастер продолжил работу без паузы.",
+      title: `Заявка #${item.id}: нужна оплата`,
+      helper: "Оплатите и загрузите чек, чтобы мастер сразу продолжил работу.",
       cta: "Перейти к оплате",
     };
   }
@@ -106,7 +106,7 @@ function resolveAttentionAction(item) {
     return {
       actionKey: "open_chat",
       title: `Заявка #${item.id}: чек на проверке`,
-      helper: "Обычно это занимает 1-5 минут. Если дольше, откройте чат.",
+      helper: "Проверка обычно занимает 1-5 минут. При вопросах откройте чат.",
       cta: "Открыть чат",
     };
   }
@@ -142,7 +142,7 @@ export default function MyAppointmentsPage() {
   const [activeFilter, setActiveFilter] = useState("ALL");
   const [onlyUnread, setOnlyUnread] = useState(false);
   const [sortValue, setSortValue] = useState("updated_desc");
-  const [showAdvancedFilters, setShowAdvancedFilters] = useState(!isMobile);
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
 
   const load = useCallback(async ({ silent = false } = {}) => {
     setLoading(true);
@@ -160,10 +160,6 @@ export default function MyAppointmentsPage() {
   useEffect(() => {
     load();
   }, [load]);
-
-  useEffect(() => {
-    setShowAdvancedFilters(!isMobile);
-  }, [isMobile]);
 
   useAutoRefresh(
     async () => {
@@ -209,15 +205,6 @@ export default function MyAppointmentsPage() {
   const priorityItem = useMemo(() => sortItems(items, "priority")[0] || null, [items]);
   const attentionAction = useMemo(() => resolveAttentionAction(priorityItem), [priorityItem]);
 
-  const repeatAppointment = async (appointmentId) => {
-    try {
-      const response = await appointmentsApi.repeat(appointmentId);
-      navigate(`/appointments/${response.data.id}`);
-    } catch {
-      setError("Не удалось создать повторную заявку");
-    }
-  };
-
   const handleWorkflowAction = (actionKey, item) => {
     if (actionKey === "create_new") {
       navigate("/client/create");
@@ -252,15 +239,17 @@ export default function MyAppointmentsPage() {
               </Typography>
             </Box>
             <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
-              <Button
-                variant="outlined"
-                startIcon={<RefreshRoundedIcon />}
-                onClick={() => load()}
-                disabled={loading}
-                sx={{ minWidth: { xs: "100%", sm: 140 } }}
-              >
-                Обновить
-              </Button>
+              {!isMobile ? (
+                <Button
+                  variant="outlined"
+                  startIcon={<RefreshRoundedIcon />}
+                  onClick={() => load()}
+                  disabled={loading}
+                  sx={{ minWidth: { xs: "100%", sm: 140 } }}
+                >
+                  Обновить
+                </Button>
+              ) : null}
               <Button
                 variant="contained"
                 onClick={() => navigate("/client/create")}
@@ -323,18 +312,16 @@ export default function MyAppointmentsPage() {
         <Stack spacing={1}>
           <Stack direction="row" justifyContent="space-between" alignItems="center">
             <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
-              Фильтр и сортировка
+              Фильтры и поиск
             </Typography>
-            {isMobile ? (
-              <Button
-                size="small"
-                variant={showAdvancedFilters ? "outlined" : "text"}
-                startIcon={<TuneRoundedIcon fontSize="small" />}
-                onClick={() => setShowAdvancedFilters((prev) => !prev)}
-              >
-                {showAdvancedFilters ? "Свернуть" : "Настроить"}
-              </Button>
-            ) : null}
+            <Button
+              size="small"
+              variant={showAdvancedFilters ? "outlined" : "text"}
+              startIcon={<TuneRoundedIcon fontSize="small" />}
+              onClick={() => setShowAdvancedFilters((prev) => !prev)}
+            >
+              {showAdvancedFilters ? "Скрыть" : "Показать"}
+            </Button>
           </Stack>
 
           <Tabs value={activeFilter} onChange={(_, value) => setActiveFilter(value)} variant="scrollable" allowScrollButtonsMobile>
@@ -395,20 +382,14 @@ export default function MyAppointmentsPage() {
       ) : filteredItems.length ? (
         <Stack spacing={1}>
           {filteredItems.map((item) => (
-            <Stack key={item.id} spacing={0.5}>
-              <AppointmentCard
-                item={item}
-                role="client"
-                linkTo={`/appointments/${item.id}`}
-                showWorkflowAction
-                onPrimaryAction={handleWorkflowAction}
-              />
-              {["COMPLETED", "DECLINED_BY_MASTER", "CANCELLED"].includes(item.status) ? (
-                <Button variant="text" size="small" sx={{ alignSelf: "flex-start" }} onClick={() => repeatAppointment(item.id)}>
-                  Повторить заявку
-                </Button>
-              ) : null}
-            </Stack>
+            <AppointmentCard
+              key={item.id}
+              item={item}
+              role="client"
+              linkTo={`/appointments/${item.id}`}
+              showWorkflowAction={!isMobile}
+              onPrimaryAction={handleWorkflowAction}
+            />
           ))}
         </Stack>
       ) : (

@@ -44,16 +44,16 @@ const URL_REGEX = /\bhttps?:\/\/[^\s<>"']+/gi;
 
 const QUICK_TEMPLATES = {
   client: [
-    "Я на месте, готов к подключению.",
-    "Оплату отправил, проверьте пожалуйста.",
-    "Не получается, нужна помощь пошагово.",
+    "Р Р‡ Р Р…Р В° Р СР ВµРЎРѓРЎвЂљР Вµ, Р С–Р С•РЎвЂљР С•Р Р† Р С” Р С—Р С•Р Т‘Р С”Р В»РЎР‹РЎвЂЎР ВµР Р…Р С‘РЎР‹.",
+    "Р С›Р С—Р В»Р В°РЎвЂљРЎС“ Р С•РЎвЂљР С—РЎР‚Р В°Р Р†Р С‘Р В», Р С—РЎР‚Р С•Р Р†Р ВµРЎР‚РЎРЉРЎвЂљР Вµ Р С—Р С•Р В¶Р В°Р В»РЎС“Р в„–РЎРѓРЎвЂљР В°.",
+    "Р СњР Вµ Р С—Р С•Р В»РЎС“РЎвЂЎР В°Р ВµРЎвЂљРЎРѓРЎРЏ, Р Р…РЎС“Р В¶Р Р…Р В° Р С—Р С•Р СР С•РЎвЂ°РЎРЉ Р С—Р С•РЎв‚¬Р В°Р С–Р С•Р Р†Р С•.",
   ],
   master: [
-    "Проверил данные, сейчас продолжаю работу.",
-    "Нужен короткий доступ к ПК для следующего шага.",
-    "Проверьте результат и дайте обратную связь.",
+    "Р СџРЎР‚Р С•Р Р†Р ВµРЎР‚Р С‘Р В» Р Т‘Р В°Р Р…Р Р…РЎвЂ№Р Вµ, РЎРѓР ВµР в„–РЎвЂЎР В°РЎРѓ Р С—РЎР‚Р С•Р Т‘Р С•Р В»Р В¶Р В°РЎР‹ РЎР‚Р В°Р В±Р С•РЎвЂљРЎС“.",
+    "Р СњРЎС“Р В¶Р ВµР Р… Р С”Р С•РЎР‚Р С•РЎвЂљР С”Р С‘Р в„– Р Т‘Р С•РЎРѓРЎвЂљРЎС“Р С— Р С” Р СџР С™ Р Т‘Р В»РЎРЏ РЎРѓР В»Р ВµР Т‘РЎС“РЎР‹РЎвЂ°Р ВµР С–Р С• РЎв‚¬Р В°Р С–Р В°.",
+    "Р СџРЎР‚Р С•Р Р†Р ВµРЎР‚РЎРЉРЎвЂљР Вµ РЎР‚Р ВµР В·РЎС“Р В»РЎРЉРЎвЂљР В°РЎвЂљ Р С‘ Р Т‘Р В°Р в„–РЎвЂљР Вµ Р С•Р В±РЎР‚Р В°РЎвЂљР Р…РЎС“РЎР‹ РЎРѓР Р†РЎРЏР В·РЎРЉ.",
   ],
-  admin: ["Подключили поддержку, сейчас поможем решить вопрос."],
+  admin: ["Р СџР С•Р Т‘Р С”Р В»РЎР‹РЎвЂЎР С‘Р В»Р С‘ Р С—Р С•Р Т‘Р Т‘Р ВµРЎР‚Р В¶Р С”РЎС“, РЎРѓР ВµР в„–РЎвЂЎР В°РЎРѓ Р С—Р С•Р СР С•Р В¶Р ВµР С РЎР‚Р ВµРЎв‚¬Р С‘РЎвЂљРЎРЉ Р Р†Р С•Р С—РЎР‚Р С•РЎРѓ."],
 };
 
 function mapSystemEvents(systemEvents = []) {
@@ -81,7 +81,7 @@ function mapSystemEvents(systemEvents = []) {
       type: "system_event",
       id: `system-${event.id}`,
       created_at: event.created_at,
-      text: event.title || event.event_type || "Системное событие",
+      text: event.title || event.event_type || "Р РЋР С‘РЎРѓРЎвЂљР ВµР СР Р…Р С•Р Вµ РЎРѓР С•Р В±РЎвЂ№РЎвЂљР С‘Р Вµ",
     }));
 }
 
@@ -90,10 +90,10 @@ function validateAttachment(file) {
 
   const extension = (file.name.split(".").pop() || "").toLowerCase();
   if (!ALLOWED_EXTENSIONS.includes(extension)) {
-    return "Файл должен быть в формате jpg/jpeg/png/pdf/txt/log/zip";
+    return "Р В¤Р В°Р в„–Р В» Р Т‘Р С•Р В»Р В¶Р ВµР Р… Р В±РЎвЂ№РЎвЂљРЎРЉ Р Р† РЎвЂћР С•РЎР‚Р СР В°РЎвЂљР Вµ jpg/jpeg/png/pdf/txt/log/zip";
   }
   if (file.size > MAX_FILE_SIZE) {
-    return "Размер файла не должен превышать 10 МБ";
+    return "Р В Р В°Р В·Р СР ВµРЎР‚ РЎвЂћР В°Р в„–Р В»Р В° Р Р…Р Вµ Р Т‘Р С•Р В»Р В¶Р ВµР Р… Р С—РЎР‚Р ВµР Р†РЎвЂ№РЎв‚¬Р В°РЎвЂљРЎРЉ 10 Р СљР вЂ";
   }
   return "";
 }
@@ -140,7 +140,7 @@ function buildLinkItems(messages = []) {
       items.push({
         id: key,
         url,
-        sender_username: message.sender_username || "Пользователь",
+        sender_username: message.sender_username || "Р СџР С•Р В»РЎРЉР В·Р С•Р Р†Р В°РЎвЂљР ВµР В»РЎРЉ",
         created_at: message.created_at,
         message_text: message.text || "",
       });
@@ -190,7 +190,7 @@ export default function ChatPanel({
 
   const isMaster = currentUser.role === "master";
   const isMinimalClientMode = minimalClient && currentUser.role === "client";
-  const isSplitClientLayout = isMinimalClientMode && !isMobile;
+  const isSplitClientLayout = false;
   const safeDownloadLinks = useMemo(
     () => (downloadLinks || []).filter((item) => item?.href && item?.label),
     [downloadLinks]
@@ -251,7 +251,7 @@ export default function ChatPanel({
           }
         }
       } catch {
-        setError("Не удалось загрузить сообщения");
+        setError("Р СњР Вµ РЎС“Р Т‘Р В°Р В»Р С•РЎРѓРЎРЉ Р В·Р В°Р С–РЎР‚РЎС“Р В·Р С‘РЎвЂљРЎРЉ РЎРѓР С•Р С•Р В±РЎвЂ°Р ВµР Р…Р С‘РЎРЏ");
       }
     },
     [appointmentId, currentUser.id, isNearBottom, scrollToBottom]
@@ -268,7 +268,7 @@ export default function ChatPanel({
       setQuickReplies(response.data || []);
       setQuickReplyError("");
     } catch {
-      setQuickReplyError("Не удалось загрузить быстрые ответы.");
+      setQuickReplyError("Р СњР Вµ РЎС“Р Т‘Р В°Р В»Р С•РЎРѓРЎРЉ Р В·Р В°Р С–РЎР‚РЎС“Р В·Р С‘РЎвЂљРЎРЉ Р В±РЎвЂ№РЎРѓРЎвЂљРЎР‚РЎвЂ№Р Вµ Р С•РЎвЂљР Р†Р ВµРЎвЂљРЎвЂ№.");
     }
   }, [isMaster]);
 
@@ -335,7 +335,7 @@ export default function ChatPanel({
     const optimisticMessage = {
       id: optimisticId,
       sender: currentUser.id,
-      sender_username: currentUser.username || "Вы",
+      sender_username: currentUser.username || "Р вЂ™РЎвЂ№",
       text: resolvedText,
       file_url: null,
       created_at: new Date().toISOString(),
@@ -365,7 +365,7 @@ export default function ChatPanel({
       setError("");
     } catch (sendError) {
       setMessages((prev) => prev.filter((item) => item.id !== optimisticId));
-      setError(sendError?.response?.data?.detail || "Не удалось отправить сообщение");
+      setError(sendError?.response?.data?.detail || "Р СњР Вµ РЎС“Р Т‘Р В°Р В»Р С•РЎРѓРЎРЉ Р С•РЎвЂљР С—РЎР‚Р В°Р Р†Р С‘РЎвЂљРЎРЉ РЎРѓР С•Р С•Р В±РЎвЂ°Р ВµР Р…Р С‘Р Вµ");
     } finally {
       setIsSending(false);
     }
@@ -382,7 +382,7 @@ export default function ChatPanel({
         )
       );
     } catch {
-      setError("Не удалось удалить сообщение");
+      setError("Р СњР Вµ РЎС“Р Т‘Р В°Р В»Р С•РЎРѓРЎРЉ РЎС“Р Т‘Р В°Р В»Р С‘РЎвЂљРЎРЉ РЎРѓР С•Р С•Р В±РЎвЂ°Р ВµР Р…Р С‘Р Вµ");
     }
   };
 
@@ -403,7 +403,7 @@ export default function ChatPanel({
     try {
       await navigator.clipboard.writeText(link);
     } catch {
-      setError("Не удалось скопировать ссылку");
+      setError("Р СњР Вµ РЎС“Р Т‘Р В°Р В»Р С•РЎРѓРЎРЉ РЎРѓР С”Р С•Р С—Р С‘РЎР‚Р С•Р Р†Р В°РЎвЂљРЎРЉ РЎРѓРЎРѓРЎвЂ№Р В»Р С”РЎС“");
     }
   };
 
@@ -430,7 +430,7 @@ export default function ChatPanel({
     };
 
     if (!payload.command || !payload.text) {
-      setQuickReplyError("Заполните команду и текст шаблона.");
+      setQuickReplyError("Р вЂ”Р В°Р С—Р С•Р В»Р Р…Р С‘РЎвЂљР Вµ Р С”Р С•Р СР В°Р Р…Р Т‘РЎС“ Р С‘ РЎвЂљР ВµР С”РЎРѓРЎвЂљ РЎв‚¬Р В°Р В±Р В»Р С•Р Р…Р В°.");
       return;
     }
 
@@ -444,7 +444,7 @@ export default function ChatPanel({
       await loadQuickReplies();
       resetReplyForm();
     } catch (err) {
-      setQuickReplyError(err?.response?.data?.detail || "Не удалось сохранить быстрый ответ.");
+      setQuickReplyError(err?.response?.data?.detail || "Р СњР Вµ РЎС“Р Т‘Р В°Р В»Р С•РЎРѓРЎРЉ РЎРѓР С•РЎвЂ¦РЎР‚Р В°Р Р…Р С‘РЎвЂљРЎРЉ Р В±РЎвЂ№РЎРѓРЎвЂљРЎР‚РЎвЂ№Р в„– Р С•РЎвЂљР Р†Р ВµРЎвЂљ.");
     } finally {
       setQuickReplySaving(false);
     }
@@ -459,7 +459,7 @@ export default function ChatPanel({
         resetReplyForm();
       }
     } catch (err) {
-      setQuickReplyError(err?.response?.data?.detail || "Не удалось удалить быстрый ответ.");
+      setQuickReplyError(err?.response?.data?.detail || "Р СњР Вµ РЎС“Р Т‘Р В°Р В»Р С•РЎРѓРЎРЉ РЎС“Р Т‘Р В°Р В»Р С‘РЎвЂљРЎРЉ Р В±РЎвЂ№РЎРѓРЎвЂљРЎР‚РЎвЂ№Р в„– Р С•РЎвЂљР Р†Р ВµРЎвЂљ.");
     } finally {
       setQuickReplySaving(false);
     }
@@ -492,7 +492,7 @@ export default function ChatPanel({
             >
               <Stack spacing={0.45}>
                 <Typography variant="caption" color="text.secondary">
-                  {item.sender_username} • {dayjs(item.created_at).format("DD.MM.YYYY HH:mm")}
+                  {item.sender_username} РІР‚Сћ {dayjs(item.created_at).format("DD.MM.YYYY HH:mm")}
                 </Typography>
                 <Typography
                   component="a"
@@ -518,7 +518,7 @@ export default function ChatPanel({
                     target="_blank"
                     rel="noreferrer"
                   >
-                    Открыть
+                    Р С›РЎвЂљР С”РЎР‚РЎвЂ№РЎвЂљРЎРЉ
                   </Button>
                   <Button
                     size="small"
@@ -526,7 +526,7 @@ export default function ChatPanel({
                     startIcon={<ContentCopyRoundedIcon fontSize="small" />}
                     onClick={() => copyLink(item.url)}
                   >
-                    Копировать
+                    Р С™Р С•Р С—Р С‘РЎР‚Р С•Р Р†Р В°РЎвЂљРЎРЉ
                   </Button>
                 </Stack>
               </Stack>
@@ -535,7 +535,7 @@ export default function ChatPanel({
         </Stack>
       ) : (
         <Typography variant="body2" color="text.secondary">
-          Ссылок пока нет. Отправьте сообщение с `https://...`, и ссылка появится здесь автоматически.
+          Р РЋРЎРѓРЎвЂ№Р В»Р С•Р С” Р С—Р С•Р С”Р В° Р Р…Р ВµРЎвЂљ. Р С›РЎвЂљР С—РЎР‚Р В°Р Р†РЎРЉРЎвЂљР Вµ РЎРѓР С•Р С•Р В±РЎвЂ°Р ВµР Р…Р С‘Р Вµ РЎРѓ `https://...`, Р С‘ РЎРѓРЎРѓРЎвЂ№Р В»Р С”Р В° Р С—Р С•РЎРЏР Р†Р С‘РЎвЂљРЎРѓРЎРЏ Р В·Р Т‘Р ВµРЎРѓРЎРЉ Р В°Р Р†РЎвЂљР С•Р СР В°РЎвЂљР С‘РЎвЂЎР ВµРЎРѓР С”Р С‘.
         </Typography>
       )}
     </Paper>
@@ -557,12 +557,12 @@ export default function ChatPanel({
           <Chip
             size="small"
             icon={<LinkRoundedIcon />}
-            label={isSplitClientLayout ? `Ссылок: ${linkItems.length}` : `Ссылки: ${linkItems.length}`}
+            label={`РЎСЃС‹Р»РєРё: ${linkItems.length}`}
             variant="outlined"
           />
         </Stack>
 
-        {!isSplitClientLayout ? (
+        {!isSplitClientLayout && !isMinimalClientMode ? (
           <Tabs
             value={chatView}
             onChange={(_, value) => setChatView(value)}
@@ -579,8 +579,8 @@ export default function ChatPanel({
               },
             }}
           >
-            <Tab value="messages" label="Сообщения" />
-            <Tab value="links" label={`Ссылки (${linkItems.length})`} />
+            <Tab value="messages" label="РЎРѕРѕР±С‰РµРЅРёСЏ" />
+            <Tab value="links" label={`РЎСЃС‹Р»РєРё (${linkItems.length})`} />
           </Tabs>
         ) : null}
 
@@ -588,7 +588,7 @@ export default function ChatPanel({
           <Stack spacing={0.65}>
             <Stack direction="row" justifyContent="space-between" alignItems="center">
               <Typography variant="caption" color="text.secondary">
-                {isMaster ? "Быстрые фразы и команды" : "Быстрые фразы"}
+                {isMaster ? "Р вЂРЎвЂ№РЎРѓРЎвЂљРЎР‚РЎвЂ№Р Вµ РЎвЂћРЎР‚Р В°Р В·РЎвЂ№ Р С‘ Р С”Р С•Р СР В°Р Р…Р Т‘РЎвЂ№" : "Р вЂРЎвЂ№РЎРѓРЎвЂљРЎР‚РЎвЂ№Р Вµ РЎвЂћРЎР‚Р В°Р В·РЎвЂ№"}
               </Typography>
               <Button
                 size="small"
@@ -597,7 +597,7 @@ export default function ChatPanel({
                 onClick={() => setQuickPhrasesOpen((prev) => !prev)}
                 sx={{ minHeight: 28, px: 1 }}
               >
-                {quickPhrasesOpen ? "Скрыть" : "Показать"}
+                {quickPhrasesOpen ? "Р РЋР С”РЎР‚РЎвЂ№РЎвЂљРЎРЉ" : "Р СџР С•Р С”Р В°Р В·Р В°РЎвЂљРЎРЉ"}
               </Button>
             </Stack>
             {quickPhrasesOpen ? (
@@ -621,7 +621,7 @@ export default function ChatPanel({
                   ? quickReplies.map((item) => (
                       <Chip
                         key={item.id}
-                        label={item.title ? `/${item.command} — ${item.title}` : `/${item.command}`}
+                        label={item.title ? `/${item.command} РІР‚вЂќ ${item.title}` : `/${item.command}`}
                         color="primary"
                         variant="outlined"
                         onClick={() => applyQuickReplyCommand(item.command)}
@@ -637,21 +637,21 @@ export default function ChatPanel({
         {isMaster ? (
           <Stack direction="row" justifyContent="space-between" alignItems="center">
             <Typography variant="caption" color="text.secondary">
-              Команды мастера: введите `/команда`, например `/1`.
+              Р С™Р С•Р СР В°Р Р…Р Т‘РЎвЂ№ Р СР В°РЎРѓРЎвЂљР ВµРЎР‚Р В°: Р Р†Р Р†Р ВµР Т‘Р С‘РЎвЂљР Вµ `/Р С”Р С•Р СР В°Р Р…Р Т‘Р В°`, Р Р…Р В°Р С—РЎР‚Р С‘Р СР ВµРЎР‚ `/1`.
             </Typography>
             <Button
               size="small"
               startIcon={<SettingsRoundedIcon fontSize="small" />}
               onClick={() => setQuickRepliesOpen(true)}
             >
-              Управлять
+              Р Р€Р С—РЎР‚Р В°Р Р†Р В»РЎРЏРЎвЂљРЎРЉ
             </Button>
           </Stack>
         ) : null}
 
         {error ? <Alert severity="error">{error}</Alert> : null}
         {fileError ? <Alert severity="warning">{fileError}</Alert> : null}
-        {file && !fileError ? <Alert severity="success">Файл готов к отправке: {file.name}</Alert> : null}
+        {file && !fileError ? <Alert severity="success">Р В¤Р В°Р в„–Р В» Р С–Р С•РЎвЂљР С•Р Р† Р С” Р С•РЎвЂљР С—РЎР‚Р В°Р Р†Р С”Р Вµ: {file.name}</Alert> : null}
 
         {isSplitClientLayout ? (
           <Box
@@ -706,7 +706,7 @@ export default function ChatPanel({
                 >
                   <Stack spacing={0.55}>
                     <Typography variant="caption" color="text.secondary">
-                      Скачать и открыть
+                      Р РЋР С”Р В°РЎвЂЎР В°РЎвЂљРЎРЉ Р С‘ Р С•РЎвЂљР С”РЎР‚РЎвЂ№РЎвЂљРЎРЉ
                     </Typography>
                     {safeDownloadLinks.map((item) => (
                       <Button
@@ -726,12 +726,12 @@ export default function ChatPanel({
                 </Paper>
               ) : null}
               <Typography variant="caption" color="text.secondary" sx={{ px: 0.2 }}>
-                Ссылки из чата
+                Р РЋРЎРѓРЎвЂ№Р В»Р С”Р С‘ Р С‘Р В· РЎвЂЎР В°РЎвЂљР В°
               </Typography>
               {linksPanel}
             </Stack>
           </Box>
-        ) : chatView === "messages" ? (
+        ) : isMinimalClientMode || chatView === "messages" ? (
           <>
             {newIncomingCount > 0 ? (
               <Button
@@ -777,8 +777,8 @@ export default function ChatPanel({
         >
           <Stack spacing={1}>
             <TextField
-              label={chatView === "links" && !isSplitClientLayout ? "Ссылка или сообщение" : "Сообщение"}
-              placeholder={chatView === "links" && !isSplitClientLayout ? "Вставьте ссылку вида https://..." : ""}
+              label="РЎРѕРѕР±С‰РµРЅРёРµ"
+              placeholder=""
               multiline
               minRows={isMobile ? 2.3 : 2}
               value={text}
@@ -789,17 +789,7 @@ export default function ChatPanel({
                   onSend();
                 }
               }}
-              helperText={
-                isMinimalClientMode
-                  ? "Пишите коротко и по делу. Ссылки автоматически появляются справа."
-                  : chatView === "links"
-                  ? "Режим «Ссылки»: вставьте URL, чтобы он появился во вкладке ссылок. Ctrl+Enter для отправки."
-                  : text.trim().length
-                    ? "Сообщение готово к отправке. Ctrl+Enter для быстрой отправки"
-                    : isMaster
-                      ? "Можно писать /команда (пример: /1). Ctrl+Enter для быстрой отправки"
-                      : "Пишите коротко и по делу. Ctrl+Enter для быстрой отправки"
-              }
+              helperText={isMinimalClientMode ? "Пишите коротко и по делу. Ctrl+Enter для отправки." : "Ctrl+Enter для быстрой отправки."}
             />
             <Stack direction="row" spacing={1} alignItems="center">
               <Button component="label" variant="outlined" startIcon={<AttachFileIcon />}>
@@ -818,26 +808,26 @@ export default function ChatPanel({
       </Stack>
 
       <Dialog open={quickRepliesOpen} onClose={() => setQuickRepliesOpen(false)} fullWidth maxWidth="md">
-        <DialogTitle>Быстрые ответы мастера</DialogTitle>
+        <DialogTitle>Р вЂРЎвЂ№РЎРѓРЎвЂљРЎР‚РЎвЂ№Р Вµ Р С•РЎвЂљР Р†Р ВµРЎвЂљРЎвЂ№ Р СР В°РЎРѓРЎвЂљР ВµРЎР‚Р В°</DialogTitle>
         <DialogContent dividers>
           <Stack spacing={1.2}>
             <Typography variant="body2" color="text.secondary">
-              Создайте свои команды и используйте их в чате: `/1`, `/привет` и т.д.
+              Р РЋР С•Р В·Р Т‘Р В°Р в„–РЎвЂљР Вµ РЎРѓР Р†Р С•Р С‘ Р С”Р С•Р СР В°Р Р…Р Т‘РЎвЂ№ Р С‘ Р С‘РЎРѓР С—Р С•Р В»РЎРЉР В·РЎС“Р в„–РЎвЂљР Вµ Р С‘РЎвЂ¦ Р Р† РЎвЂЎР В°РЎвЂљР Вµ: `/1`, `/Р С—РЎР‚Р С‘Р Р†Р ВµРЎвЂљ` Р С‘ РЎвЂљ.Р Т‘.
             </Typography>
 
             {quickReplyError ? <Alert severity="error">{quickReplyError}</Alert> : null}
 
             <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
               <TextField
-                label="Команда"
+                label="Р С™Р С•Р СР В°Р Р…Р Т‘Р В°"
                 placeholder="/1"
                 value={replyForm.command}
                 onChange={(event) => setReplyForm((prev) => ({ ...prev, command: event.target.value }))}
                 sx={{ minWidth: { xs: "100%", sm: 160 } }}
               />
               <TextField
-                label="Название (опционально)"
-                placeholder="Инструкция по установке"
+                label="Р СњР В°Р В·Р Р†Р В°Р Р…Р С‘Р Вµ (Р С•Р С—РЎвЂ Р С‘Р С•Р Р…Р В°Р В»РЎРЉР Р…Р С•)"
+                placeholder="Р ВР Р…РЎРѓРЎвЂљРЎР‚РЎС“Р С”РЎвЂ Р С‘РЎРЏ Р С—Р С• РЎС“РЎРѓРЎвЂљР В°Р Р…Р С•Р Р†Р С”Р Вµ"
                 value={replyForm.title}
                 onChange={(event) => setReplyForm((prev) => ({ ...prev, title: event.target.value }))}
                 sx={{ flexGrow: 1 }}
@@ -845,7 +835,7 @@ export default function ChatPanel({
             </Stack>
 
             <TextField
-              label="Текст шаблона"
+              label="Р СћР ВµР С”РЎРѓРЎвЂљ РЎв‚¬Р В°Р В±Р В»Р С•Р Р…Р В°"
               multiline
               minRows={3}
               value={replyForm.text}
@@ -859,11 +849,11 @@ export default function ChatPanel({
                 onClick={saveQuickReply}
                 disabled={quickReplySaving}
               >
-                {replyForm.id ? "Сохранить" : "Добавить"}
+                {replyForm.id ? "Р РЋР С•РЎвЂ¦РЎР‚Р В°Р Р…Р С‘РЎвЂљРЎРЉ" : "Р вЂќР С•Р В±Р В°Р Р†Р С‘РЎвЂљРЎРЉ"}
               </Button>
               {replyForm.id ? (
                 <Button variant="outlined" onClick={resetReplyForm} disabled={quickReplySaving}>
-                  Новый шаблон
+                  Р СњР С•Р Р†РЎвЂ№Р в„– РЎв‚¬Р В°Р В±Р В»Р С•Р Р…
                 </Button>
               ) : null}
             </Stack>
@@ -877,7 +867,7 @@ export default function ChatPanel({
                     <Stack direction="row" justifyContent="space-between" spacing={1}>
                       <Box sx={{ minWidth: 0 }}>
                         <Typography variant="body2" sx={{ fontWeight: 700 }}>
-                          /{item.command} {item.title ? `— ${item.title}` : ""}
+                          /{item.command} {item.title ? `РІР‚вЂќ ${item.title}` : ""}
                         </Typography>
                         <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: "pre-wrap" }}>
                           {item.text}
@@ -896,14 +886,14 @@ export default function ChatPanel({
                 ))
               ) : (
                 <Typography variant="body2" color="text.secondary">
-                  Шаблонов пока нет. Добавьте первый быстрый ответ.
+                  Р РЃР В°Р В±Р В»Р С•Р Р…Р С•Р Р† Р С—Р С•Р С”Р В° Р Р…Р ВµРЎвЂљ. Р вЂќР С•Р В±Р В°Р Р†РЎРЉРЎвЂљР Вµ Р С—Р ВµРЎР‚Р Р†РЎвЂ№Р в„– Р В±РЎвЂ№РЎРѓРЎвЂљРЎР‚РЎвЂ№Р в„– Р С•РЎвЂљР Р†Р ВµРЎвЂљ.
                 </Typography>
               )}
             </Stack>
           </Stack>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setQuickRepliesOpen(false)}>Закрыть</Button>
+          <Button onClick={() => setQuickRepliesOpen(false)}>Р вЂ”Р В°Р С”РЎР‚РЎвЂ№РЎвЂљРЎРЉ</Button>
         </DialogActions>
       </Dialog>
     </Paper>
