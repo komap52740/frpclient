@@ -605,21 +605,51 @@ export default function AppointmentDetailPage() {
 
   const openRuDesktopSession = async (remoteId, remotePassword = "") => {
     const preparedId = String(remoteId || "").trim();
+    const preparedPassword = String(remotePassword || "").trim();
     if (!preparedId) {
       setError("Логин/ID RuDesktop не указан");
       return;
     }
 
-    const payload = remotePassword
-      ? `Логин/ID RuDesktop: ${preparedId}\nПароль: ${remotePassword}`
+    const payload = preparedPassword
+      ? `Логин/ID RuDesktop: ${preparedId}\nПароль: ${preparedPassword}`
       : `Логин/ID RuDesktop: ${preparedId}`;
 
     try {
       await navigator.clipboard.writeText(payload);
-      setSuccess("Данные скопированы. Откройте RuDesktop и вставьте логин/ID в поле подключения.");
+      setSuccess("Запускаем RuDesktop. Данные подключения уже скопированы в буфер.");
     } catch {
-      setSuccess("Откройте RuDesktop, затем скопируйте логин/ID и пароль вручную из карточки.");
+      setSuccess("Запускаем RuDesktop. Если не откроется — скопируйте данные вручную из карточки.");
     }
+
+    const encodedId = encodeURIComponent(preparedId);
+    const encodedPassword = encodeURIComponent(preparedPassword);
+    const uriCandidates = preparedPassword
+      ? [
+          `rudesktop://${encodedId}?password=${encodedPassword}`,
+          `rudesktop://${encodedId}`,
+          `rustdesk://${encodedId}?password=${encodedPassword}`,
+          `rustdesk://${encodedId}`,
+        ]
+      : [
+          `rudesktop://${encodedId}`,
+          `rustdesk://${encodedId}`,
+        ];
+
+    uriCandidates.forEach((uri, index) => {
+      window.setTimeout(() => {
+        if (!document.hidden) {
+          window.location.href = uri;
+        }
+      }, 550 * index);
+    });
+
+    window.setTimeout(() => {
+      if (!document.hidden) {
+        window.open(RU_DESKTOP_DOWNLOAD_URL, "_blank", "noopener,noreferrer");
+        setError("Не удалось открыть RuDesktop автоматически. Установите/переустановите клиент и попробуйте снова.");
+      }
+    }, 550 * uriCandidates.length + 700);
   };
 
   if (!appointment) {
@@ -1815,7 +1845,7 @@ export default function AppointmentDetailPage() {
                           sx={{ alignSelf: "flex-start" }}
                           disabled={!canLaunchRuDesktop}
                         >
-                          Подготовить подключение
+                          Подключиться по кнопке
                         </Button>
                       ) : null}
                       <Stack direction="row" spacing={0.7} flexWrap="wrap" useFlexGap>
@@ -1841,7 +1871,7 @@ export default function AppointmentDetailPage() {
                       {hasRuDesktopCredentials ? (
                         <Typography variant="caption" color="text.secondary">
                           {canLaunchRuDesktop
-                            ? "Кнопка подготовит подключение: скопирует логин/ID и пароль в буфер."
+                            ? "Кнопка запускает RuDesktop и сразу передает логин/ID (пароль тоже копируется в буфер)."
                             : "Подключение станет доступно после подтверждения оплаты и перехода заявки в работу."}
                         </Typography>
                       ) : null}
