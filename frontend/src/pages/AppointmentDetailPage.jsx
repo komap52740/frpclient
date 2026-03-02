@@ -65,6 +65,9 @@ import { normalizeRuText } from "../utils/text";
 
 dayjs.locale("ru");
 
+const RU_DESKTOP_DOWNLOAD_URL = "https://rudesktop.ru/downloads/";
+const RU_DESKTOP_HELP_URL = "https://rudesktop.ru/";
+
 const behaviorFlags = [
   { code: "bad_internet", label: "Проблемный интернет" },
   { code: "weak_pc", label: "Слабый ПК" },
@@ -618,7 +621,18 @@ export default function AppointmentDetailPage() {
       setSuccess("Открываем RuDesktop. Если нужно — скопируйте ID вручную.");
     }
 
-    window.location.href = "rustdesk://";
+    window.location.href = "rudesktop://";
+    window.setTimeout(() => {
+      if (!document.hidden) {
+        window.location.href = "rustdesk://";
+      }
+    }, 700);
+    window.setTimeout(() => {
+      if (!document.hidden) {
+        window.open(RU_DESKTOP_DOWNLOAD_URL, "_blank", "noopener,noreferrer");
+        setError("RuDesktop не найден. Установите приложение и повторите подключение.");
+      }
+    }, 1800);
   };
 
   if (!appointment) {
@@ -720,12 +734,12 @@ export default function AppointmentDetailPage() {
     {
       id: "rustdesk_download",
       label: "Скачать RuDesktop",
-      href: "https://rustdesk.com/download",
+      href: RU_DESKTOP_DOWNLOAD_URL,
     },
     {
       id: "rustdesk_guide",
       label: "Инструкция по RuDesktop",
-      href: "https://rustdesk.com/docs/en/",
+      href: RU_DESKTOP_HELP_URL,
     },
     ...(appointment.photo_lock_screen_url
       ? [
