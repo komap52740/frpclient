@@ -102,14 +102,10 @@ export default function CreateAppointmentPage() {
     setError("");
 
     const { brand, model } = splitDevice(form.device);
-    const description = form.description.trim();
+    const description =
+      form.description.trim() || "Нужна удаленная разблокировка. Детали уточню в чате.";
     if (!brand || !model) {
       setError("Укажите устройство (марка и модель)");
-      setSubmitting(false);
-      return;
-    }
-    if (!description) {
-      setError("Коротко опишите проблему");
       setSubmitting(false);
       return;
     }
@@ -162,7 +158,7 @@ export default function CreateAppointmentPage() {
       <Stack spacing={0.7} sx={{ mb: 2 }}>
         <Typography variant="h5">Новая заявка</Typography>
         <Typography variant="body2" color="text.secondary">
-          4 шага: устройство, проблема, RuDesktop ID, пароль. Остальное можно уточнить в чате.
+          3 обязательных шага: устройство, RuDesktop ID и пароль. Остальное можно уточнить в чате.
         </Typography>
       </Stack>
 
@@ -197,13 +193,13 @@ export default function CreateAppointmentPage() {
         </Stack>
 
         <TextField
-          label="Что случилось?"
-          placeholder="Коротко опишите проблему"
+          label="Комментарий (опционально)"
+          placeholder="Например: после сброса просит Google-аккаунт"
           multiline
           minRows={3}
           value={form.description}
           onChange={(event) => updateField("description", event.target.value)}
-          required
+          helperText="Можно не заполнять: мастер уточнит детали в чате."
         />
 
         <Stack direction="row" spacing={0.7} flexWrap="wrap" useFlexGap>

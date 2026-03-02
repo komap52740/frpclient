@@ -244,6 +244,17 @@ function dedupeEvents(eventItems = []) {
   });
 }
 
+function getAppointmentSnapshot(appointment) {
+  if (!appointment || typeof appointment !== "object") {
+    return "";
+  }
+  try {
+    return JSON.stringify(appointment);
+  } catch {
+    return `${appointment.id || ""}|${appointment.status || ""}|${appointment.updated_at || ""}`;
+  }
+}
+
 function formatEtaMinutes(minutes) {
   if (minutes == null) {
     return "—";
@@ -323,6 +334,7 @@ export default function AppointmentDetailPage() {
   const paymentFileInputRef = useRef(null);
   const lastEventIdRef = useRef(0);
   const lastKnownStatusRef = useRef(null);
+  const lastDetailSnapshotRef = useRef("");
 
   const mergeEvents = useCallback((incomingEvents = []) => {
     if (!incomingEvents.length) {
@@ -340,7 +352,8 @@ export default function AppointmentDetailPage() {
   const loadDetail = useCallback(async ({ preserveDrafts = false, silent = false } = {}) => {
     try {
       const appointmentResponse = await appointmentsApi.detail(id);
-      const nextStatus = appointmentResponse.data?.status || null;
+      const nextDetail = appointmentResponse.data || null;
+      const nextStatus = nextDetail?.status || null;
       const previousStatus = lastKnownStatusRef.current;
       if (previousStatus && nextStatus && previousStatus !== nextStatus) {
         setToast({
@@ -351,12 +364,17 @@ export default function AppointmentDetailPage() {
         });
       }
       lastKnownStatusRef.current = nextStatus;
-      setAppointment(appointmentResponse.data);
-      if (!preserveDrafts) {
-        setPrice(appointmentResponse.data.total_price || "");
-        setManualStatus(appointmentResponse.data.status);
+      const nextSnapshot = getAppointmentSnapshot(nextDetail);
+      const changed = nextSnapshot !== lastDetailSnapshotRef.current;
+      if (changed) {
+        lastDetailSnapshotRef.current = nextSnapshot;
+        setAppointment(nextDetail);
+        setLastSyncedAt(dayjs());
       }
-      setLastSyncedAt(dayjs());
+      if (!preserveDrafts && nextDetail) {
+        setPrice(nextDetail.total_price || "");
+        setManualStatus(nextDetail.status);
+      }
       setError("");
     } catch {
       if (!silent) {
@@ -450,14 +468,19 @@ export default function AppointmentDetailPage() {
   }, [appointment?.id, appointment?.status, clientCompactView, searchParams, user?.role]);
 
   useAutoRefresh(async () => {
-    setIsRefreshing(true);
+    const showRefreshingState = user?.role !== "client";
+    if (showRefreshingState) {
+      setIsRefreshing(true);
+    }
     try {
       await Promise.all([
         loadDetail({ preserveDrafts: true, silent: true }),
         loadEvents({ silent: true, incremental: true }),
       ]);
     } finally {
-      setIsRefreshing(false);
+      if (showRefreshingState) {
+        setIsRefreshing(false);
+      }
     }
   }, {
     enabled: Boolean(id),
@@ -698,21 +721,25 @@ export default function AppointmentDetailPage() {
     isClient && !isClientMinimal && ["AWAITING_PAYMENT", "PAYMENT_PROOF_UPLOADED"].includes(appointment.status);
   const isClientCompact = isClient && clientCompactView;
   const clientDetailsTabEnabled = !isClientCompact;
-  const showClientDesktopSidebar = isClient && !isMobile && !isClientCompact && !isClientMinimal;
+  const showClientDesktopSidebar = isClient && !isMobile;
   const showClientPaymentDock =
     showClientDesktopSidebar &&
     ["AWAITING_PAYMENT", "PAYMENT_PROOF_UPLOADED"].includes(appointment.status);
-  const showClientFloatingActionBar = isClient && isMobile && !paymentFocusOpen && !showClientTabs && !isClientMinimal;
-  const showClientQuickRail = isClient && isMobile && !isClientCompact && !isClientMinimal;
+  const showClientFloatingActionBar = isClient && isMobile && !paymentFocusOpen;
+  const showClientQuickRail = false;
   const clientPaymentTabDisabled = !showClientPaymentActions;
-  const showClientDataCard = isClient ? !isClientMinimal && (!showClientTabs || (clientTab === "details" && clientDetailsTabEnabled)) : !showClientTabs || (clientTab === "details" && clientDetailsTabEnabled);
+  const showClientDataCard = isClient
+    ? false
+    : !showClientTabs || (clientTab === "details" && clientDetailsTabEnabled);
   const showClientPaymentCard =
     showClientPaymentActions &&
     !isClientMinimal &&
     (!showClientTabs || clientTab === "payment");
   const showClientChatPanel = !showClientTabs || clientTab === "chat";
   const showClientDetailsCard = !isClientMinimal && showClientTabs && clientTab === "details" && clientDetailsTabEnabled;
-  const showClientSecondaryCards = !isClientMinimal && !isClientCompact && (!showClientTabs || clientTab === "details");
+  const showClientSecondaryCards = isClient
+    ? false
+    : !isClientMinimal && !isClientCompact && (!showClientTabs || clientTab === "details");
   const paymentFlowStatusesDone = ["PAYMENT_PROOF_UPLOADED", "PAID", "IN_PROGRESS", "COMPLETED"];
   const paymentConfirmedStatuses = ["PAID", "IN_PROGRESS", "COMPLETED"];
   const latestPaymentProofEvent = timelineEvents.find((event) => event.event_type === "payment_proof_uploaded");
@@ -759,6 +786,11 @@ export default function AppointmentDetailPage() {
     cursor: "pointer",
   };
   const lastSyncLabel = dayjs(lastSyncedAt).format("HH:mm:ss");
+  const syncStatusText = isClient
+    ? `Последнее обновление: ${lastSyncLabel}`
+    : isRefreshing
+      ? "Обновляем статус и чат..."
+      : `Последнее обновление: ${lastSyncLabel}`;
   const visibleTimelineEvents = isClient ? timelineEvents.slice(0, isClientCompact ? 3 : 6) : timelineEvents;
   const sidebarTimelineEvents = isClient ? visibleTimelineEvents.slice(0, isClientCompact ? 2 : 4) : visibleTimelineEvents;
   const rustdeskId = (appointment.rustdesk_id || "").trim();
@@ -1280,16 +1312,16 @@ export default function AppointmentDetailPage() {
 
           {isRefreshing && !isClient ? <LinearProgress sx={{ borderRadius: 999 }} /> : null}
 
-          <Stack
-            direction={{ xs: "column", sm: "row" }}
-            spacing={1}
-            justifyContent="space-between"
-            alignItems={{ xs: "flex-start", sm: "center" }}
-          >
-            <Typography variant="caption" color="text.secondary">
-              {isRefreshing ? "Обновляем статус и чат..." : `Последнее обновление: ${lastSyncLabel}`}
-            </Typography>
-            {user.role !== "client" ? (
+          {!isClient ? (
+            <Stack
+              direction={{ xs: "column", sm: "row" }}
+              spacing={1}
+              justifyContent="space-between"
+              alignItems={{ xs: "flex-start", sm: "center" }}
+            >
+              <Typography variant="caption" color="text.secondary">
+                {syncStatusText}
+              </Typography>
               <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
                 <Button size="small" variant="text" onClick={() => handlePrimaryAction("open_payment")}>
                   К оплате
@@ -1301,8 +1333,8 @@ export default function AppointmentDetailPage() {
                   К ленте
                 </Button>
               </Stack>
-            ) : null}
-          </Stack>
+            </Stack>
+          ) : null}
         </Stack>
       </Paper>
 
@@ -1839,60 +1871,38 @@ export default function AppointmentDetailPage() {
         {(!isClient || showClientDesktopSidebar) ? (
           <Grid item xs={12} lg={4}>
             <Stack spacing={2} sx={{ position: { lg: "sticky" }, top: { lg: 88 } }}>
-              <Paper sx={{ p: 2.2 }}>
-              <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}>
-                <ShieldRoundedIcon color="primary" fontSize="small" />
-                <Typography variant="h3">{isClient ? "Быстрый контроль" : "Доверие и прозрачность"}</Typography>
-              </Stack>
+              {!isClient ? (
+                <Paper sx={{ p: 2.2 }}>
+                  <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}>
+                    <ShieldRoundedIcon color="primary" fontSize="small" />
+                    <Typography variant="h3">Доверие и прозрачность</Typography>
+                  </Stack>
 
-              <Stack spacing={0.7}>
-                <Typography variant="body2"><b>Мастер:</b> {normalizeRuText(appointment.master_username) || "Пока не назначен"}</Typography>
-                {user.role !== "client" ? (
-                  <Typography variant="body2"><b>Риск клиента:</b> {appointment.client_risk_level || "—"} {appointment.client_risk_score != null ? `(${appointment.client_risk_score})` : ""}</Typography>
-                ) : null}
-                <Typography variant="body2"><b>SLA ответ до:</b> {appointment.response_deadline_at ? dayjs(appointment.response_deadline_at).format("DD.MM.YYYY HH:mm") : "—"}</Typography>
-                <Typography variant="body2"><b>SLA завершение до:</b> {appointment.completion_deadline_at ? dayjs(appointment.completion_deadline_at).format("DD.MM.YYYY HH:mm") : "—"}</Typography>
-                {["NEW", "IN_REVIEW"].includes(appointment.status) && responseEtaMinutes != null ? (
-                  <Alert severity={responseEtaMinutes <= 0 ? "warning" : "info"} sx={{ py: 0 }}>
-                    Ожидаем ответ мастера: {formatEtaMinutes(responseEtaMinutes)}
-                  </Alert>
-                ) : null}
-                {["PAID", "IN_PROGRESS"].includes(appointment.status) && completionEtaMinutes != null ? (
-                  <Alert severity={completionEtaMinutes <= 0 ? "warning" : "info"} sx={{ py: 0 }}>
-                    Прогноз до завершения: {formatEtaMinutes(completionEtaMinutes)}
-                  </Alert>
-                ) : null}
-                {appointment.sla_breached ? (
-                  <Alert severity="warning">SLA нарушен. Мы уже уведомили администратора.</Alert>
-                ) : null}
-
-                {!isClient ? (
-                  <>
+                  <Stack spacing={0.7}>
+                    <Typography variant="body2"><b>Мастер:</b> {normalizeRuText(appointment.master_username) || "Пока не назначен"}</Typography>
+                    <Typography variant="body2"><b>Риск клиента:</b> {appointment.client_risk_level || "—"} {appointment.client_risk_score != null ? `(${appointment.client_risk_score})` : ""}</Typography>
+                    <Typography variant="body2"><b>SLA ответ до:</b> {appointment.response_deadline_at ? dayjs(appointment.response_deadline_at).format("DD.MM.YYYY HH:mm") : "—"}</Typography>
+                    <Typography variant="body2"><b>SLA завершение до:</b> {appointment.completion_deadline_at ? dayjs(appointment.completion_deadline_at).format("DD.MM.YYYY HH:mm") : "—"}</Typography>
+                    {["NEW", "IN_REVIEW"].includes(appointment.status) && responseEtaMinutes != null ? (
+                      <Alert severity={responseEtaMinutes <= 0 ? "warning" : "info"} sx={{ py: 0 }}>
+                        Ожидаем ответ мастера: {formatEtaMinutes(responseEtaMinutes)}
+                      </Alert>
+                    ) : null}
+                    {["PAID", "IN_PROGRESS"].includes(appointment.status) && completionEtaMinutes != null ? (
+                      <Alert severity={completionEtaMinutes <= 0 ? "warning" : "info"} sx={{ py: 0 }}>
+                        Прогноз до завершения: {formatEtaMinutes(completionEtaMinutes)}
+                      </Alert>
+                    ) : null}
+                    {appointment.sla_breached ? (
+                      <Alert severity="warning">SLA нарушен. Мы уже уведомили администратора.</Alert>
+                    ) : null}
                     <Divider sx={{ my: 0.7 }} />
                     <Typography variant="caption">Что делать дальше: ориентируйтесь на шаги сверху и используйте чат для всех уточнений.</Typography>
                     <Typography variant="caption">Обычно назначение мастера занимает 5-15 минут.</Typography>
                     <Typography variant="caption">Если не получается — напишите в чат, мы подключимся.</Typography>
-                  </>
-                ) : (
-                  <>
-                    <Divider sx={{ my: 0.7 }} />
-                    <Stack spacing={0.6}>
-                      {clientSidebarActions.map((action) => (
-                        <Button
-                          key={`sidebar-${action.id}`}
-                          size="small"
-                          startIcon={action.icon}
-                          variant={action.emphasis ? "contained" : "outlined"}
-                          onClick={() => handlePrimaryAction(action.key)}
-                        >
-                          {action.label}
-                        </Button>
-                      ))}
-                    </Stack>
-                  </>
-                )}
-              </Stack>
-            </Paper>
+                  </Stack>
+                </Paper>
+              ) : null}
 
               <Paper sx={{ p: 2.2 }}>
                 <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}>
@@ -1987,15 +1997,17 @@ export default function AppointmentDetailPage() {
                     </Alert>
                   )}
 
-                  <Button
-                    size="small"
-                    variant="outlined"
-                    startIcon={<LinkRoundedIcon fontSize="small" />}
-                    onClick={() => handlePrimaryAction("open_links")}
-                    sx={{ alignSelf: "flex-start" }}
-                  >
-                    Открыть чат-ссылки
-                  </Button>
+                  {!isClient ? (
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      startIcon={<LinkRoundedIcon fontSize="small" />}
+                      onClick={() => handlePrimaryAction("open_links")}
+                      sx={{ alignSelf: "flex-start" }}
+                    >
+                      Открыть чат-ссылки
+                    </Button>
+                  ) : null}
 
                   <Stack spacing={0.6}>
                     {sidebarLinks.map((item) => (
@@ -2017,37 +2029,34 @@ export default function AppointmentDetailPage() {
                 </Stack>
               </Paper>
 
-              <Paper ref={timelineRef} sx={{ p: 2.2 }}>
-                <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}>
-                  <TimelineRoundedIcon color="primary" fontSize="small" />
-                  <Typography variant="h3">{isClient ? "Статус и история" : "Лента событий"}</Typography>
-                </Stack>
-                <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1 }}>
-                  Обновляется автоматически каждые 3-4 секунды
-                </Typography>
-
-                {sidebarTimelineEvents.length ? (
-                  <Stack spacing={1}>
-                    {sidebarTimelineEvents.map((event, index) => (
-                      <Stack key={event.id} spacing={0.35}>
-                        <Typography variant="body2" sx={{ fontWeight: 700 }}>{getEventTitle(event)}</Typography>
-                        {event.note ? <Typography variant="caption" color="text.secondary">{normalizeRuText(event.note)}</Typography> : null}
-                        <Typography variant="caption" color="text.secondary">
-                          {normalizeRuText(event.actor_username) || "Система"} • {dayjs(event.created_at).format("DD.MM.YYYY HH:mm")}
-                        </Typography>
-                        {index < sidebarTimelineEvents.length - 1 ? <Divider /> : null}
-                      </Stack>
-                    ))}
-                    {isClient && visibleTimelineEvents.length > sidebarTimelineEvents.length ? (
-                      <Button size="small" variant="text" onClick={() => handlePrimaryAction("open_timeline")}>
-                        Показать больше событий
-                      </Button>
-                    ) : null}
+              {!isClient ? (
+                <Paper ref={timelineRef} sx={{ p: 2.2 }}>
+                  <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}>
+                    <TimelineRoundedIcon color="primary" fontSize="small" />
+                    <Typography variant="h3">Лента событий</Typography>
                   </Stack>
-                ) : (
-                  <Typography variant="body2" color="text.secondary">События пока отсутствуют.</Typography>
-                )}
-              </Paper>
+                  <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1 }}>
+                    Обновляется автоматически каждые 3-4 секунды
+                  </Typography>
+
+                  {sidebarTimelineEvents.length ? (
+                    <Stack spacing={1}>
+                      {sidebarTimelineEvents.map((event, index) => (
+                        <Stack key={event.id} spacing={0.35}>
+                          <Typography variant="body2" sx={{ fontWeight: 700 }}>{getEventTitle(event)}</Typography>
+                          {event.note ? <Typography variant="caption" color="text.secondary">{normalizeRuText(event.note)}</Typography> : null}
+                          <Typography variant="caption" color="text.secondary">
+                            {normalizeRuText(event.actor_username) || "Система"} • {dayjs(event.created_at).format("DD.MM.YYYY HH:mm")}
+                          </Typography>
+                          {index < sidebarTimelineEvents.length - 1 ? <Divider /> : null}
+                        </Stack>
+                      ))}
+                    </Stack>
+                  ) : (
+                    <Typography variant="body2" color="text.secondary">События пока отсутствуют.</Typography>
+                  )}
+                </Paper>
+              ) : null}
             </Stack>
           </Grid>
         ) : null}
@@ -2084,12 +2093,6 @@ export default function AppointmentDetailPage() {
               }
             >
               {["AWAITING_PAYMENT", "PAYMENT_PROOF_UPLOADED"].includes(appointment.status) ? "Оплата" : "Помощь"}
-            </Button>
-            <Button fullWidth size="small" variant="text" onClick={() => handlePrimaryAction("open_chat")}>
-              Чат
-            </Button>
-            <Button fullWidth size="small" variant="text" onClick={() => handlePrimaryAction("open_timeline")}>
-              Статус
             </Button>
           </Stack>
         </Paper>
@@ -2159,16 +2162,12 @@ export default function AppointmentDetailPage() {
             ) : null}
             <Stack direction="row" spacing={1}>
               <Button
-                fullWidth
                 variant="contained"
                 onClick={() =>
                   handlePrimaryAction(appointment.status === "AWAITING_PAYMENT" ? "open_payment" : "open_chat")
                 }
               >
                 {appointment.status === "AWAITING_PAYMENT" ? "Перейти к оплате" : "Открыть чат"}
-              </Button>
-              <Button fullWidth variant="outlined" onClick={() => handlePrimaryAction("open_timeline")}>
-                Лента
               </Button>
             </Stack>
           </Stack>
