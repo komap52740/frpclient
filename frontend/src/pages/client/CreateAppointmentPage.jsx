@@ -38,7 +38,6 @@ export default function CreateAppointmentPage() {
   const navigate = useNavigate();
   const [form, setForm] = useState({
     device: "",
-    contact_phone: "",
     lock_type: "OTHER",
     has_pc: true,
     description: "",
@@ -71,11 +70,6 @@ export default function CreateAppointmentPage() {
       setSubmitting(false);
       return;
     }
-    if (!form.contact_phone.trim()) {
-      setError("Укажите контактный телефон");
-      setSubmitting(false);
-      return;
-    }
     if (!form.rustdesk_id.trim()) {
       setError("Укажите логин/ID RuDesktop");
       setSubmitting(false);
@@ -92,7 +86,6 @@ export default function CreateAppointmentPage() {
     payload.append("model", model);
     payload.append("lock_type", form.lock_type);
     payload.append("has_pc", String(form.has_pc));
-    payload.append("contact_phone", form.contact_phone.trim());
     payload.append("description", description);
     payload.append("rustdesk_id", form.rustdesk_id.trim());
     payload.append("rustdesk_password", form.rustdesk_password.trim());
@@ -136,15 +129,6 @@ export default function CreateAppointmentPage() {
           value={form.rustdesk_id}
           onChange={(event) => updateField("rustdesk_id", event.target.value)}
           helperText="Без этого мастер не сможет подключиться."
-          required
-        />
-
-        <TextField
-          label="Ваш телефон для связи"
-          placeholder="+7 900 000-00-00"
-          value={form.contact_phone}
-          onChange={(event) => updateField("contact_phone", event.target.value)}
-          helperText="Нужен для быстрого контакта, если что-то пойдет не так."
           required
         />
 

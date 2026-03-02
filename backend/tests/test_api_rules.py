@@ -738,7 +738,7 @@ def test_create_appointment_calls_master_telegram_notifications(client_user):
 
 
 @pytest.mark.django_db
-def test_create_appointment_requires_rudesktop_credentials(client_user):
+def test_create_appointment_requires_rudesktop_credentials_only(client_user):
     payload = {
         "brand": "Samsung",
         "model": "A50",
@@ -749,7 +749,6 @@ def test_create_appointment_requires_rudesktop_credentials(client_user):
 
     response = auth_as(client_user).post("/api/appointments/", payload, format="json")
     assert response.status_code == 400
-    assert "contact_phone" in response.data
     assert "rustdesk_id" in response.data
     assert "rustdesk_password" in response.data
 

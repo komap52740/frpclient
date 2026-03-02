@@ -136,8 +136,6 @@ class AppointmentCreateSerializer(serializers.ModelSerializer):
         contact_phone = (attrs.get("contact_phone") or "").strip()
 
         errors = {}
-        if not contact_phone:
-            errors["contact_phone"] = "Укажите контактный телефон"
         if not rustdesk_id:
             errors["rustdesk_id"] = "Укажите логин/ID RuDesktop"
         if not rustdesk_password:
