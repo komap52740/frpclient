@@ -44,27 +44,69 @@ class AppointmentCreateView(APIView):
         if request.user.is_banned:
             return Response({"detail": "РљР»РёРµРЅС‚ Р·Р°Р±Р°РЅРµРЅ"}, status=status.HTTP_403_FORBIDDEN)
 
-        serializer = AppointmentCreateSerializer(data=request.data)
+        serializer = AppointmentCreateSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
         is_service_center = bool(serializer.validated_data.get("is_service_center"))
-        wholesale_company_name = (serializer.validated_data.get("wholesale_company_name") or "").strip()
-        wholesale_comment = (serializer.validated_data.get("wholesale_comment") or "").strip()
+        wholesale_company_name = (
+            (serializer.validated_data.get("wholesale_company_name") or "").strip()
+            or (request.user.wholesale_company_name or "").strip()
+        )
+        wholesale_comment = (
+            (serializer.validated_data.get("wholesale_comment") or "").strip()
+            or (request.user.wholesale_comment or "").strip()
+        )
+        wholesale_service_details = (
+            (serializer.validated_data.get("wholesale_service_details") or "").strip()
+            or (request.user.wholesale_service_details or "").strip()
+        )
+        wholesale_service_photo_1 = serializer.validated_data.get("wholesale_service_photo_1")
+        wholesale_service_photo_2 = serializer.validated_data.get("wholesale_service_photo_2")
 
         appointment = serializer.save(client=request.user)
 
         if appointment.is_wholesale_request and is_service_center:
             client_user = request.user
             previous_status = client_user.wholesale_status
+            effective_photo_1 = (
+                wholesale_service_photo_1
+                if wholesale_service_photo_1 is not None
+                else client_user.wholesale_service_photo_1
+            )
+            effective_photo_2 = (
+                wholesale_service_photo_2
+                if wholesale_service_photo_2 is not None
+                else client_user.wholesale_service_photo_2
+            )
             update_fields = [
                 "is_service_center",
                 "wholesale_company_name",
                 "wholesale_comment",
+                "wholesale_service_details",
                 "updated_at",
             ]
 
             client_user.is_service_center = True
             client_user.wholesale_company_name = wholesale_company_name
             client_user.wholesale_comment = wholesale_comment
+            client_user.wholesale_service_details = wholesale_service_details
+
+            if len(wholesale_service_details) < 20:
+                return Response(
+                    {"detail": "Добавьте подробное описание сервиса (минимум 20 символов)"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            if not effective_photo_1 and not effective_photo_2:
+                return Response(
+                    {"detail": "Добавьте хотя бы одно фото сервиса"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            if wholesale_service_photo_1 is not None:
+                client_user.wholesale_service_photo_1 = wholesale_service_photo_1
+                update_fields.append("wholesale_service_photo_1")
+            if wholesale_service_photo_2 is not None:
+                client_user.wholesale_service_photo_2 = wholesale_service_photo_2
+                update_fields.append("wholesale_service_photo_2")
 
             if client_user.wholesale_status != WholesaleStatusChoices.APPROVED:
                 client_user.wholesale_status = WholesaleStatusChoices.PENDING
@@ -87,7 +129,13 @@ class AppointmentCreateView(APIView):
                     "wholesale.requested",
                     client_user,
                     actor=client_user,
-                    payload={"company": wholesale_company_name, "comment": wholesale_comment, "appointment_id": appointment.id},
+                    payload={
+                        "company": wholesale_company_name,
+                        "comment": wholesale_comment,
+                        "appointment_id": appointment.id,
+                        "has_photo_1": bool(client_user.wholesale_service_photo_1),
+                        "has_photo_2": bool(client_user.wholesale_service_photo_2),
+                    },
                 )
                 admins = User.objects.filter(Q(role=RoleChoices.ADMIN) | Q(is_superuser=True)).distinct()
                 for admin in admins:

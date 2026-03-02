@@ -40,6 +40,8 @@ class SiteSettingsSerializer(serializers.ModelSerializer):
 class MeSerializer(serializers.ModelSerializer):
     client_stats = ClientStatsSerializer(read_only=True)
     master_stats = serializers.SerializerMethodField()
+    wholesale_service_photo_1_url = serializers.SerializerMethodField()
+    wholesale_service_photo_2_url = serializers.SerializerMethodField()
 
     class Meta:
         model = User
@@ -63,6 +65,9 @@ class MeSerializer(serializers.ModelSerializer):
             "wholesale_discount_percent",
             "wholesale_company_name",
             "wholesale_comment",
+            "wholesale_service_details",
+            "wholesale_service_photo_1_url",
+            "wholesale_service_photo_2_url",
             "wholesale_requested_at",
             "wholesale_reviewed_at",
             "wholesale_review_comment",
@@ -77,6 +82,19 @@ class MeSerializer(serializers.ModelSerializer):
             return None
         stats = getattr(obj, "master_stats", None)
         return MasterStatsSerializer(stats).data if stats else None
+
+    def _build_file_url(self, obj: User, field_name: str):
+        file_field = getattr(obj, field_name, None)
+        if not file_field or not getattr(file_field, "url", None):
+            return None
+        request = self.context.get("request")
+        return request.build_absolute_uri(file_field.url) if request else file_field.url
+
+    def get_wholesale_service_photo_1_url(self, obj: User):
+        return self._build_file_url(obj, "wholesale_service_photo_1")
+
+    def get_wholesale_service_photo_2_url(self, obj: User):
+        return self._build_file_url(obj, "wholesale_service_photo_2")
 
 
 class MasterStatsSerializer(serializers.ModelSerializer):
@@ -174,6 +192,9 @@ class WholesaleRequestSerializer(serializers.Serializer):
     is_service_center = serializers.BooleanField(default=True)
     wholesale_company_name = serializers.CharField(max_length=255, required=False, allow_blank=True)
     wholesale_comment = serializers.CharField(max_length=500, required=False, allow_blank=True)
+    wholesale_service_details = serializers.CharField(max_length=2000, required=False, allow_blank=True)
+    wholesale_service_photo_1 = serializers.FileField(required=False, allow_null=True)
+    wholesale_service_photo_2 = serializers.FileField(required=False, allow_null=True)
 
     def validate(self, attrs):
         if attrs.get("is_service_center") and not (attrs.get("wholesale_company_name") or "").strip():
@@ -187,6 +208,9 @@ class WholesaleStatusSerializer(serializers.Serializer):
     wholesale_discount_percent = serializers.IntegerField(min_value=0, max_value=100)
     wholesale_company_name = serializers.CharField(allow_blank=True)
     wholesale_comment = serializers.CharField(allow_blank=True)
+    wholesale_service_details = serializers.CharField(allow_blank=True)
+    wholesale_service_photo_1_url = serializers.CharField(allow_blank=True, allow_null=True)
+    wholesale_service_photo_2_url = serializers.CharField(allow_blank=True, allow_null=True)
     wholesale_requested_at = serializers.DateTimeField(allow_null=True)
     wholesale_reviewed_at = serializers.DateTimeField(allow_null=True)
     wholesale_review_comment = serializers.CharField(allow_blank=True)

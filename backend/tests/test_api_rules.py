@@ -738,6 +738,37 @@ def test_create_appointment_calls_master_telegram_notifications(client_user):
 
 
 @pytest.mark.django_db
+def test_create_wholesale_appointment_updates_client_wholesale_profile(client_user):
+    service_photo = SimpleUploadedFile("service1.jpg", b"photo-data", content_type="image/jpeg")
+    payload = {
+        "brand": "Samsung",
+        "model": "A50",
+        "lock_type": "PIN",
+        "has_pc": True,
+        "description": "desc",
+        "rustdesk_id": "987654321",
+        "rustdesk_password": "test-pass",
+        "is_wholesale_request": True,
+        "is_service_center": True,
+        "wholesale_company_name": "FixLab",
+        "wholesale_comment": "15+ заявок в месяц",
+        "wholesale_service_details": "Сервисный центр с потоком заявок, работаем с Samsung/Xiaomi/Realme.",
+        "wholesale_service_photo_1": service_photo,
+    }
+
+    response = auth_as(client_user).post("/api/appointments/", payload, format="multipart")
+    assert response.status_code == 201
+    assert response.data["is_wholesale_request"] is True
+
+    client_user.refresh_from_db()
+    assert client_user.is_service_center is True
+    assert client_user.wholesale_status == WholesaleStatusChoices.PENDING
+    assert client_user.wholesale_company_name == "FixLab"
+    assert client_user.wholesale_service_details
+    assert bool(client_user.wholesale_service_photo_1)
+
+
+@pytest.mark.django_db
 def test_create_appointment_requires_rudesktop_credentials_only(client_user):
     payload = {
         "brand": "Samsung",
@@ -822,14 +853,17 @@ def test_admin_can_list_all_reviews_with_filters(client_user, master_user, admin
 
 @pytest.mark.django_db
 def test_client_can_submit_wholesale_request(client_user):
+    service_photo = SimpleUploadedFile("service.jpg", b"photo-data", content_type="image/jpeg")
     response = auth_as(client_user).post(
         "/api/wholesale/request/",
         {
             "is_service_center": True,
             "wholesale_company_name": "FixLab",
             "wholesale_comment": "15 заявок в месяц",
+            "wholesale_service_details": "Сервисный центр с потоком 15+ заявок в месяц, специализация Samsung и Xiaomi",
+            "wholesale_service_photo_1": service_photo,
         },
-        format="json",
+        format="multipart",
     )
     assert response.status_code == 200
     assert response.data["wholesale_status"] == WholesaleStatusChoices.PENDING
@@ -838,6 +872,8 @@ def test_client_can_submit_wholesale_request(client_user):
     assert client_user.is_service_center is True
     assert client_user.wholesale_status == WholesaleStatusChoices.PENDING
     assert client_user.wholesale_company_name == "FixLab"
+    assert client_user.wholesale_service_details
+    assert bool(client_user.wholesale_service_photo_1)
 
 
 @pytest.mark.django_db

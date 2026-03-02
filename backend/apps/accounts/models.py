@@ -29,6 +29,16 @@ class WholesaleStatusChoices(models.TextChoices):
     REJECTED = "rejected", "Отклонено"
 
 
+def validate_service_photo(value):
+    if not value:
+        return
+    name = (value.name or "").lower()
+    if not name.endswith((".jpg", ".jpeg", ".png", ".webp")):
+        raise ValidationError("Фото сервиса должно быть jpg/jpeg/png/webp")
+    if value.size > 10 * 1024 * 1024:
+        raise ValidationError("Максимальный размер фото сервиса — 10 МБ")
+
+
 class User(AbstractUser, TimeStampedModel):
     role = models.CharField(max_length=20, choices=RoleChoices.choices, default=RoleChoices.CLIENT)
     telegram_id = models.BigIntegerField(unique=True, null=True, blank=True)
@@ -52,6 +62,19 @@ class User(AbstractUser, TimeStampedModel):
     wholesale_discount_percent = models.PositiveSmallIntegerField(default=0)
     wholesale_company_name = models.CharField(max_length=255, blank=True)
     wholesale_comment = models.CharField(max_length=500, blank=True)
+    wholesale_service_details = models.TextField(blank=True)
+    wholesale_service_photo_1 = models.FileField(
+        upload_to="service_centers/",
+        null=True,
+        blank=True,
+        validators=[validate_service_photo],
+    )
+    wholesale_service_photo_2 = models.FileField(
+        upload_to="service_centers/",
+        null=True,
+        blank=True,
+        validators=[validate_service_photo],
+    )
     wholesale_requested_at = models.DateTimeField(null=True, blank=True)
     wholesale_reviewed_at = models.DateTimeField(null=True, blank=True)
     wholesale_review_comment = models.CharField(max_length=255, blank=True)

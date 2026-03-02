@@ -13,6 +13,8 @@ class BanUserSerializer(serializers.Serializer):
 class AdminUserSerializer(serializers.ModelSerializer):
     client_stats = ClientStatsSerializer(read_only=True)
     master_stats = MasterStatsSerializer(read_only=True)
+    wholesale_service_photo_1_url = serializers.SerializerMethodField()
+    wholesale_service_photo_2_url = serializers.SerializerMethodField()
 
     class Meta:
         model = User
@@ -37,6 +39,9 @@ class AdminUserSerializer(serializers.ModelSerializer):
             "wholesale_discount_percent",
             "wholesale_company_name",
             "wholesale_comment",
+            "wholesale_service_details",
+            "wholesale_service_photo_1_url",
+            "wholesale_service_photo_2_url",
             "wholesale_requested_at",
             "wholesale_reviewed_at",
             "wholesale_review_comment",
@@ -45,6 +50,19 @@ class AdminUserSerializer(serializers.ModelSerializer):
             "client_stats",
             "master_stats",
         )
+
+    def _build_file_url(self, obj: User, field_name: str):
+        file_field = getattr(obj, field_name, None)
+        if not file_field or not getattr(file_field, "url", None):
+            return None
+        request = self.context.get("request")
+        return request.build_absolute_uri(file_field.url) if request else file_field.url
+
+    def get_wholesale_service_photo_1_url(self, obj: User):
+        return self._build_file_url(obj, "wholesale_service_photo_1")
+
+    def get_wholesale_service_photo_2_url(self, obj: User):
+        return self._build_file_url(obj, "wholesale_service_photo_2")
 
 
 class AdminUserRoleSerializer(serializers.Serializer):

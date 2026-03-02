@@ -223,7 +223,12 @@ class MeView(APIView):
         return Response(payload, status=status.HTTP_200_OK)
 
 
-def serialize_wholesale_status(user: User) -> dict:
+def serialize_wholesale_status(user: User, request=None) -> dict:
+    def file_url(file_field):
+        if not file_field or not getattr(file_field, "url", None):
+            return None
+        return request.build_absolute_uri(file_field.url) if request else file_field.url
+
     return WholesaleStatusSerializer(
         {
             "is_service_center": user.is_service_center,
@@ -231,6 +236,9 @@ def serialize_wholesale_status(user: User) -> dict:
             "wholesale_discount_percent": user.wholesale_discount_percent,
             "wholesale_company_name": user.wholesale_company_name,
             "wholesale_comment": user.wholesale_comment,
+            "wholesale_service_details": user.wholesale_service_details,
+            "wholesale_service_photo_1_url": file_url(user.wholesale_service_photo_1),
+            "wholesale_service_photo_2_url": file_url(user.wholesale_service_photo_2),
             "wholesale_requested_at": user.wholesale_requested_at,
             "wholesale_reviewed_at": user.wholesale_reviewed_at,
             "wholesale_review_comment": user.wholesale_review_comment,
@@ -244,7 +252,7 @@ class WholesaleStatusView(APIView):
     def get(self, request):
         if request.user.role != RoleChoices.CLIENT:
             return Response({"detail": "Только для клиентов"}, status=status.HTTP_403_FORBIDDEN)
-        return Response(serialize_wholesale_status(request.user), status=status.HTTP_200_OK)
+        return Response(serialize_wholesale_status(request.user, request=request), status=status.HTTP_200_OK)
 
 
 class WholesaleRequestView(APIView):
@@ -263,12 +271,39 @@ class WholesaleRequestView(APIView):
         is_service_center = bool(payload.get("is_service_center", True))
         service_name = (payload.get("wholesale_company_name") or "").strip()
         comment = (payload.get("wholesale_comment") or "").strip()
+        service_details = (payload.get("wholesale_service_details") or "").strip()
+        service_photo_1 = payload.get("wholesale_service_photo_1")
+        service_photo_2 = payload.get("wholesale_service_photo_2")
+        effective_photo_1 = service_photo_1 if service_photo_1 is not None else user.wholesale_service_photo_1
+        effective_photo_2 = service_photo_2 if service_photo_2 is not None else user.wholesale_service_photo_2
 
         update_fields = ["updated_at"]
         user.is_service_center = is_service_center
         user.wholesale_company_name = service_name
         user.wholesale_comment = comment
-        update_fields.extend(["is_service_center", "wholesale_company_name", "wholesale_comment"])
+        user.wholesale_service_details = service_details
+        update_fields.extend(
+            ["is_service_center", "wholesale_company_name", "wholesale_comment", "wholesale_service_details"]
+        )
+
+        if is_service_center:
+            if len(service_details) < 20:
+                return Response(
+                    {"detail": "Добавьте подробное описание сервиса (минимум 20 символов)"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            if not effective_photo_1 and not effective_photo_2:
+                return Response(
+                    {"detail": "Добавьте хотя бы одно фото сервиса"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        if service_photo_1 is not None:
+            user.wholesale_service_photo_1 = service_photo_1
+            update_fields.append("wholesale_service_photo_1")
+        if service_photo_2 is not None:
+            user.wholesale_service_photo_2 = service_photo_2
+            update_fields.append("wholesale_service_photo_2")
 
         if not is_service_center:
             user.wholesale_status = WholesaleStatusChoices.NONE
@@ -276,6 +311,9 @@ class WholesaleRequestView(APIView):
             user.wholesale_requested_at = None
             user.wholesale_reviewed_at = None
             user.wholesale_review_comment = ""
+            user.wholesale_service_details = ""
+            user.wholesale_service_photo_1 = None
+            user.wholesale_service_photo_2 = None
             update_fields.extend(
                 [
                     "wholesale_status",
@@ -283,6 +321,9 @@ class WholesaleRequestView(APIView):
                     "wholesale_requested_at",
                     "wholesale_reviewed_at",
                     "wholesale_review_comment",
+                    "wholesale_service_details",
+                    "wholesale_service_photo_1",
+                    "wholesale_service_photo_2",
                 ]
             )
         else:
@@ -307,7 +348,12 @@ class WholesaleRequestView(APIView):
                 "wholesale.requested",
                 user,
                 actor=user,
-                payload={"company": service_name, "comment": comment},
+                payload={
+                    "company": service_name,
+                    "comment": comment,
+                    "has_photo_1": bool(user.wholesale_service_photo_1),
+                    "has_photo_2": bool(user.wholesale_service_photo_2),
+                },
             )
             admins = User.objects.filter(Q(role=RoleChoices.ADMIN) | Q(is_superuser=True)).distinct()
             for admin in admins:
@@ -319,7 +365,7 @@ class WholesaleRequestView(APIView):
                     payload={"client_id": user.id},
                 )
 
-        return Response(serialize_wholesale_status(user), status=status.HTTP_200_OK)
+        return Response(serialize_wholesale_status(user, request=request), status=status.HTTP_200_OK)
 
 
 def calculate_unread_total(appointments_queryset, user: User) -> int:

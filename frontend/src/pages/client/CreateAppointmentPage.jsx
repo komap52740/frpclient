@@ -110,8 +110,11 @@ export default function CreateAppointmentPage() {
     photo_lock_screen: null,
     is_wholesale_request: false,
     is_service_center: false,
-    wholesale_company_name: "",
-    wholesale_comment: "",
+    wholesale_company_name: user?.wholesale_company_name || "",
+    wholesale_comment: user?.wholesale_comment || "",
+    wholesale_service_details: user?.wholesale_service_details || "",
+    wholesale_service_photo_1: null,
+    wholesale_service_photo_2: null,
   });
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -126,6 +129,9 @@ export default function CreateAppointmentPage() {
   const hasStoredAccess = Boolean(storedDefaults.rustdesk_id || storedDefaults.rustdesk_password);
   const wholesaleStatus = user?.wholesale_status || "none";
   const wholesaleDiscount = Number(user?.wholesale_discount_percent || 0);
+  const hasExistingWholesalePhoto = Boolean(
+    user?.wholesale_service_photo_1_url || user?.wholesale_service_photo_2_url
+  );
 
   const autoTemplate = useMemo(
     () =>
@@ -153,13 +159,40 @@ export default function CreateAppointmentPage() {
     }
     return form.wholesale_company_name.trim() ? "" : "Укажите название сервисного центра";
   }, [form.is_wholesale_request, form.wholesale_company_name]);
+  const wholesaleDetailsError = useMemo(() => {
+    if (!form.is_wholesale_request) {
+      return "";
+    }
+    return form.wholesale_service_details.trim().length >= 20
+      ? ""
+      : "Опишите сервис минимум в 20 символах";
+  }, [form.is_wholesale_request, form.wholesale_service_details]);
+  const wholesalePhotoError = useMemo(() => {
+    if (!form.is_wholesale_request) {
+      return "";
+    }
+    return form.wholesale_service_photo_1 || form.wholesale_service_photo_2 || hasExistingWholesalePhoto
+      ? ""
+      : "Добавьте хотя бы одно фото сервиса";
+  }, [
+    form.is_wholesale_request,
+    form.wholesale_service_photo_1,
+    form.wholesale_service_photo_2,
+    hasExistingWholesalePhoto,
+  ]);
 
   const showDeviceError = touched.device && Boolean(deviceError);
   const showRustdeskIdError = touched.rustdesk_id && Boolean(rustdeskIdError);
   const showRustdeskPasswordError = touched.rustdesk_password && Boolean(rustdeskPasswordError);
 
   const canSubmit =
-    !submitting && !deviceError && !rustdeskIdError && !rustdeskPasswordError && !wholesaleCompanyError;
+    !submitting &&
+    !deviceError &&
+    !rustdeskIdError &&
+    !rustdeskPasswordError &&
+    !wholesaleCompanyError &&
+    !wholesaleDetailsError &&
+    !wholesalePhotoError;
 
   const updateField = (key, value) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -182,8 +215,22 @@ export default function CreateAppointmentPage() {
       rustdesk_password: true,
     });
 
-    if (deviceError || rustdeskIdError || rustdeskPasswordError || wholesaleCompanyError) {
-      setError(deviceError || rustdeskIdError || rustdeskPasswordError || wholesaleCompanyError);
+    if (
+      deviceError ||
+      rustdeskIdError ||
+      rustdeskPasswordError ||
+      wholesaleCompanyError ||
+      wholesaleDetailsError ||
+      wholesalePhotoError
+    ) {
+      setError(
+        deviceError ||
+          rustdeskIdError ||
+          rustdeskPasswordError ||
+          wholesaleCompanyError ||
+          wholesaleDetailsError ||
+          wholesalePhotoError
+      );
       setSubmitting(false);
       return;
     }
@@ -207,6 +254,15 @@ export default function CreateAppointmentPage() {
     }
     if (form.wholesale_comment.trim()) {
       payload.append("wholesale_comment", form.wholesale_comment.trim());
+    }
+    if (form.wholesale_service_details.trim()) {
+      payload.append("wholesale_service_details", form.wholesale_service_details.trim());
+    }
+    if (form.wholesale_service_photo_1) {
+      payload.append("wholesale_service_photo_1", form.wholesale_service_photo_1);
+    }
+    if (form.wholesale_service_photo_2) {
+      payload.append("wholesale_service_photo_2", form.wholesale_service_photo_2);
     }
     if (form.photo_lock_screen) {
       payload.append("photo_lock_screen", form.photo_lock_screen);
@@ -392,6 +448,69 @@ export default function CreateAppointmentPage() {
                   multiline
                   minRows={2}
                 />
+                <TextField
+                  label="Описание сервиса"
+                  placeholder="Какие устройства обслуживаете, объём заявок, специализация"
+                  value={form.wholesale_service_details}
+                  onChange={(event) => updateField("wholesale_service_details", event.target.value)}
+                  error={Boolean(wholesaleDetailsError)}
+                  helperText={wholesaleDetailsError || "Минимум 20 символов"}
+                  multiline
+                  minRows={3}
+                  required
+                />
+                <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+                  <Button
+                    component="label"
+                    variant="outlined"
+                    startIcon={<AddPhotoAlternateRoundedIcon fontSize="small" />}
+                  >
+                    Фото сервиса 1 (обязательно)
+                    <input
+                      hidden
+                      type="file"
+                      accept=".jpg,.jpeg,.png,.webp"
+                      onChange={(event) => updateField("wholesale_service_photo_1", event.target.files?.[0] || null)}
+                    />
+                  </Button>
+                  <Button
+                    component="label"
+                    variant="outlined"
+                    startIcon={<AddPhotoAlternateRoundedIcon fontSize="small" />}
+                  >
+                    Фото сервиса 2 (опционально)
+                    <input
+                      hidden
+                      type="file"
+                      accept=".jpg,.jpeg,.png,.webp"
+                      onChange={(event) => updateField("wholesale_service_photo_2", event.target.files?.[0] || null)}
+                    />
+                  </Button>
+                </Stack>
+                {form.wholesale_service_photo_1 ? (
+                  <Typography variant="caption" color="text.secondary">
+                    Фото 1: {form.wholesale_service_photo_1.name}
+                  </Typography>
+                ) : null}
+                {form.wholesale_service_photo_2 ? (
+                  <Typography variant="caption" color="text.secondary">
+                    Фото 2: {form.wholesale_service_photo_2.name}
+                  </Typography>
+                ) : null}
+                {hasExistingWholesalePhoto && !form.wholesale_service_photo_1 && !form.wholesale_service_photo_2 ? (
+                  <Typography variant="caption" color="text.secondary">
+                    Фото сервиса уже сохранены в профиле, можно отправить заявку без повторной загрузки.
+                  </Typography>
+                ) : null}
+                {wholesalePhotoError ? (
+                  <Typography variant="caption" color="error.main">
+                    {wholesalePhotoError}
+                  </Typography>
+                ) : (
+                  <Typography variant="caption" color="text.secondary">
+                    Форматы: jpg/jpeg/png/webp, до 10 МБ
+                  </Typography>
+                )}
                 <Alert severity="warning" sx={{ py: 0.5 }}>
                   Оптовая скидка начнет применяться после одобрения администратором.
                 </Alert>

@@ -2,6 +2,7 @@
   Alert,
   Button,
   Chip,
+  Link,
   MenuItem,
   Paper,
   Stack,
@@ -154,6 +155,8 @@ export default function AdminClientsPage() {
               <TableCell>Причина бана</TableCell>
               <TableCell>Опт-статус</TableCell>
               <TableCell>Сервис</TableCell>
+              <TableCell>Данные сервиса</TableCell>
+              <TableCell>Фото</TableCell>
               <TableCell>Комментарий</TableCell>
               <TableCell>Скидка, %</TableCell>
               <TableCell>Действия</TableCell>
@@ -184,6 +187,30 @@ export default function AdminClientsPage() {
                     />
                   </TableCell>
                   <TableCell>{row.wholesale_company_name || "—"}</TableCell>
+                  <TableCell sx={{ minWidth: 260 }}>
+                    {row.wholesale_service_details ? (
+                      <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>
+                        {row.wholesale_service_details}
+                      </Typography>
+                    ) : (
+                      "—"
+                    )}
+                  </TableCell>
+                  <TableCell sx={{ minWidth: 170 }}>
+                    <Stack spacing={0.4}>
+                      {row.wholesale_service_photo_1_url ? (
+                        <Link href={row.wholesale_service_photo_1_url} target="_blank" rel="noreferrer">
+                          Фото сервиса 1
+                        </Link>
+                      ) : null}
+                      {row.wholesale_service_photo_2_url ? (
+                        <Link href={row.wholesale_service_photo_2_url} target="_blank" rel="noreferrer">
+                          Фото сервиса 2
+                        </Link>
+                      ) : null}
+                      {!row.wholesale_service_photo_1_url && !row.wholesale_service_photo_2_url ? "—" : null}
+                    </Stack>
+                  </TableCell>
                   <TableCell sx={{ minWidth: 220 }}>
                     <TextField
                       size="small"
