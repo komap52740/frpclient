@@ -735,6 +735,22 @@ def test_create_appointment_calls_master_telegram_notifications(client_user):
 
 
 @pytest.mark.django_db
+def test_create_appointment_requires_rudesktop_credentials(client_user):
+    payload = {
+        "brand": "Samsung",
+        "model": "A50",
+        "lock_type": "PIN",
+        "has_pc": True,
+        "description": "desc",
+    }
+
+    response = auth_as(client_user).post("/api/appointments/", payload, format="json")
+    assert response.status_code == 400
+    assert "rustdesk_id" in response.data
+    assert "rustdesk_password" in response.data
+
+
+@pytest.mark.django_db
 def test_master_can_list_own_reviews(client_user, master_user):
     appointment = Appointment.objects.create(
         client=client_user,

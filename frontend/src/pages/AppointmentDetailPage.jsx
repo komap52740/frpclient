@@ -606,13 +606,13 @@ export default function AppointmentDetailPage() {
   const openRuDesktopSession = async (remoteId, remotePassword = "") => {
     const preparedId = String(remoteId || "").trim();
     if (!preparedId) {
-      setError("RuDesktop ID не указан");
+      setError("Логин/ID RuDesktop не указан");
       return;
     }
 
     const payload = remotePassword
-      ? `RuDesktop ID: ${preparedId}\nПароль: ${remotePassword}`
-      : `RuDesktop ID: ${preparedId}`;
+      ? `Логин/ID RuDesktop: ${preparedId}\nПароль: ${remotePassword}`
+      : `Логин/ID RuDesktop: ${preparedId}`;
 
     try {
       await navigator.clipboard.writeText(payload);
@@ -1283,7 +1283,7 @@ export default function AppointmentDetailPage() {
                           <Chip size="small" label={`Блокировка: ${getLockTypeLabel(appointment.lock_type)}`} />
                           <Chip size="small" color={appointment.total_price ? "warning" : "default"} label={appointment.total_price ? `К оплате: ${appointment.total_price} руб.` : "Цена уточняется"} />
                           <Chip size="small" label={`Мастер: ${normalizeRuText(appointment.master_username) || "пока не назначен"}`} />
-                          {rustdeskId ? <Chip size="small" icon={<ComputerRoundedIcon fontSize="small" />} label={`RuDesktop: ${rustdeskId}`} /> : null}
+                          {rustdeskId ? <Chip size="small" icon={<ComputerRoundedIcon fontSize="small" />} label={`RuDesktop логин/ID: ${rustdeskId}`} /> : null}
                         </Stack>
                         {appointment.description ? (
                           <Typography variant="body2" color="text.secondary">
@@ -1297,7 +1297,7 @@ export default function AppointmentDetailPage() {
                         <Typography variant="body2"><b>Тип блокировки:</b> {getLockTypeLabel(appointment.lock_type)}</Typography>
                         <Typography variant="body2"><b>Цена:</b> {appointment.total_price ? `${appointment.total_price} руб.` : "Не выставлена"}</Typography>
                         <Typography variant="body2"><b>Мастер:</b> {normalizeRuText(appointment.master_username) || appointment.assigned_master || "Пока не назначен"}</Typography>
-                        <Typography variant="body2"><b>RuDesktop ID:</b> {rustdeskId || "Не указан"}</Typography>
+                        <Typography variant="body2"><b>Логин/ID RuDesktop:</b> {rustdeskId || "Не указан"}</Typography>
                         {rustdeskPassword ? <Typography variant="body2"><b>RuDesktop пароль:</b> {rustdeskPassword}</Typography> : null}
                         {appointment.description ? (
                           <Typography variant="body2"><b>Комментарий:</b> {normalizeRuText(appointment.description)}</Typography>
@@ -1813,7 +1813,7 @@ export default function AppointmentDetailPage() {
                       <Chip
                         size="small"
                         icon={<ComputerRoundedIcon fontSize="small" />}
-                        label={`RuDesktop ID: ${rustdeskId}`}
+                        label={`Логин/ID RuDesktop: ${rustdeskId}`}
                         sx={{ alignSelf: "flex-start" }}
                       />
                       {hasRuDesktopCredentials ? (
@@ -1833,9 +1833,9 @@ export default function AppointmentDetailPage() {
                           size="small"
                           variant="outlined"
                           startIcon={<ContentCopyRoundedIcon fontSize="small" />}
-                          onClick={() => copyToClipboard(rustdeskId, "RuDesktop ID не указан")}
+                          onClick={() => copyToClipboard(rustdeskId, "Логин/ID RuDesktop не указан")}
                         >
-                          Копировать ID
+                          Копировать логин/ID
                         </Button>
                         {rustdeskPassword ? (
                           <Button
@@ -1866,8 +1866,8 @@ export default function AppointmentDetailPage() {
                       )}
                     >
                       {isClient
-                        ? "RuDesktop ID пока не указан. Отправьте его в чат, чтобы мастер подключился быстрее."
-                        : "Клиент еще не указал RuDesktop ID. Запросите его в чате."}
+                        ? "Логин/ID RuDesktop пока не указан. Отправьте его в чат, чтобы мастер подключился быстрее."
+                        : "Клиент еще не указал логин/ID RuDesktop. Запросите его в чате."}
                     </Alert>
                   )}
 

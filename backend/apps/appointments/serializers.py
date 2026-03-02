@@ -129,6 +129,22 @@ class AppointmentSerializer(serializers.ModelSerializer):
 
 
 class AppointmentCreateSerializer(serializers.ModelSerializer):
+    def validate(self, attrs):
+        rustdesk_id = (attrs.get("rustdesk_id") or "").strip()
+        rustdesk_password = (attrs.get("rustdesk_password") or "").strip()
+
+        errors = {}
+        if not rustdesk_id:
+            errors["rustdesk_id"] = "Укажите логин/ID RuDesktop"
+        if not rustdesk_password:
+            errors["rustdesk_password"] = "Укажите пароль RuDesktop"
+        if errors:
+            raise serializers.ValidationError(errors)
+
+        attrs["rustdesk_id"] = rustdesk_id
+        attrs["rustdesk_password"] = rustdesk_password
+        return attrs
+
     class Meta:
         model = Appointment
         fields = (

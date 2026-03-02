@@ -70,6 +70,16 @@ export default function CreateAppointmentPage() {
       setSubmitting(false);
       return;
     }
+    if (!form.rustdesk_id.trim()) {
+      setError("Укажите логин/ID RuDesktop");
+      setSubmitting(false);
+      return;
+    }
+    if (!form.rustdesk_password.trim()) {
+      setError("Укажите пароль RuDesktop");
+      setSubmitting(false);
+      return;
+    }
 
     const payload = new FormData();
     payload.append("brand", brand);
@@ -77,13 +87,8 @@ export default function CreateAppointmentPage() {
     payload.append("lock_type", form.lock_type);
     payload.append("has_pc", String(form.has_pc));
     payload.append("description", description);
-
-    if (form.rustdesk_id.trim()) {
-      payload.append("rustdesk_id", form.rustdesk_id.trim());
-    }
-    if (form.rustdesk_password.trim()) {
-      payload.append("rustdesk_password", form.rustdesk_password.trim());
-    }
+    payload.append("rustdesk_id", form.rustdesk_id.trim());
+    payload.append("rustdesk_password", form.rustdesk_password.trim());
     if (form.photo_lock_screen) {
       payload.append("photo_lock_screen", form.photo_lock_screen);
     }
@@ -119,11 +124,20 @@ export default function CreateAppointmentPage() {
         />
 
         <TextField
-          label="Ваш RuDesktop ID"
+          label="Ваш логин/ID RuDesktop"
           placeholder="Например: 123 456 789"
           value={form.rustdesk_id}
           onChange={(event) => updateField("rustdesk_id", event.target.value)}
-          helperText="Лучше указать сразу: мастер сможет быстрее подключиться."
+          helperText="Без этого мастер не сможет подключиться."
+          required
+        />
+
+        <TextField
+          label="Пароль RuDesktop"
+          value={form.rustdesk_password}
+          onChange={(event) => updateField("rustdesk_password", event.target.value)}
+          helperText="Укажите пароль для подключения мастера."
+          required
         />
 
         <TextField
@@ -147,12 +161,6 @@ export default function CreateAppointmentPage() {
 
         {showAdvanced ? (
           <Stack spacing={1.2}>
-            <TextField
-              label="Пароль RuDesktop (если есть)"
-              value={form.rustdesk_password}
-              onChange={(event) => updateField("rustdesk_password", event.target.value)}
-            />
-
             <TextField
               select
               label="Тип блокировки"
