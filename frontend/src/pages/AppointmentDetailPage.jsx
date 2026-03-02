@@ -616,23 +616,10 @@ export default function AppointmentDetailPage() {
 
     try {
       await navigator.clipboard.writeText(payload);
-      setSuccess("Данные подключения скопированы. Открываем RuDesktop...");
+      setSuccess("Данные скопированы. Откройте RuDesktop и вставьте логин/ID в поле подключения.");
     } catch {
-      setSuccess("Открываем RuDesktop. Если нужно — скопируйте ID вручную.");
+      setSuccess("Откройте RuDesktop, затем скопируйте логин/ID и пароль вручную из карточки.");
     }
-
-    window.location.href = "rudesktop://";
-    window.setTimeout(() => {
-      if (!document.hidden) {
-        window.location.href = "rustdesk://";
-      }
-    }, 700);
-    window.setTimeout(() => {
-      if (!document.hidden) {
-        window.open(RU_DESKTOP_DOWNLOAD_URL, "_blank", "noopener,noreferrer");
-        setError("RuDesktop не найден. Установите приложение и повторите подключение.");
-      }
-    }, 1800);
   };
 
   if (!appointment) {
@@ -1825,7 +1812,7 @@ export default function AppointmentDetailPage() {
                           sx={{ alignSelf: "flex-start" }}
                           disabled={!canLaunchRuDesktop}
                         >
-                          Подключиться через сайт
+                          Подготовить подключение
                         </Button>
                       ) : null}
                       <Stack direction="row" spacing={0.7} flexWrap="wrap" useFlexGap>
@@ -1851,7 +1838,7 @@ export default function AppointmentDetailPage() {
                       {hasRuDesktopCredentials ? (
                         <Typography variant="caption" color="text.secondary">
                           {canLaunchRuDesktop
-                            ? "Кнопка откроет RuDesktop на вашем устройстве и скопирует ID/пароль в буфер."
+                            ? "Кнопка подготовит подключение: скопирует логин/ID и пароль в буфер."
                             : "Подключение станет доступно после подтверждения оплаты и перехода заявки в работу."}
                         </Typography>
                       ) : null}
