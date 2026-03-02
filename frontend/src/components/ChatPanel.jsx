@@ -48,12 +48,32 @@ const QUICK_TEMPLATES = {
 };
 
 function mapSystemEvents(systemEvents = []) {
-  return (systemEvents || []).map((event) => ({
-    type: "system_event",
-    id: `system-${event.id}`,
-    created_at: event.created_at,
-    text: event.title || event.event_type || "Системное событие",
-  }));
+  const seen = new Set();
+  return (systemEvents || [])
+    .filter((event) => {
+      const timestamp = dayjs(event.created_at).isValid()
+        ? dayjs(event.created_at).format("YYYY-MM-DDTHH:mm:ss")
+        : String(event.created_at || "");
+      const fingerprint = [
+        event.event_type || "",
+        event.from_status || "",
+        event.to_status || "",
+        event.actor || "",
+        timestamp,
+        event.title || "",
+      ].join("|");
+      if (seen.has(fingerprint)) {
+        return false;
+      }
+      seen.add(fingerprint);
+      return true;
+    })
+    .map((event) => ({
+      type: "system_event",
+      id: `system-${event.id}`,
+      created_at: event.created_at,
+      text: event.title || event.event_type || "Системное событие",
+    }));
 }
 
 function validateAttachment(file) {
