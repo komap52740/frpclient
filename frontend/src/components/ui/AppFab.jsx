@@ -41,12 +41,22 @@ export default function AppFab({ role }) {
         right: 14,
         bottom: "calc(env(safe-area-inset-bottom, 0px) + 88px)",
         zIndex: 1300,
-        border: "1px solid",
-        borderColor: "divider",
+        border: "1px solid rgba(255,255,255,0.25)",
+        background: (theme) =>
+          theme.palette.mode === "dark"
+            ? "linear-gradient(135deg, #2a8dff 0%, #5aa9ff 100%)"
+            : "linear-gradient(135deg, #007aff 0%, #2d9bff 100%)",
+        color: "#fff",
         boxShadow: (theme) =>
           theme.palette.mode === "dark" ? "0 12px 28px rgba(2,6,23,0.55)" : "0 12px 28px rgba(15,23,42,0.16)",
         maxWidth: "calc(100vw - 28px)",
         whiteSpace: "nowrap",
+        transition: "transform 220ms ease, box-shadow 220ms ease",
+        "&:hover": {
+          transform: "translateY(-2px)",
+          boxShadow: (theme) =>
+            theme.palette.mode === "dark" ? "0 16px 32px rgba(2,6,23,0.62)" : "0 16px 32px rgba(15,23,42,0.2)",
+        },
       }}
     >
       {action.icon}

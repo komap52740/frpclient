@@ -1,6 +1,7 @@
-import ReplayRoundedIcon from "@mui/icons-material/ReplayRounded";
+﻿import ReplayRoundedIcon from "@mui/icons-material/ReplayRounded";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
+import TuneRoundedIcon from "@mui/icons-material/TuneRounded";
 import {
   Alert,
   Box,
@@ -31,17 +32,17 @@ import { getStatusLabel } from "../../constants/labels";
 import useAutoRefresh from "../../hooks/useAutoRefresh";
 
 const FILTERS = [
-  { key: "ALL", label: "Все" },
-  { key: "ACTIVE", label: "Активные" },
-  { key: "AWAITING_PAYMENT", label: "Нужна оплата" },
-  { key: "IN_PROGRESS", label: "В работе" },
-  { key: "COMPLETED", label: "Завершенные" },
+  { key: "ALL", label: "Р’СЃРµ" },
+  { key: "ACTIVE", label: "РђРєС‚РёРІРЅС‹Рµ" },
+  { key: "AWAITING_PAYMENT", label: "РќСѓР¶РЅР° РѕРїР»Р°С‚Р°" },
+  { key: "IN_PROGRESS", label: "Р’ СЂР°Р±РѕС‚Рµ" },
+  { key: "COMPLETED", label: "Р—Р°РІРµСЂС€РµРЅРЅС‹Рµ" },
 ];
 
 const SORT_OPTIONS = [
-  { value: "updated_desc", label: "Сначала последние" },
-  { value: "priority", label: "Сначала важные" },
-  { value: "created_desc", label: "Сначала новые" },
+  { value: "updated_desc", label: "РЎРЅР°С‡Р°Р»Р° РїРѕСЃР»РµРґРЅРёРµ" },
+  { value: "priority", label: "РЎРЅР°С‡Р°Р»Р° РІР°Р¶РЅС‹Рµ" },
+  { value: "created_desc", label: "РЎРЅР°С‡Р°Р»Р° РЅРѕРІС‹Рµ" },
 ];
 
 const PRIORITY_WEIGHT = {
@@ -109,33 +110,33 @@ function resolveAttentionAction(item) {
   if (item.status === "AWAITING_PAYMENT") {
     return {
       actionKey: "open_payment",
-      title: `Заявка #${item.id}: нужна оплата`,
-      helper: "Оплатите и загрузите чек, чтобы мастер продолжил работу без паузы.",
-      cta: "Перейти к оплате",
+      title: `Р—Р°СЏРІРєР° #${item.id}: РЅСѓР¶РЅР° РѕРїР»Р°С‚Р°`,
+      helper: "РћРїР»Р°С‚РёС‚Рµ Рё Р·Р°РіСЂСѓР·РёС‚Рµ С‡РµРє, С‡С‚РѕР±С‹ РјР°СЃС‚РµСЂ РїСЂРѕРґРѕР»Р¶РёР» СЂР°Р±РѕС‚Сѓ Р±РµР· РїР°СѓР·С‹.",
+      cta: "РџРµСЂРµР№С‚Рё Рє РѕРїР»Р°С‚Рµ",
     };
   }
   if (item.status === "PAYMENT_PROOF_UPLOADED") {
     return {
       actionKey: "open_chat",
-      title: `Заявка #${item.id}: чек на проверке`,
-      helper: "Проверка обычно занимает 1-5 минут. Если есть вопрос, откройте чат.",
-      cta: "Открыть чат",
+      title: `Р—Р°СЏРІРєР° #${item.id}: С‡РµРє РЅР° РїСЂРѕРІРµСЂРєРµ`,
+      helper: "РџСЂРѕРІРµСЂРєР° РѕР±С‹С‡РЅРѕ Р·Р°РЅРёРјР°РµС‚ 1-5 РјРёРЅСѓС‚. Р•СЃР»Рё РµСЃС‚СЊ РІРѕРїСЂРѕСЃ, РѕС‚РєСЂРѕР№С‚Рµ С‡Р°С‚.",
+      cta: "РћС‚РєСЂС‹С‚СЊ С‡Р°С‚",
     };
   }
   if ((item.unread_count || 0) > 0) {
     return {
       actionKey: "open_chat",
-      title: `Заявка #${item.id}: есть новые сообщения`,
-      helper: "Быстрый ответ в чате ускоряет весь процесс.",
-      cta: "Перейти к диалогу",
+      title: `Р—Р°СЏРІРєР° #${item.id}: РµСЃС‚СЊ РЅРѕРІС‹Рµ СЃРѕРѕР±С‰РµРЅРёСЏ`,
+      helper: "Р‘С‹СЃС‚СЂС‹Р№ РѕС‚РІРµС‚ РІ С‡Р°С‚Рµ СѓСЃРєРѕСЂСЏРµС‚ РІРµСЃСЊ РїСЂРѕС†РµСЃСЃ.",
+      cta: "РџРµСЂРµР№С‚Рё Рє РґРёР°Р»РѕРіСѓ",
     };
   }
   if (["NEW", "IN_REVIEW", "IN_PROGRESS", "PAID"].includes(item.status)) {
     return {
       actionKey: "open_timeline",
-      title: `Заявка #${item.id}: работа в процессе`,
-      helper: "Проверьте текущий статус и последние события по заявке.",
-      cta: "Открыть статус",
+      title: `Р—Р°СЏРІРєР° #${item.id}: СЂР°Р±РѕС‚Р° РІ РїСЂРѕС†РµСЃСЃРµ`,
+      helper: "РџСЂРѕРІРµСЂСЊС‚Рµ С‚РµРєСѓС‰РёР№ СЃС‚Р°С‚СѓСЃ Рё РїРѕСЃР»РµРґРЅРёРµ СЃРѕР±С‹С‚РёСЏ РїРѕ Р·Р°СЏРІРєРµ.",
+      cta: "РћС‚РєСЂС‹С‚СЊ СЃС‚Р°С‚СѓСЃ",
     };
   }
   return null;
@@ -156,6 +157,7 @@ export default function MyAppointmentsPage() {
   const [activeFilter, setActiveFilter] = useState("ALL");
   const [onlyUnread, setOnlyUnread] = useState(false);
   const [sortValue, setSortValue] = useState("updated_desc");
+  const [filtersExpanded, setFiltersExpanded] = useState(!isMobile);
 
   const load = useCallback(async ({ silent = false, withLoading = true } = {}) => {
     if (withLoading) {
@@ -167,7 +169,7 @@ export default function MyAppointmentsPage() {
       setError("");
     } catch {
       if (!silent) {
-        setError("Не удалось загрузить список заявок");
+        setError("РќРµ СѓРґР°Р»РѕСЃСЊ Р·Р°РіСЂСѓР·РёС‚СЊ СЃРїРёСЃРѕРє Р·Р°СЏРІРѕРє");
       }
     } finally {
       if (withLoading) {
@@ -179,6 +181,10 @@ export default function MyAppointmentsPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    setFiltersExpanded(!isMobile);
+  }, [isMobile]);
 
   useAutoRefresh(
     async () => {
@@ -239,7 +245,7 @@ export default function MyAppointmentsPage() {
       const response = await appointmentsApi.repeat(appointmentId);
       navigate(`/appointments/${response.data.id}`);
     } catch {
-      setError("Не удалось создать повторную заявку");
+      setError("РќРµ СѓРґР°Р»РѕСЃСЊ СЃРѕР·РґР°С‚СЊ РїРѕРІС‚РѕСЂРЅСѓСЋ Р·Р°СЏРІРєСѓ");
     }
   };
 
@@ -275,9 +281,9 @@ export default function MyAppointmentsPage() {
             alignItems={{ xs: "flex-start", md: "center" }}
           >
             <Box>
-              <Typography variant="h2">Мои заявки</Typography>
-              <Typography variant="body2" color="text.secondary">
-                Один экран для статуса, оплаты и чата без лишнего шума.
+              <Typography variant="h2">РњРѕРё Р·Р°СЏРІРєРё</Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ display: { xs: "none", sm: "block" } }}>
+                РћРґРёРЅ СЌРєСЂР°РЅ РґР»СЏ СЃС‚Р°С‚СѓСЃР°, РѕРїР»Р°С‚С‹ Рё С‡Р°С‚Р° Р±РµР· Р»РёС€РЅРµРіРѕ С€СѓРјР°.
               </Typography>
             </Box>
             <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ width: { xs: "100%", md: "auto" } }}>
@@ -288,21 +294,21 @@ export default function MyAppointmentsPage() {
                 disabled={loading}
                 sx={{ minWidth: { xs: "100%", sm: 124 }, minHeight: { xs: 40, sm: 42 } }}
               >
-                Обновить
+                РћР±РЅРѕРІРёС‚СЊ
               </Button>
               <Button
                 variant="contained"
                 onClick={() => navigate("/client/create")}
                 sx={{ minWidth: { xs: "100%", sm: 164 }, minHeight: { xs: 40, sm: 42 } }}
               >
-                Новая заявка
+                РќРѕРІР°СЏ Р·Р°СЏРІРєР°
               </Button>
             </Stack>
           </Stack>
 
           <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-            <Chip size="small" variant="outlined" label={`Всего: ${items.length}`} />
-            <Chip size="small" color={unreadTotal ? "primary" : "default"} variant={unreadTotal ? "filled" : "outlined"} label={`Непрочитанные: ${unreadTotal}`} />
+            <Chip size="small" variant="outlined" label={`Р’СЃРµРіРѕ: ${items.length}`} />
+            <Chip size="small" color={unreadTotal ? "primary" : "default"} variant={unreadTotal ? "filled" : "outlined"} label={`РќРµРїСЂРѕС‡РёС‚Р°РЅРЅС‹Рµ: ${unreadTotal}`} />
           </Stack>
 
           {autoRefreshing ? <LinearProgress sx={{ borderRadius: 999 }} /> : null}
@@ -322,12 +328,12 @@ export default function MyAppointmentsPage() {
             >
               <Stack spacing={0.6}>
                 <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
-                  Что важно сейчас
+                  Р§С‚Рѕ РІР°Р¶РЅРѕ СЃРµР№С‡Р°СЃ
                 </Typography>
                 <Typography variant="body2" sx={{ fontWeight: 700 }}>
                   {attentionAction.title}
                 </Typography>
-                <Typography variant="caption" color="text.secondary">
+                <Typography variant="caption" color="text.secondary" sx={{ display: { xs: "none", sm: "block" } }}>
                   {attentionAction.helper}
                 </Typography>
                 <Button
@@ -346,20 +352,22 @@ export default function MyAppointmentsPage() {
 
       <Paper sx={{ p: { xs: 1, md: 1.5 }, borderRadius: 3 }}>
         <Stack spacing={1.1}>
-          <TextField
-            fullWidth
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            label="Поиск по заявкам"
-            placeholder="Номер, модель, комментарий"
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchRoundedIcon fontSize="small" />
-                </InputAdornment>
-              ),
-            }}
-          />
+          <Stack direction="row" justifyContent="space-between" alignItems="center">
+            <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
+              Фильтр и сортировка
+            </Typography>
+            {isMobile ? (
+              <Button
+                size="small"
+                variant={filtersExpanded ? "outlined" : "text"}
+                startIcon={<TuneRoundedIcon fontSize="small" />}
+                onClick={() => setFiltersExpanded((prev) => !prev)}
+                sx={{ minHeight: 30, px: 1 }}
+              >
+                {filtersExpanded ? "Свернуть" : "Настроить"}
+              </Button>
+            ) : null}
+          </Stack>
 
           <Tabs
             value={activeFilter}
@@ -386,28 +394,47 @@ export default function MyAppointmentsPage() {
             ))}
           </Tabs>
 
-          <Stack direction={{ xs: "column", md: "row" }} spacing={1} justifyContent="space-between">
-            <FormControlLabel
-              control={
-                <Switch checked={onlyUnread} onChange={(event) => setOnlyUnread(event.target.checked)} />
-              }
-              label="Только с непрочитанными"
-            />
+          {filtersExpanded ? (
+            <>
+              <TextField
+                fullWidth
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                label="Поиск по заявкам"
+                placeholder="Номер, модель, комментарий"
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchRoundedIcon fontSize="small" />
+                    </InputAdornment>
+                  ),
+                }}
+              />
 
-            <TextField
-              select
-              label="Сортировка"
-              value={sortValue}
-              onChange={(event) => setSortValue(event.target.value)}
-              sx={{ minWidth: { xs: "100%", md: 260 } }}
-            >
-              {SORT_OPTIONS.map((option) => (
-                <MenuItem key={option.value} value={option.value}>
-                  {option.label}
-                </MenuItem>
-              ))}
-            </TextField>
-          </Stack>
+              <Stack direction={{ xs: "column", md: "row" }} spacing={1} justifyContent="space-between">
+                <FormControlLabel
+                  control={
+                    <Switch checked={onlyUnread} onChange={(event) => setOnlyUnread(event.target.checked)} />
+                  }
+                  label="Только с непрочитанными"
+                />
+
+                <TextField
+                  select
+                  label="Сортировка"
+                  value={sortValue}
+                  onChange={(event) => setSortValue(event.target.value)}
+                  sx={{ minWidth: { xs: "100%", md: 260 } }}
+                >
+                  {SORT_OPTIONS.map((option) => (
+                    <MenuItem key={option.value} value={option.value}>
+                      {option.label}
+                    </MenuItem>
+                  ))}
+                </TextField>
+              </Stack>
+            </>
+          ) : null}
         </Stack>
       </Paper>
 
@@ -438,7 +465,7 @@ export default function MyAppointmentsPage() {
                   onClick={() => repeatAppointment(item.id)}
                   sx={{ alignSelf: "flex-start" }}
                 >
-                  Повторить заявку
+                  РџРѕРІС‚РѕСЂРёС‚СЊ Р·Р°СЏРІРєСѓ
                 </Button>
               ) : null}
             </Stack>
@@ -446,12 +473,13 @@ export default function MyAppointmentsPage() {
         </Stack>
       ) : (
         <EmptyState
-          title="По этим фильтрам ничего не найдено"
-          description="Сбросьте фильтры или создайте новую заявку."
-          actionLabel="Создать заявку"
+          title="РџРѕ СЌС‚РёРј С„РёР»СЊС‚СЂР°Рј РЅРёС‡РµРіРѕ РЅРµ РЅР°Р№РґРµРЅРѕ"
+          description="РЎР±СЂРѕСЃСЊС‚Рµ С„РёР»СЊС‚СЂС‹ РёР»Рё СЃРѕР·РґР°Р№С‚Рµ РЅРѕРІСѓСЋ Р·Р°СЏРІРєСѓ."
+          actionLabel="РЎРѕР·РґР°С‚СЊ Р·Р°СЏРІРєСѓ"
           onAction={() => navigate("/client/create")}
         />
       )}
     </Stack>
   );
 }
+

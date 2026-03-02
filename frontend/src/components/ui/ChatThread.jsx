@@ -6,6 +6,7 @@ import { Box, IconButton, Stack, Typography } from "@mui/material";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import dayjs from "dayjs";
 import "dayjs/locale/ru";
+import { normalizeRuText } from "../../utils/text";
 
 dayjs.locale("ru");
 
@@ -52,7 +53,7 @@ export default function ChatThread({
               <Stack direction="row" spacing={0.55} alignItems="center" justifyContent="center">
                 <InfoOutlinedIcon sx={{ fontSize: 14, color: "info.main" }} />
                 <Typography variant="caption" sx={{ fontWeight: 700, color: "text.primary" }}>
-                  {item.text}
+                  {normalizeRuText(item.text)}
                 </Typography>
               </Stack>
               <Typography variant="caption" color="text.secondary" sx={{ display: "block", textAlign: "center" }}>
@@ -103,7 +104,7 @@ export default function ChatThread({
           >
             <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={0.8}>
               <Typography variant="caption" color="text.secondary">
-                {message.sender_username}
+                {normalizeRuText(message.sender_username)}
               </Typography>
               <Typography variant="caption" color="text.secondary">
                 {dayjs(message.created_at).format("HH:mm")}
@@ -111,7 +112,7 @@ export default function ChatThread({
             </Stack>
 
             <Typography variant="body2" sx={{ mt: 0.35, color: message.is_deleted ? "text.secondary" : "text.primary" }}>
-              {message.is_deleted ? "Сообщение удалено" : message.text}
+              {message.is_deleted ? "Сообщение удалено" : normalizeRuText(message.text)}
             </Typography>
 
             {message.file_url && !message.is_deleted ? (

@@ -1,10 +1,17 @@
 import NotificationsRoundedIcon from "@mui/icons-material/NotificationsRounded";
 import { Badge, IconButton, Tooltip } from "@mui/material";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { keyframes } from "@mui/system";
 
 import { notificationsApi } from "../../api/client";
 import useAutoRefresh from "../../hooks/useAutoRefresh";
 import NotificationsDrawer from "./NotificationsDrawer";
+
+const bellPulse = keyframes`
+  0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, .35); }
+  70% { box-shadow: 0 0 0 8px rgba(239, 68, 68, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+`;
 
 export default function NotificationBell() {
   const [open, setOpen] = useState(false);
@@ -72,8 +79,28 @@ export default function NotificationBell() {
   return (
     <>
       <Tooltip title="Уведомления">
-        <IconButton color="inherit" onClick={openDrawer}>
-          <Badge color="error" badgeContent={cappedUnread} invisible={!unreadCount}>
+        <IconButton
+          color="inherit"
+          onClick={openDrawer}
+          sx={{
+            border: unreadCount ? "1px solid" : "1px solid transparent",
+            borderColor: unreadCount ? "error.light" : "transparent",
+            bgcolor: unreadCount ? "rgba(239,68,68,0.08)" : "transparent",
+          }}
+        >
+          <Badge
+            color="error"
+            badgeContent={cappedUnread}
+            invisible={!unreadCount}
+            sx={{
+              "& .MuiBadge-badge": unreadCount
+                ? {
+                    animation: `${bellPulse} 1.9s infinite`,
+                    transformOrigin: "center",
+                  }
+                : undefined,
+            }}
+          >
             <NotificationsRoundedIcon />
           </Badge>
         </IconButton>

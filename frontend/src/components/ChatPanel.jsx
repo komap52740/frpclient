@@ -2,6 +2,8 @@
 import AttachFileIcon from "@mui/icons-material/AttachFile";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
+import ExpandLessRoundedIcon from "@mui/icons-material/ExpandLessRounded";
+import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
 import SendIcon from "@mui/icons-material/Send";
 import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
 import {
@@ -144,6 +146,7 @@ export default function ChatPanel({ appointmentId, currentUser, systemEvents = [
   const [quickReplySaving, setQuickReplySaving] = useState(false);
   const [replyForm, setReplyForm] = useState(EMPTY_REPLY_FORM);
   const [newIncomingCount, setNewIncomingCount] = useState(0);
+  const [quickPhrasesOpen, setQuickPhrasesOpen] = useState(!isMobile);
 
   const threadRef = useRef(null);
 
@@ -231,6 +234,10 @@ export default function ChatPanel({ appointmentId, currentUser, systemEvents = [
   useEffect(() => {
     loadQuickReplies();
   }, [loadQuickReplies]);
+
+  useEffect(() => {
+    setQuickPhrasesOpen(!isMobile);
+  }, [appointmentId, isMobile]);
 
   useAutoRefresh(() => loadMessages(lastMessageId), { intervalMs: 2500 });
 
@@ -435,39 +442,52 @@ export default function ChatPanel({ appointmentId, currentUser, systemEvents = [
       </Typography>
 
       <Stack spacing={0.65} sx={{ mb: 1.1 }}>
-        <Typography variant="caption" color="text.secondary">
-          {isMaster ? "Быстрые фразы и команды" : "Быстрые фразы"}
-        </Typography>
-        <Stack
-          direction="row"
-          spacing={0.7}
-          flexWrap={isMobile ? "nowrap" : "wrap"}
-          useFlexGap={!isMobile}
-          sx={{ overflowX: isMobile ? "auto" : "visible", pb: isMobile ? 0.4 : 0 }}
-        >
-          {quickTemplates.map((template) => (
-            <Chip
-              key={template}
-              label={template}
-              variant="outlined"
-              onClick={() => applyTemplate(template)}
-              sx={{ cursor: "pointer" }}
-            />
-          ))}
-
-          {isMaster
-            ? quickReplies.map((item) => (
-                <Chip
-                  key={item.id}
-                  label={item.title ? `/${item.command} — ${item.title}` : `/${item.command}`}
-                  color="primary"
-                  variant="outlined"
-                  onClick={() => applyQuickReplyCommand(item.command)}
-                  sx={{ cursor: "pointer" }}
-                />
-              ))
-            : null}
+        <Stack direction="row" justifyContent="space-between" alignItems="center">
+          <Typography variant="caption" color="text.secondary">
+            {isMaster ? "Быстрые фразы и команды" : "Быстрые фразы"}
+          </Typography>
+          <Button
+            size="small"
+            variant="text"
+            endIcon={quickPhrasesOpen ? <ExpandLessRoundedIcon fontSize="small" /> : <ExpandMoreRoundedIcon fontSize="small" />}
+            onClick={() => setQuickPhrasesOpen((prev) => !prev)}
+            sx={{ minHeight: 28, px: 1 }}
+          >
+            {quickPhrasesOpen ? "Скрыть" : "Показать"}
+          </Button>
         </Stack>
+        {quickPhrasesOpen ? (
+          <Stack
+            direction="row"
+            spacing={0.7}
+            flexWrap={isMobile ? "nowrap" : "wrap"}
+            useFlexGap={!isMobile}
+            sx={{ overflowX: isMobile ? "auto" : "visible", pb: isMobile ? 0.4 : 0 }}
+          >
+            {quickTemplates.map((template) => (
+              <Chip
+                key={template}
+                label={template}
+                variant="outlined"
+                onClick={() => applyTemplate(template)}
+                sx={{ cursor: "pointer" }}
+              />
+            ))}
+
+            {isMaster
+              ? quickReplies.map((item) => (
+                  <Chip
+                    key={item.id}
+                    label={item.title ? `/${item.command} — ${item.title}` : `/${item.command}`}
+                    color="primary"
+                    variant="outlined"
+                    onClick={() => applyQuickReplyCommand(item.command)}
+                    sx={{ cursor: "pointer" }}
+                  />
+                ))
+              : null}
+          </Stack>
+        ) : null}
       </Stack>
 
       {isMaster ? (
@@ -516,40 +536,56 @@ export default function ChatPanel({ appointmentId, currentUser, systemEvents = [
         onScroll={onThreadScroll}
       />
 
-      <Stack spacing={1} sx={{ mt: 1.75 }}>
-        <TextField
-          label="Сообщение"
-          multiline
-          minRows={isMobile ? 2.4 : 2}
-          value={text}
-          onChange={(event) => setText(event.target.value)}
-          onKeyDown={(event) => {
-            if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
-              event.preventDefault();
-              onSend();
+      <Paper
+        elevation={0}
+        sx={{
+          mt: 1.75,
+          p: 1,
+          borderRadius: 2.5,
+          border: "1px solid",
+          borderColor: "divider",
+          position: isMobile ? "sticky" : "static",
+          bottom: isMobile ? 2 : "auto",
+          zIndex: 4,
+          backdropFilter: "blur(10px)",
+          background: isDark ? "rgba(12,18,31,0.9)" : "rgba(255,255,255,0.92)",
+        }}
+      >
+        <Stack spacing={1}>
+          <TextField
+            label="Сообщение"
+            multiline
+            minRows={isMobile ? 2.4 : 2}
+            value={text}
+            onChange={(event) => setText(event.target.value)}
+            onKeyDown={(event) => {
+              if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+                event.preventDefault();
+                onSend();
+              }
+            }}
+            helperText={
+              text.trim().length
+                ? "Сообщение готово к отправке. Ctrl+Enter для быстрой отправки"
+                : isMaster
+                  ? "Можно писать /команда (пример: /1). Ctrl+Enter для быстрой отправки"
+                  : "Напишите мастеру коротко и по делу. Ctrl+Enter для быстрой отправки"
             }
-          }}
-          helperText={
-            text.trim().length
-              ? "Сообщение готово к отправке. Ctrl+Enter для быстрой отправки"
-              : isMaster
-                ? "Можно писать /команда (пример: /1). Ctrl+Enter для быстрой отправки"
-                : "Напишите мастеру коротко и по делу. Ctrl+Enter для быстрой отправки"
-          }
-        />
-        <Stack direction="row" spacing={1} alignItems="center">
-          <Button component="label" variant="outlined" startIcon={<AttachFileIcon />}>
-            Файл
-            <input hidden type="file" onChange={(event) => onFileChange(event.target.files?.[0] || null)} />
-          </Button>
-          <Typography variant="body2" sx={{ flexGrow: 1 }}>
-            {file ? file.name : "Файл не выбран"}
-          </Typography>
-          <Button variant="contained" onClick={onSend} endIcon={<SendIcon />} disabled={isSending || Boolean(fileError)}>
-            {isSending ? "Отправка..." : "Отправить"}
-          </Button>
+          />
+          <Stack direction="row" spacing={1} alignItems="center">
+            <Button component="label" variant="outlined" startIcon={<AttachFileIcon />}>
+              Файл
+              <input hidden type="file" onChange={(event) => onFileChange(event.target.files?.[0] || null)} />
+            </Button>
+            <Typography variant="body2" sx={{ flexGrow: 1 }}>
+              {file ? file.name : "Файл не выбран"}
+            </Typography>
+            <Button variant="contained" onClick={onSend} endIcon={<SendIcon />} disabled={isSending || Boolean(fileError)}>
+              {isSending ? "Отправка..." : "Отправить"}
+            </Button>
+          </Stack>
         </Stack>
-      </Stack>
+      </Paper>
 
       <Dialog open={quickRepliesOpen} onClose={() => setQuickRepliesOpen(false)} fullWidth maxWidth="md">
         <DialogTitle>Быстрые ответы мастера</DialogTitle>

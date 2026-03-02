@@ -356,7 +356,7 @@ export default function ClientHomePage() {
         />
           <Stack spacing={1} sx={{ position: "relative" }}>
             <Typography variant="h5">Личный кабинет клиента</Typography>
-            <Typography variant="body1" sx={{ opacity: 0.95, maxWidth: 760 }}>
+            <Typography variant="body1" sx={{ opacity: 0.95, maxWidth: 760, display: { xs: "none", sm: "block" } }}>
               Вся работа по заявке в одном месте: прогресс, оплата, чат и история действий без лишних переходов.
             </Typography>
           </Stack>
@@ -407,6 +407,7 @@ export default function ClientHomePage() {
                       severity="info"
                       icon={false}
                       sx={{
+                        display: { xs: "none", sm: "flex" },
                         py: 0.5,
                         borderRadius: 2,
                         border: `1px solid ${scenario.tone}33`,

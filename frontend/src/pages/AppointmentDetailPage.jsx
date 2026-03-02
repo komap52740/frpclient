@@ -1,6 +1,9 @@
 ﻿import CampaignRoundedIcon from "@mui/icons-material/CampaignRounded";
 import ContentCopyRoundedIcon from "@mui/icons-material/ContentCopyRounded";
 import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
+import ForumRoundedIcon from "@mui/icons-material/ForumRounded";
+import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
+import PaymentsRoundedIcon from "@mui/icons-material/PaymentsRounded";
 import ReplayRoundedIcon from "@mui/icons-material/ReplayRounded";
 import ShieldRoundedIcon from "@mui/icons-material/ShieldRounded";
 import TimelineRoundedIcon from "@mui/icons-material/TimelineRounded";
@@ -19,6 +22,7 @@ import {
   DialogTitle,
   Divider,
   Drawer,
+  Fade,
   Grid,
   LinearProgress,
   MenuItem,
@@ -54,6 +58,7 @@ import {
 } from "../constants/labels";
 import useAutoRefresh from "../hooks/useAutoRefresh";
 import { resolveStatusUI } from "../theme/status";
+import { normalizeRuText } from "../utils/text";
 
 dayjs.locale("ru");
 
@@ -103,18 +108,22 @@ const EVENT_LABELS = {
 function getEventTitle(event) {
   if (event.event_type === "client_signal") {
     const signalLabel = CLIENT_SIGNAL_OPTIONS.find((option) => option.value === event.metadata?.signal)?.label;
-    return signalLabel ? `${EVENT_LABELS.client_signal}: ${signalLabel}` : EVENT_LABELS.client_signal;
+    return signalLabel
+      ? normalizeRuText(`${EVENT_LABELS.client_signal}: ${signalLabel}`)
+      : EVENT_LABELS.client_signal;
   }
   if (event.event_type === "status_changed") {
     if (event.from_status && event.to_status) {
-      return `${EVENT_LABELS.status_changed}: ${getStatusLabel(event.from_status)} -> ${getStatusLabel(event.to_status)}`;
+      return normalizeRuText(
+        `${EVENT_LABELS.status_changed}: ${getStatusLabel(event.from_status)} -> ${getStatusLabel(event.to_status)}`
+      );
     }
     if (event.to_status) {
-      return `${EVENT_LABELS.status_changed}: ${getStatusLabel(event.to_status)}`;
+      return normalizeRuText(`${EVENT_LABELS.status_changed}: ${getStatusLabel(event.to_status)}`);
     }
     return EVENT_LABELS.status_changed;
   }
-  return EVENT_LABELS[event.event_type] || event.event_type;
+  return normalizeRuText(EVENT_LABELS[event.event_type] || event.event_type);
 }
 
 function buildFallbackEvents(appointment) {
@@ -243,6 +252,16 @@ function formatEtaMinutes(minutes) {
   return `~${hours} ч`;
 }
 
+function resolveClientActionByStatus(status) {
+  if (["AWAITING_PAYMENT", "PAYMENT_PROOF_UPLOADED"].includes(status)) {
+    return "open_payment";
+  }
+  if (status === "COMPLETED") {
+    return "leave_review";
+  }
+  return "open_chat";
+}
+
 export default function AppointmentDetailPage() {
   const navigate = useNavigate();
   const { id } = useParams();
@@ -278,7 +297,16 @@ export default function AppointmentDetailPage() {
   const [paymentFocusOpen, setPaymentFocusOpen] = useState(false);
   const [paymentDragOver, setPaymentDragOver] = useState(false);
   const [clientTab, setClientTab] = useState("chat");
-  const [toast, setToast] = useState({ open: false, severity: "success", message: "" });
+  const [toast, setToast] = useState({ open: false, severity: "success", message: "", actionKey: "" });
+  const [clientCompactView, setClientCompactView] = useState(() => {
+    if (typeof window === "undefined") {
+      return false;
+    }
+    const saved = window.localStorage.getItem("frp_client_compact_view");
+    if (saved === "1") return true;
+    if (saved === "0") return false;
+    return window.matchMedia("(max-width: 1200px)").matches;
+  });
 
   const paymentRef = useRef(null);
   const chatRef = useRef(null);
@@ -311,6 +339,7 @@ export default function AppointmentDetailPage() {
           open: true,
           severity: "info",
           message: `Статус обновился: ${getStatusLabel(nextStatus)}`,
+          actionKey: resolveClientActionByStatus(nextStatus),
         });
       }
       lastKnownStatusRef.current = nextStatus;
@@ -467,6 +496,13 @@ export default function AppointmentDetailPage() {
     setClientTab((prev) => (prev === "payment" ? "chat" : prev));
   }, [appointment?.id, appointment?.status, user?.role]);
 
+  useEffect(() => {
+    if (user?.role !== "client") {
+      return;
+    }
+    window.localStorage.setItem("frp_client_compact_view", clientCompactView ? "1" : "0");
+  }, [clientCompactView, user?.role]);
+
   const timelineEvents = useMemo(
     () => (events.length ? events : buildFallbackEvents(appointment)),
     [events, appointment]
@@ -571,12 +607,14 @@ export default function AppointmentDetailPage() {
 
   const showAdminControls = user.role === "admin";
   const showAdminPaymentConfirm = showAdminControls && appointment.status === "PAYMENT_PROOF_UPLOADED";
-  const showClientPaymentHighlight = false;
+  const showClientPaymentHighlight = isClient && ["AWAITING_PAYMENT", "PAYMENT_PROOF_UPLOADED"].includes(appointment.status);
+  const isClientCompact = isClient && clientCompactView;
   const showClientDesktopSidebar = isClient && !isMobile;
   const showClientPaymentDock =
     showClientDesktopSidebar &&
     ["AWAITING_PAYMENT", "PAYMENT_PROOF_UPLOADED"].includes(appointment.status);
-  const showClientFloatingActionBar = isClient && isMobile && !paymentFocusOpen;
+  const showClientFloatingActionBar = isClient && isMobile && !paymentFocusOpen && !showClientTabs;
+  const showClientQuickRail = isClient && isMobile;
   const clientPaymentTabDisabled = !showClientPaymentActions;
   const showClientDataCard = !showClientTabs || clientTab === "details";
   const showClientPaymentCard = showClientPaymentActions && (!showClientTabs || clientTab === "payment");
@@ -628,8 +666,69 @@ export default function AppointmentDetailPage() {
     cursor: "pointer",
   };
   const lastSyncLabel = dayjs(lastSyncedAt).format("HH:mm:ss");
-  const visibleTimelineEvents = isClient ? timelineEvents.slice(0, 8) : timelineEvents;
-  const sidebarTimelineEvents = isClient ? visibleTimelineEvents.slice(0, 4) : visibleTimelineEvents;
+  const visibleTimelineEvents = isClient ? timelineEvents.slice(0, isClientCompact ? 4 : 6) : timelineEvents;
+  const sidebarTimelineEvents = isClient ? visibleTimelineEvents.slice(0, isClientCompact ? 3 : 4) : visibleTimelineEvents;
+  const actionEtaLabel = (() => {
+    if (appointment.status === "AWAITING_PAYMENT") {
+      return "После оплаты мастер продолжит обычно за 1-5 минут";
+    }
+    if (["NEW", "IN_REVIEW"].includes(appointment.status) && responseEtaMinutes != null) {
+      return `Ожидаем ответ: ${formatEtaMinutes(responseEtaMinutes)}`;
+    }
+    if (["PAID", "IN_PROGRESS"].includes(appointment.status) && completionEtaMinutes != null) {
+      return `До завершения: ${formatEtaMinutes(completionEtaMinutes)}`;
+    }
+    return "";
+  })();
+  const clientQuickActions = isClient
+    ? [
+        {
+          id: "focus",
+          key: ["AWAITING_PAYMENT", "PAYMENT_PROOF_UPLOADED"].includes(appointment.status) ? "open_payment" : "open_chat",
+          label: ["AWAITING_PAYMENT", "PAYMENT_PROOF_UPLOADED"].includes(appointment.status) ? "Оплата" : "Чат",
+          tab: ["AWAITING_PAYMENT", "PAYMENT_PROOF_UPLOADED"].includes(appointment.status) ? "payment" : "chat",
+          icon:
+            ["AWAITING_PAYMENT", "PAYMENT_PROOF_UPLOADED"].includes(appointment.status) ? (
+              <PaymentsRoundedIcon fontSize="small" />
+            ) : (
+              <ForumRoundedIcon fontSize="small" />
+            ),
+          emphasis: true,
+        },
+        {
+          id: "messages",
+          key: "open_chat",
+          label: "Сообщения",
+          tab: "chat",
+          icon: <ForumRoundedIcon fontSize="small" />,
+        },
+        {
+          id: "status",
+          key: "open_timeline",
+          label: "Статус",
+          tab: "details",
+          icon: <TimelineRoundedIcon fontSize="small" />,
+        },
+        ...(appointment.status === "COMPLETED"
+          ? [
+              {
+                id: "review",
+                key: "leave_review",
+                label: "Отзыв",
+                tab: "details",
+                icon: <InfoOutlinedIcon fontSize="small" />,
+              },
+            ]
+          : []),
+      ]
+    : [];
+  const clientSidebarActions = (isClientCompact
+    ? clientQuickActions.filter((action) => action.id !== "status")
+    : clientQuickActions
+  ).slice(0, 3);
+  const clientRailActions = isClientCompact
+    ? clientQuickActions.filter((action) => action.id !== "status")
+    : clientQuickActions;
 
   const statusUi = resolveStatusUI(appointment.status, appointment.sla_breached);
   const clientFocus = (() => {
@@ -683,6 +782,14 @@ export default function AppointmentDetailPage() {
       cta: "Открыть чат",
     };
   })();
+  const toastActionLabel =
+    toast.actionKey === "open_payment"
+      ? "К оплате"
+      : toast.actionKey === "leave_review"
+        ? "К отзыву"
+        : toast.actionKey
+          ? "Открыть"
+          : "";
 
   const handlePrimaryAction = async (actionKey) => {
     if (actionKey === "open_payment") {
@@ -857,13 +964,25 @@ export default function AppointmentDetailPage() {
             <Box>
               <Typography variant="h2">Заявка #{appointment.id}</Typography>
               <Typography variant="body2" color="text.secondary">
-                {appointment.brand} {appointment.model} • {getLockTypeLabel(appointment.lock_type)}
+                {normalizeRuText(appointment.brand)} {normalizeRuText(appointment.model)} • {getLockTypeLabel(appointment.lock_type)}
               </Typography>
             </Box>
-            <Chip
-              label={statusUi.label}
-              sx={{ bgcolor: statusUi.bg, color: statusUi.color, border: `1px solid ${statusUi.color}33`, fontWeight: 700 }}
-            />
+            <Stack direction="row" spacing={0.75} alignItems="center">
+              <Chip
+                label={statusUi.label}
+                sx={{ bgcolor: statusUi.bg, color: statusUi.color, border: `1px solid ${statusUi.color}33`, fontWeight: 700 }}
+              />
+              {isClient ? (
+                <Button
+                  size="small"
+                  variant={clientCompactView ? "outlined" : "text"}
+                  onClick={() => setClientCompactView((prev) => !prev)}
+                  sx={{ minHeight: 28, px: 1.1, borderRadius: 2 }}
+                >
+                  {clientCompactView ? "Полный вид" : "Фокус"}
+                </Button>
+              ) : null}
+            </Stack>
           </Stack>
 
           <StatusStepper
@@ -895,6 +1014,14 @@ export default function AppointmentDetailPage() {
                 <Box>
                   <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>{clientFocus?.title}</Typography>
                   <Typography variant="caption" color="text.secondary">{clientFocus?.description}</Typography>
+                  {actionEtaLabel ? (
+                    <Stack direction="row" alignItems="center" spacing={0.5} sx={{ mt: 0.55 }}>
+                      <InfoOutlinedIcon sx={{ fontSize: 14, color: "text.secondary" }} />
+                      <Typography variant="caption" color="text.secondary">
+                        {actionEtaLabel}
+                      </Typography>
+                    </Stack>
+                  ) : null}
                 </Box>
                 <Button
                   variant="contained"
@@ -930,10 +1057,53 @@ export default function AppointmentDetailPage() {
                   "& .MuiTab-root": { minHeight: 42, fontWeight: 700, fontSize: 13.5, textTransform: "none" },
                 }}
               >
-                <Tab value="payment" label="Оплата" disabled={clientPaymentTabDisabled} />
-                <Tab value="chat" label="Чат" />
-                <Tab value="details" label="Детали" />
+                <Tab
+                  value="payment"
+                  label="Оплата"
+                  icon={<PaymentsRoundedIcon fontSize="small" />}
+                  iconPosition="start"
+                  disabled={clientPaymentTabDisabled}
+                />
+                <Tab value="chat" label="Чат" icon={<ForumRoundedIcon fontSize="small" />} iconPosition="start" />
+                <Tab value="details" label="Детали" icon={<InfoOutlinedIcon fontSize="small" />} iconPosition="start" />
               </Tabs>
+            </Paper>
+          ) : null}
+          {showClientQuickRail ? (
+            <Paper
+              elevation={0}
+              sx={{
+                p: 0.7,
+                borderRadius: 2.5,
+                border: "1px solid",
+                borderColor: "divider",
+                bgcolor: isDark ? "rgba(15,23,42,0.82)" : "rgba(255,255,255,0.82)",
+              }}
+            >
+              <Stack direction="row" spacing={0.6} sx={{ overflowX: "auto", pb: 0.2 }}>
+                {clientRailActions.map((action) => {
+                  const active = showClientTabs ? clientTab === action.tab : false;
+                  return (
+                    <Button
+                      key={action.id}
+                      size="small"
+                      startIcon={action.icon}
+                      variant={active || action.emphasis ? "contained" : "text"}
+                      color={active || action.emphasis ? "primary" : "inherit"}
+                      onClick={() => handlePrimaryAction(action.key)}
+                      sx={{
+                        borderRadius: 2.2,
+                        px: 1.2,
+                        whiteSpace: "nowrap",
+                        flexShrink: 0,
+                        minWidth: "fit-content",
+                      }}
+                    >
+                      {action.label}
+                    </Button>
+                  );
+                })}
+              </Stack>
             </Paper>
           ) : null}
 
@@ -986,68 +1156,72 @@ export default function AppointmentDetailPage() {
         <Grid item xs={12} lg={(!isClient || showClientDesktopSidebar) ? 8 : 12}>
           <Stack spacing={2}>
             {showClientDataCard ? (
-              <Paper
-                sx={{
-                  p: { xs: 1.8, md: 2.2 },
-                  borderRadius: 3,
-                  border: "1px solid",
-                  borderColor: "divider",
-                  background: isClient
-                    ? isDark
-                      ? "linear-gradient(160deg, rgba(15,23,42,0.94) 0%, rgba(18,31,50,0.9) 100%)"
-                      : "linear-gradient(160deg, rgba(255,255,255,0.98) 0%, rgba(248,252,255,0.95) 100%)"
-                    : "background.paper",
-                  transition: "box-shadow .24s ease, border-color .24s ease",
-                  "&:hover": isClient
-                    ? {
-                        boxShadow: isDark ? "0 14px 30px rgba(2,6,23,0.5)" : "0 14px 30px rgba(15,23,42,0.10)",
-                        borderColor: "rgba(2,132,199,0.18)",
-                      }
-                    : undefined,
-                }}
-              >
-                <Typography variant="h3" sx={{ mb: 1 }}>Данные заявки</Typography>
-                {isClient ? (
-                  <Stack spacing={1.1}>
-                    <Typography variant="body2" color="text.secondary">
-                      Главное по заявке без лишнего шума
-                    </Typography>
-                    <Stack direction="row" spacing={0.8} flexWrap="wrap" useFlexGap>
-                      <Chip size="small" label={`Устройство: ${appointment.brand} ${appointment.model}`} />
-                      <Chip size="small" label={`Блокировка: ${getLockTypeLabel(appointment.lock_type)}`} />
-                      <Chip size="small" color={appointment.total_price ? "warning" : "default"} label={appointment.total_price ? `К оплате: ${appointment.total_price} руб.` : "Цена уточняется"} />
-                      <Chip size="small" label={`Мастер: ${appointment.master_username || "пока не назначен"}`} />
-                    </Stack>
-                    {appointment.description ? (
-                      <Typography variant="body2" color="text.secondary">
-                        {appointment.description}
-                      </Typography>
-                    ) : null}
-                  </Stack>
-                ) : (
-                  <Stack spacing={0.7}>
-                    <Typography variant="body2"><b>Устройство:</b> {appointment.brand} {appointment.model}</Typography>
-                    <Typography variant="body2"><b>Тип блокировки:</b> {getLockTypeLabel(appointment.lock_type)}</Typography>
-                    <Typography variant="body2"><b>Цена:</b> {appointment.total_price ? `${appointment.total_price} руб.` : "Не выставлена"}</Typography>
-                    <Typography variant="body2"><b>Мастер:</b> {appointment.master_username || appointment.assigned_master || "Пока не назначен"}</Typography>
-                    {appointment.description ? (
-                      <Typography variant="body2"><b>Комментарий:</b> {appointment.description}</Typography>
-                    ) : null}
-                    <Typography variant="body2"><b>Есть ПК:</b> {appointment.has_pc ? "Да" : "Нет"}</Typography>
-                    <Typography variant="body2"><b>Клиент:</b> {appointment.client_username || appointment.client}</Typography>
-                    {appointment.photo_lock_screen_url ? (
-                      <Typography variant="body2">
-                        <a href={appointment.photo_lock_screen_url} target="_blank" rel="noreferrer">Фото экрана блокировки</a>
-                      </Typography>
-                    ) : null}
-                    {appointment.payment_proof_url ? (
-                      <Typography variant="body2">
-                        <a href={appointment.payment_proof_url} target="_blank" rel="noreferrer">Чек/скрин оплаты</a>
-                      </Typography>
-                    ) : null}
-                  </Stack>
-                )}
-              </Paper>
+              <Fade in={showClientDataCard} timeout={220}>
+                <Box>
+                  <Paper
+                    sx={{
+                      p: { xs: 1.8, md: 2.2 },
+                      borderRadius: 3,
+                      border: "1px solid",
+                      borderColor: "divider",
+                      background: isClient
+                        ? isDark
+                          ? "linear-gradient(160deg, rgba(15,23,42,0.94) 0%, rgba(18,31,50,0.9) 100%)"
+                          : "linear-gradient(160deg, rgba(255,255,255,0.98) 0%, rgba(248,252,255,0.95) 100%)"
+                        : "background.paper",
+                      transition: "box-shadow .24s ease, border-color .24s ease",
+                      "&:hover": isClient
+                        ? {
+                            boxShadow: isDark ? "0 14px 30px rgba(2,6,23,0.5)" : "0 14px 30px rgba(15,23,42,0.10)",
+                            borderColor: "rgba(2,132,199,0.18)",
+                          }
+                        : undefined,
+                    }}
+                  >
+                    <Typography variant="h3" sx={{ mb: 1 }}>Данные заявки</Typography>
+                    {isClient ? (
+                      <Stack spacing={1.1}>
+                        <Typography variant="body2" color="text.secondary">
+                          Главное по заявке без лишнего шума
+                        </Typography>
+                        <Stack direction="row" spacing={0.8} flexWrap="wrap" useFlexGap>
+                          <Chip size="small" label={`Устройство: ${normalizeRuText(appointment.brand)} ${normalizeRuText(appointment.model)}`} />
+                          <Chip size="small" label={`Блокировка: ${getLockTypeLabel(appointment.lock_type)}`} />
+                          <Chip size="small" color={appointment.total_price ? "warning" : "default"} label={appointment.total_price ? `К оплате: ${appointment.total_price} руб.` : "Цена уточняется"} />
+                          <Chip size="small" label={`Мастер: ${normalizeRuText(appointment.master_username) || "пока не назначен"}`} />
+                        </Stack>
+                        {appointment.description ? (
+                          <Typography variant="body2" color="text.secondary">
+                            {normalizeRuText(appointment.description)}
+                          </Typography>
+                        ) : null}
+                      </Stack>
+                    ) : (
+                      <Stack spacing={0.7}>
+                        <Typography variant="body2"><b>Устройство:</b> {normalizeRuText(appointment.brand)} {normalizeRuText(appointment.model)}</Typography>
+                        <Typography variant="body2"><b>Тип блокировки:</b> {getLockTypeLabel(appointment.lock_type)}</Typography>
+                        <Typography variant="body2"><b>Цена:</b> {appointment.total_price ? `${appointment.total_price} руб.` : "Не выставлена"}</Typography>
+                        <Typography variant="body2"><b>Мастер:</b> {normalizeRuText(appointment.master_username) || appointment.assigned_master || "Пока не назначен"}</Typography>
+                        {appointment.description ? (
+                          <Typography variant="body2"><b>Комментарий:</b> {normalizeRuText(appointment.description)}</Typography>
+                        ) : null}
+                        <Typography variant="body2"><b>Есть ПК:</b> {appointment.has_pc ? "Да" : "Нет"}</Typography>
+                        <Typography variant="body2"><b>Клиент:</b> {normalizeRuText(appointment.client_username) || appointment.client}</Typography>
+                        {appointment.photo_lock_screen_url ? (
+                          <Typography variant="body2">
+                            <a href={appointment.photo_lock_screen_url} target="_blank" rel="noreferrer">Фото экрана блокировки</a>
+                          </Typography>
+                        ) : null}
+                        {appointment.payment_proof_url ? (
+                          <Typography variant="body2">
+                            <a href={appointment.payment_proof_url} target="_blank" rel="noreferrer">Чек/скрин оплаты</a>
+                          </Typography>
+                        ) : null}
+                      </Stack>
+                    )}
+                  </Paper>
+                </Box>
+              </Fade>
             ) : null}
 
             {showMasterReviewAndPrice ? (
@@ -1103,8 +1277,9 @@ export default function AppointmentDetailPage() {
               </Paper>
             ) : null}
 
-            {showClientPaymentCard ? (
-              <Paper
+            <Fade in={showClientPaymentCard} timeout={220} mountOnEnter unmountOnExit>
+              <Box>
+                <Paper
                 ref={paymentRef}
                 sx={{
                   p: { xs: 1.8, md: 2.2 },
@@ -1266,8 +1441,9 @@ export default function AppointmentDetailPage() {
                     </Stack>
                   )}
                 </Stack>
-              </Paper>
-            ) : null}
+                </Paper>
+              </Box>
+            </Fade>
 
             {showClientSignals ? (
               <Paper sx={{ p: 2.2 }}>
@@ -1407,13 +1583,13 @@ export default function AppointmentDetailPage() {
               </Paper>
             ) : null}
 
-            {showClientChatPanel ? (
+            <Fade in={showClientChatPanel} timeout={220} mountOnEnter unmountOnExit>
               <Box ref={chatRef}>
                 <ChatPanel appointmentId={id} currentUser={user} systemEvents={mappedSystemEvents} />
               </Box>
-            ) : null}
+            </Fade>
 
-            {showClientDetailsCard ? (
+            <Fade in={showClientDetailsCard} timeout={220} mountOnEnter unmountOnExit>
               <Box ref={timelineRef}>
                 <Accordion
                   disableGutters
@@ -1435,7 +1611,7 @@ export default function AppointmentDetailPage() {
                   </AccordionSummary>
                   <AccordionDetails>
                     <Stack spacing={1.2}>
-                      <Typography variant="body2"><b>Мастер:</b> {appointment.master_username || "Пока не назначен"}</Typography>
+                      <Typography variant="body2"><b>Мастер:</b> {normalizeRuText(appointment.master_username) || "Пока не назначен"}</Typography>
                       <Typography variant="body2"><b>SLA ответ до:</b> {appointment.response_deadline_at ? dayjs(appointment.response_deadline_at).format("DD.MM.YYYY HH:mm") : "—"}</Typography>
                       <Typography variant="body2"><b>SLA завершение до:</b> {appointment.completion_deadline_at ? dayjs(appointment.completion_deadline_at).format("DD.MM.YYYY HH:mm") : "—"}</Typography>
                       {appointment.sla_breached ? (
@@ -1463,7 +1639,7 @@ export default function AppointmentDetailPage() {
                   </AccordionDetails>
                 </Accordion>
               </Box>
-            ) : null}
+            </Fade>
           </Stack>
         </Grid>
 
@@ -1477,7 +1653,7 @@ export default function AppointmentDetailPage() {
               </Stack>
 
               <Stack spacing={0.7}>
-                <Typography variant="body2"><b>Мастер:</b> {appointment.master_username || "Пока не назначен"}</Typography>
+                <Typography variant="body2"><b>Мастер:</b> {normalizeRuText(appointment.master_username) || "Пока не назначен"}</Typography>
                 {user.role !== "client" ? (
                   <Typography variant="body2"><b>Риск клиента:</b> {appointment.client_risk_level || "—"} {appointment.client_risk_score != null ? `(${appointment.client_risk_score})` : ""}</Typography>
                 ) : null}
@@ -1507,24 +1683,19 @@ export default function AppointmentDetailPage() {
                 ) : (
                   <>
                     <Divider sx={{ my: 0.7 }} />
-                    <Button
-                      variant="contained"
-                      size="small"
-                      onClick={() =>
-                        handlePrimaryAction(
-                          ["AWAITING_PAYMENT", "PAYMENT_PROOF_UPLOADED"].includes(appointment.status)
-                            ? "open_payment"
-                            : "open_chat"
-                        )
-                      }
-                    >
-                      {["AWAITING_PAYMENT", "PAYMENT_PROOF_UPLOADED"].includes(appointment.status)
-                        ? "Оплата и чек"
-                        : "Открыть чат"}
-                    </Button>
-                    <Button variant="outlined" size="small" onClick={() => handlePrimaryAction("open_timeline")}>
-                      Лента событий
-                    </Button>
+                    <Stack spacing={0.6}>
+                      {clientSidebarActions.map((action) => (
+                        <Button
+                          key={`sidebar-${action.id}`}
+                          size="small"
+                          startIcon={action.icon}
+                          variant={action.emphasis ? "contained" : "outlined"}
+                          onClick={() => handlePrimaryAction(action.key)}
+                        >
+                          {action.label}
+                        </Button>
+                      ))}
+                    </Stack>
                   </>
                 )}
               </Stack>
@@ -1544,9 +1715,9 @@ export default function AppointmentDetailPage() {
                     {sidebarTimelineEvents.map((event, index) => (
                       <Stack key={event.id} spacing={0.35}>
                         <Typography variant="body2" sx={{ fontWeight: 700 }}>{getEventTitle(event)}</Typography>
-                        {event.note ? <Typography variant="caption" color="text.secondary">{event.note}</Typography> : null}
+                        {event.note ? <Typography variant="caption" color="text.secondary">{normalizeRuText(event.note)}</Typography> : null}
                         <Typography variant="caption" color="text.secondary">
-                          {event.actor_username || "Система"} • {dayjs(event.created_at).format("DD.MM.YYYY HH:mm")}
+                          {normalizeRuText(event.actor_username) || "Система"} • {dayjs(event.created_at).format("DD.MM.YYYY HH:mm")}
                         </Typography>
                         {index < sidebarTimelineEvents.length - 1 ? <Divider /> : null}
                       </Stack>
@@ -2092,15 +2263,34 @@ export default function AppointmentDetailPage() {
       </Dialog>
       <Snackbar
         open={toast.open}
-        autoHideDuration={2600}
-        onClose={() => setToast((prev) => ({ ...prev, open: false }))}
+        autoHideDuration={3200}
+        onClose={() => setToast((prev) => ({ ...prev, open: false, actionKey: "" }))}
         anchorOrigin={{ vertical: "top", horizontal: "center" }}
       >
         <Alert
           severity={toast.severity}
           variant="filled"
-          onClose={() => setToast((prev) => ({ ...prev, open: false }))}
-          sx={{ width: "100%" }}
+          onClose={() => setToast((prev) => ({ ...prev, open: false, actionKey: "" }))}
+          action={
+            isClient && toast.actionKey ? (
+              <Button
+                size="small"
+                color="inherit"
+                onClick={() => {
+                  const actionKey = toast.actionKey;
+                  setToast((prev) => ({ ...prev, open: false, actionKey: "" }));
+                  handlePrimaryAction(actionKey);
+                }}
+              >
+                {toastActionLabel}
+              </Button>
+            ) : null
+          }
+          sx={{
+            width: "100%",
+            borderRadius: 2.2,
+            boxShadow: isDark ? "0 12px 28px rgba(2,6,23,0.56)" : "0 10px 24px rgba(15,23,42,0.14)",
+          }}
         >
           {toast.message}
         </Alert>

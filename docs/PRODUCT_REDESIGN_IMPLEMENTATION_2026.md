@@ -573,3 +573,52 @@ No-Go, РµСЃР»Рё:
   - `index.html` now no-cache/no-store
   - `/assets/*` now immutable cache
 - This reduces post-deploy chunk mismatch issues and gives users a clear reload action instead of a blank page.
+### 2026-03-02 (UX polish, mobile + readability)
+- Reduced cognitive load on key client screens:
+  - less secondary text on mobile in `ClientHomePage` and `MyAppointmentsPage`
+  - cleaner compact metadata in appointment cards on small screens.
+- Improved shell usability in `MainLayout`:
+  - cleaner mobile header, direct logout icon, and logout entry in drawer
+  - better hierarchy for username/role display on desktop vs mobile.
+- Upgraded mobile navigation feel in `AppBottomNav`:
+  - clearer selected state with soft active background.
+- Payment UX on `AppointmentDetailPage` improved:
+  - explicit “Выбрать файл”, “Очистить”, file meta preview, and upload progress
+  - same clear payment behavior in mobile bottom-sheet.
+- Added runtime normalization for mojibake-like text (`РџРѕ...`) using `frontend/src/utils/text.js`:
+  - applied in timeline/status text and chat thread rendering.
+- Refined chat visuals (`ChatThread`) for premium look:
+  - improved system event pills, bubbles, spacing, and dark-mode readability.
+### 2026-03-02 (UX polish, shell + motion)
+- Added page-entry motion wrapper `PageMotion` and connected it in `MainLayout` for smoother route transitions.
+- Improved global visual quality in theme baseline:
+  - text rendering polish, selection color, and custom scrollbar styling.
+- Upgraded notifications UX:
+  - improved drawer visual hierarchy, unread chips, stronger unread state, safer mark-read interactions.
+- Improved mobile shell controls:
+  - cleaner top bar composition and direct mobile logout action
+  - enhanced FAB visual treatment and hover/press feel.
+### 2026-03-02 (UX polish, contextual guidance)
+- Added route-aware header context in `MainLayout`:
+  - page title/subtitle now reflect current role and route, reducing orientation time.
+- Improved notification trigger (`NotificationBell`):
+  - visual emphasis for unread state with subtle pulse and highlighted bell container.
+- Upgraded `StatusStepper` visuals:
+  - stronger active/completed state hierarchy and smoother compact progress animation.
+- Improved appointment details focus block:
+  - contextual ETA/helper line for current stage
+  - tab strip now uses semantic icons (payment/chat/details) for faster scanning on mobile.
+### 2026-03-02 (UX polish, focus-first client flow)
+- `AppointmentDetailPage` improvements:
+  - enabled payment-priority highlight alert for client statuses `AWAITING_PAYMENT` and `PAYMENT_PROOF_UPLOADED`.
+  - added persistent client view mode toggle (`Фокус` / `Полный вид`) with localStorage (`frp_client_compact_view`).
+  - reduced timeline density in compact mode for lower cognitive load.
+  - improved live status toast with contextual CTA (`К оплате` / `К отзыву` / `Открыть`).
+- `ChatPanel` mobile refinements:
+  - quick phrases are now collapsible (`Показать/Скрыть`) to reduce visual overload.
+  - message composer moved into a sticky glass panel on mobile for faster, thumb-friendly sending.
+- `AppointmentCard` visual scanability:
+  - added status-color accent rail and cleaner secondary action hierarchy.
+  - card action flow now emphasizes one primary action while keeping `Открыть заявку` as a lighter secondary path for clients.
+- `MyAppointmentsPage` controls:
+  - added compact mobile filter mode with `Настроить/Свернуть` behavior for search + sort + unread toggle.

@@ -1,5 +1,6 @@
 import ErrorOutlineRoundedIcon from "@mui/icons-material/ErrorOutlineRounded";
 import { Box, LinearProgress, Stack, Step, StepLabel, Stepper, Typography } from "@mui/material";
+import { alpha } from "@mui/material/styles";
 
 import { STATUS_PROGRESS_ORDER, resolveStatusUI } from "../../theme/status";
 
@@ -51,18 +52,47 @@ export default function StatusStepper({ status, role, compact = false, slaBreach
             variant="determinate"
             value={getProgressValue(status)}
             sx={{
-              height: 7,
+              height: 7.5,
               borderRadius: 999,
               bgcolor: ui.bg,
               "& .MuiLinearProgress-bar": {
                 borderRadius: 999,
                 bgcolor: ui.color,
+                transition: "transform 360ms cubic-bezier(0.22, 1, 0.36, 1)",
               },
             }}
           />
         </Box>
       ) : (
-        <Stepper activeStep={activeStep} alternativeLabel>
+        <Stepper
+          activeStep={activeStep}
+          alternativeLabel
+          sx={{
+            "& .MuiStepLabel-label": {
+              fontSize: 12,
+              fontWeight: 600,
+              color: "text.secondary",
+              mt: 0.45,
+            },
+            "& .MuiStepLabel-label.Mui-active": {
+              color: ui.color,
+              fontWeight: 800,
+            },
+            "& .MuiStepLabel-label.Mui-completed": {
+              color: "text.primary",
+              fontWeight: 700,
+            },
+            "& .MuiStepIcon-root": {
+              color: alpha(ui.color, 0.26),
+            },
+            "& .MuiStepIcon-root.Mui-active": {
+              color: ui.color,
+            },
+            "& .MuiStepIcon-root.Mui-completed": {
+              color: ui.color,
+            },
+          }}
+        >
           {STATUS_PROGRESS_ORDER.map((stepStatus) => (
             <Step key={stepStatus} completed={activeStep > (STEP_INDEX_MAP[stepStatus] ?? 0) || status === "COMPLETED"}>
               <StepLabel>{STEP_TITLES[stepStatus]}</StepLabel>

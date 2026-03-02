@@ -1,4 +1,5 @@
 import ChatBubbleOutlineRoundedIcon from "@mui/icons-material/ChatBubbleOutlineRounded";
+import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
 import ScheduleRoundedIcon from "@mui/icons-material/ScheduleRounded";
 import WarningAmberRoundedIcon from "@mui/icons-material/WarningAmberRounded";
 import { Badge, Box, Button, Card, CardContent, Chip, Stack, Typography } from "@mui/material";
@@ -10,6 +11,7 @@ import { Link as RouterLink } from "react-router-dom";
 
 import { getLockTypeLabel } from "../../constants/labels";
 import { resolveStatusUI } from "../../theme/status";
+import { normalizeRuText } from "../../utils/text";
 import PrimaryCTA from "./PrimaryCTA";
 import StatusStepper from "./StatusStepper";
 
@@ -45,16 +47,28 @@ export default function AppointmentCard({
   const statusUi = resolveStatusUI(item.status, item.sla_breached);
   const unreadCount = item.unread_count || 0;
   const riskUi = riskTone(item.client_risk_level);
+  const showCompactMeta = isClient && isMobile;
+  const detailButtonVariant = showWorkflowAction ? (isClient ? "text" : "outlined") : "contained";
 
   return (
     <Card
       sx={{
+        position: "relative",
+        overflow: "hidden",
         transition: "transform 220ms ease, box-shadow 220ms ease, border-color 220ms ease",
         border: "1px solid",
         borderColor: "divider",
         background: isDark
           ? "linear-gradient(156deg, rgba(15,23,42,0.88) 0%, rgba(20,29,46,0.85) 100%)"
           : "linear-gradient(156deg, rgba(255,255,255,0.96) 0%, rgba(247,251,255,0.92) 100%)",
+        "&::before": {
+          content: "\"\"",
+          position: "absolute",
+          inset: "0 auto 0 0",
+          width: 3,
+          background: statusUi.color,
+          opacity: 0.8,
+        },
         "&:hover": {
           transform: "translateY(-2px)",
           boxShadow: isDark ? "0 14px 30px rgba(2,6,23,0.55)" : 6,
@@ -70,7 +84,7 @@ export default function AppointmentCard({
                 Заявка #{item.id}
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                {item.brand} {item.model} • {getLockTypeLabel(item.lock_type)}
+                {normalizeRuText(item.brand)} {normalizeRuText(item.model)} • {getLockTypeLabel(item.lock_type)}
               </Typography>
             </Box>
             <Chip
@@ -90,7 +104,7 @@ export default function AppointmentCard({
               color="text.secondary"
               sx={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}
             >
-              {item.description}
+              {normalizeRuText(item.description)}
             </Typography>
           ) : null}
 
@@ -99,20 +113,37 @@ export default function AppointmentCard({
           {!isClient ? <PaperHint hint={statusUi.hint} /> : null}
 
           <Stack direction="row" spacing={0.8} flexWrap="wrap" useFlexGap alignItems="center">
-            <Chip
-              size="small"
-              icon={<ScheduleRoundedIcon />}
-              label={isMobile ? dayjs(item.updated_at || item.created_at).format("HH:mm") : `Обновлено: ${formatLastActivity(item)}`}
-              variant="outlined"
-            />
-            <Badge color="primary" badgeContent={unreadCount} max={99}>
-              <Chip
-                size="small"
-                icon={<ChatBubbleOutlineRoundedIcon />}
-                label={unreadCount ? (isMobile ? "Новые" : "Есть новые") : "Сообщения"}
-                variant="outlined"
-              />
-            </Badge>
+            {showCompactMeta ? (
+              unreadCount ? (
+                <Badge color="primary" badgeContent={unreadCount} max={99}>
+                  <Chip size="small" icon={<ChatBubbleOutlineRoundedIcon />} label="Новые сообщения" variant="outlined" />
+                </Badge>
+              ) : (
+                <Chip
+                  size="small"
+                  icon={<ScheduleRoundedIcon />}
+                  label={`Обновлено ${dayjs(item.updated_at || item.created_at).format("HH:mm")}`}
+                  variant="outlined"
+                />
+              )
+            ) : (
+              <>
+                <Chip
+                  size="small"
+                  icon={<ScheduleRoundedIcon />}
+                  label={isMobile ? dayjs(item.updated_at || item.created_at).format("HH:mm") : `Обновлено: ${formatLastActivity(item)}`}
+                  variant="outlined"
+                />
+                <Badge color="primary" badgeContent={unreadCount} max={99}>
+                  <Chip
+                    size="small"
+                    icon={<ChatBubbleOutlineRoundedIcon />}
+                    label={unreadCount ? (isMobile ? "Новые" : "Есть новые") : "Сообщения"}
+                    variant="outlined"
+                  />
+                </Badge>
+              </>
+            )}
             {role === "master" && item.client_risk_level ? (
               <Chip
                 size="small"
@@ -135,9 +166,14 @@ export default function AppointmentCard({
             <Button
               component={RouterLink}
               to={linkTo}
-              variant={showWorkflowAction ? "outlined" : "contained"}
+              variant={detailButtonVariant}
               size={isClient ? "small" : "medium"}
               fullWidth
+              endIcon={showWorkflowAction ? <ChevronRightRoundedIcon fontSize="small" /> : null}
+              sx={{
+                opacity: showWorkflowAction && isClient ? 0.86 : 1,
+                minHeight: isMobile ? 38 : undefined,
+              }}
             >
               Открыть заявку
             </Button>

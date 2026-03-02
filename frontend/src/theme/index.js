@@ -103,6 +103,28 @@ export function createAppTheme(mode = "light") {
             background: isDark
               ? "radial-gradient(1200px 620px at -10% -30%, #10233f 0%, #0a111f 45%, #060a12 100%)"
               : "radial-gradient(1200px 560px at -10% -20%, #e9f3ff 0%, #f5f7fb 40%, #f2f2f7 100%)",
+            color: colors.textMain,
+            textRendering: "geometricPrecision",
+          },
+          "::selection": {
+            background: isDark ? alpha(colors.brand, 0.45) : alpha(colors.brand, 0.22),
+          },
+          "@keyframes frpPageEnter": {
+            "0%": { opacity: 0, transform: "translateY(10px) scale(0.996)" },
+            "100%": { opacity: 1, transform: "translateY(0px) scale(1)" },
+          },
+          "::-webkit-scrollbar": {
+            width: 9,
+            height: 9,
+          },
+          "::-webkit-scrollbar-thumb": {
+            backgroundColor: isDark ? "rgba(124,140,164,0.42)" : "rgba(71,85,105,0.26)",
+            borderRadius: 999,
+            border: "2px solid transparent",
+            backgroundClip: "padding-box",
+          },
+          "::-webkit-scrollbar-track": {
+            backgroundColor: "transparent",
           },
           "#root": {
             minHeight: "100vh",

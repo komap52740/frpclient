@@ -75,12 +75,14 @@ export default function AppBottomNav({ role }) {
         onChange={(_, value) => navigate(value)}
         showLabels
         sx={{
-          minHeight: 60,
+          minHeight: 62,
           bgcolor: "transparent",
           "& .MuiBottomNavigationAction-root": {
             minWidth: 56,
             color: "text.secondary",
-            py: 0.6,
+            py: 0.5,
+            borderRadius: 2.5,
+            mx: 0.25,
             "& .MuiBottomNavigationAction-label": {
               fontSize: 11.5,
             },
@@ -88,6 +90,8 @@ export default function AppBottomNav({ role }) {
           "& .Mui-selected": {
             color: "primary.main",
             fontWeight: 700,
+            bgcolor: (theme) =>
+              theme.palette.mode === "dark" ? "rgba(90,169,255,0.16)" : "rgba(0,122,255,0.10)",
           },
         }}
       >
