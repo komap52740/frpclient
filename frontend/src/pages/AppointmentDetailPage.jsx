@@ -300,12 +300,12 @@ export default function AppointmentDetailPage() {
   const [toast, setToast] = useState({ open: false, severity: "success", message: "", actionKey: "" });
   const [clientCompactView, setClientCompactView] = useState(() => {
     if (typeof window === "undefined") {
-      return false;
+      return true;
     }
     const saved = window.localStorage.getItem("frp_client_compact_view");
     if (saved === "1") return true;
     if (saved === "0") return false;
-    return window.matchMedia("(max-width: 1200px)").matches;
+    return true;
   });
 
   const paymentRef = useRef(null);
@@ -411,7 +411,7 @@ export default function AppointmentDetailPage() {
       if (focus === "payment" && ["AWAITING_PAYMENT", "PAYMENT_PROOF_UPLOADED"].includes(appointment?.status)) {
         setClientTab("payment");
       } else if (focus === "timeline" || focus === "review") {
-        setClientTab("details");
+        setClientTab(clientCompactView ? "chat" : "details");
       } else if (focus === "chat") {
         setClientTab("chat");
       }
@@ -434,7 +434,7 @@ export default function AppointmentDetailPage() {
     }, 120);
 
     return () => window.clearTimeout(timer);
-  }, [appointment?.id, appointment?.status, searchParams, user?.role]);
+  }, [appointment?.id, appointment?.status, clientCompactView, searchParams, user?.role]);
 
   useAutoRefresh(async () => {
     setIsRefreshing(true);
@@ -493,8 +493,12 @@ export default function AppointmentDetailPage() {
       setClientTab("payment");
       return;
     }
-    setClientTab((prev) => (prev === "payment" ? "chat" : prev));
-  }, [appointment?.id, appointment?.status, user?.role]);
+    setClientTab((prev) => {
+      if (prev === "payment") return "chat";
+      if (clientCompactView && prev === "details") return "chat";
+      return prev;
+    });
+  }, [appointment?.id, appointment?.status, clientCompactView, user?.role]);
 
   useEffect(() => {
     if (user?.role !== "client") {
@@ -502,6 +506,18 @@ export default function AppointmentDetailPage() {
     }
     window.localStorage.setItem("frp_client_compact_view", clientCompactView ? "1" : "0");
   }, [clientCompactView, user?.role]);
+
+  useEffect(() => {
+    if (user?.role !== "client" || !clientCompactView) {
+      return;
+    }
+    setClientTab((prev) => {
+      if (prev !== "details") {
+        return prev;
+      }
+      return ["AWAITING_PAYMENT", "PAYMENT_PROOF_UPLOADED"].includes(appointment?.status) ? "payment" : "chat";
+    });
+  }, [appointment?.status, clientCompactView, user?.role]);
 
   const timelineEvents = useMemo(
     () => (events.length ? events : buildFallbackEvents(appointment)),
@@ -609,17 +625,20 @@ export default function AppointmentDetailPage() {
   const showAdminPaymentConfirm = showAdminControls && appointment.status === "PAYMENT_PROOF_UPLOADED";
   const showClientPaymentHighlight = isClient && ["AWAITING_PAYMENT", "PAYMENT_PROOF_UPLOADED"].includes(appointment.status);
   const isClientCompact = isClient && clientCompactView;
+  const clientDetailsTabEnabled = !isClientCompact;
   const showClientDesktopSidebar = isClient && !isMobile;
   const showClientPaymentDock =
     showClientDesktopSidebar &&
     ["AWAITING_PAYMENT", "PAYMENT_PROOF_UPLOADED"].includes(appointment.status);
   const showClientFloatingActionBar = isClient && isMobile && !paymentFocusOpen && !showClientTabs;
-  const showClientQuickRail = isClient && isMobile;
+  const showClientQuickRail = isClient && isMobile && !isClientCompact;
   const clientPaymentTabDisabled = !showClientPaymentActions;
-  const showClientDataCard = !showClientTabs || clientTab === "details";
+  const showClientDataCard = !showClientTabs || (clientTab === "details" && clientDetailsTabEnabled);
   const showClientPaymentCard = showClientPaymentActions && (!showClientTabs || clientTab === "payment");
   const showClientChatPanel = !showClientTabs || clientTab === "chat";
-  const showClientDetailsCard = showClientTabs && clientTab === "details";
+  const showClientDetailsCard = showClientTabs && clientTab === "details" && clientDetailsTabEnabled;
+  const showClientSecondaryCards =
+    !showClientTabs || clientTab === "details" || (isClientCompact && clientTab === "chat");
   const paymentFlowStatusesDone = ["PAYMENT_PROOF_UPLOADED", "PAID", "IN_PROGRESS", "COMPLETED"];
   const paymentConfirmedStatuses = ["PAID", "IN_PROGRESS", "COMPLETED"];
   const latestPaymentProofEvent = timelineEvents.find((event) => event.event_type === "payment_proof_uploaded");
@@ -666,8 +685,8 @@ export default function AppointmentDetailPage() {
     cursor: "pointer",
   };
   const lastSyncLabel = dayjs(lastSyncedAt).format("HH:mm:ss");
-  const visibleTimelineEvents = isClient ? timelineEvents.slice(0, isClientCompact ? 4 : 6) : timelineEvents;
-  const sidebarTimelineEvents = isClient ? visibleTimelineEvents.slice(0, isClientCompact ? 3 : 4) : visibleTimelineEvents;
+  const visibleTimelineEvents = isClient ? timelineEvents.slice(0, isClientCompact ? 3 : 6) : timelineEvents;
+  const sidebarTimelineEvents = isClient ? visibleTimelineEvents.slice(0, isClientCompact ? 2 : 4) : visibleTimelineEvents;
   const actionEtaLabel = (() => {
     if (appointment.status === "AWAITING_PAYMENT") {
       return "После оплаты мастер продолжит обычно за 1-5 минут";
@@ -811,14 +830,14 @@ export default function AppointmentDetailPage() {
     }
     if (actionKey === "open_timeline") {
       if (isClient) {
-        setClientTab("details");
+        setClientTab(clientDetailsTabEnabled ? "details" : "chat");
       }
       timelineRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
       return;
     }
     if (actionKey === "leave_review") {
       if (isClient) {
-        setClientTab("details");
+        setClientTab(clientDetailsTabEnabled ? "details" : "chat");
       }
       reviewRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
       return;
@@ -1065,7 +1084,9 @@ export default function AppointmentDetailPage() {
                   disabled={clientPaymentTabDisabled}
                 />
                 <Tab value="chat" label="Чат" icon={<ForumRoundedIcon fontSize="small" />} iconPosition="start" />
-                <Tab value="details" label="Детали" icon={<InfoOutlinedIcon fontSize="small" />} iconPosition="start" />
+                {clientDetailsTabEnabled ? (
+                  <Tab value="details" label="Детали" icon={<InfoOutlinedIcon fontSize="small" />} iconPosition="start" />
+                ) : null}
               </Tabs>
             </Paper>
           ) : null}
@@ -1486,7 +1507,7 @@ export default function AppointmentDetailPage() {
               </Paper>
             ) : null}
 
-            {showClientRepeat && (!showClientTabs || clientTab === "details") ? (
+            {showClientRepeat && showClientSecondaryCards ? (
               <Paper sx={{ p: 2.2 }}>
                 <Stack spacing={1}>
                   <Typography variant="h3">Нужна похожая заявка?</Typography>
@@ -1529,7 +1550,7 @@ export default function AppointmentDetailPage() {
               </Paper>
             ) : null}
 
-            {showClientReview && (!showClientTabs || clientTab === "details") ? (
+            {showClientReview && showClientSecondaryCards ? (
               <Paper ref={reviewRef} sx={{ p: 2.2 }}>
                 <Typography variant="h3" sx={{ mb: 1 }}>Оцените работу мастера</Typography>
                 <Stack spacing={1}>

@@ -654,3 +654,15 @@ No-Go, РµСЃР»Рё:
 - Refactored client page `MyAppointmentsPage`:
   - less clutter, stronger “priority action” block, and simplified filter/sort UX.
   - improved mobile behavior for advanced filters.
+### 2026-03-02 (Client profile + links chat + focus details)
+- Redesigned `ClientProfilePage` into a minimal premium dashboard:
+  - compact hero, key KPI only, and direct quick actions.
+  - removed excessive informational noise for client role.
+- Upgraded `ChatPanel` with a dedicated `Ссылки` mode:
+  - automatic URL extraction from messages.
+  - separate links feed with `Открыть` and `Копировать`.
+  - kept full backward compatibility with message sending, files, quick replies, and polling.
+- Refined client flow in `AppointmentDetailPage`:
+  - focus mode is now default for clients.
+  - in focus mode tabs are simplified to `Оплата` + `Чат`.
+  - timeline/details become secondary to reduce cognitive load while preserving access to key actions.
