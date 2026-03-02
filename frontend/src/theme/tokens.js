@@ -44,4 +44,18 @@ export const appTokens = {
     textMuted: "#5e6b7f",
     borderSoft: "rgba(15, 23, 42, 0.08)",
   },
+  colorsDark: {
+    brand: "#5aa9ff",
+    brandStrong: "#2a8dff",
+    accent: "#43d17a",
+    danger: "#ff6b66",
+    success: "#33c06a",
+    warning: "#ffb347",
+    info: "#74d7ff",
+    bg: "#090d14",
+    bgElevated: "rgba(17, 24, 39, 0.84)",
+    textMain: "#e8eef8",
+    textMuted: "#9dadc5",
+    borderSoft: "rgba(148, 163, 184, 0.22)",
+  },
 };

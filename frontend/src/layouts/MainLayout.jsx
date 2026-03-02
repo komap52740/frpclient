@@ -1,4 +1,6 @@
-﻿import MenuIcon from "@mui/icons-material/Menu";
+import DarkModeRoundedIcon from "@mui/icons-material/DarkModeRounded";
+import LightModeRoundedIcon from "@mui/icons-material/LightModeRounded";
+import MenuIcon from "@mui/icons-material/Menu";
 import {
   AppBar,
   Box,
@@ -21,6 +23,7 @@ import { useAuth } from "../auth/AuthContext";
 import AppBottomNav from "../components/ui/AppBottomNav";
 import AppFab from "../components/ui/AppFab";
 import NotificationBell from "../components/ui/NotificationBell";
+import { useThemeMode } from "../theme/ThemeModeContext";
 
 function buildMenu(role) {
   if (role === "client") {
@@ -63,6 +66,7 @@ export default function MainLayout({ children }) {
   const { user, logout } = useAuth();
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
+  const { mode, toggleMode } = useThemeMode();
   const menuItems = buildMenu(user?.role);
 
   const roleLabel = useMemo(() => getRoleLabel(user?.role), [user?.role]);
@@ -80,16 +84,34 @@ export default function MainLayout({ children }) {
         elevation={0}
         sx={{
           backdropFilter: "blur(18px) saturate(140%)",
+          px: { xs: 0.5, sm: 0 },
         }}
       >
-        <Toolbar>
-          <IconButton color="inherit" edge="start" onClick={() => setOpen(true)} sx={{ mr: 1, display: { xs: "none", md: "inline-flex" } }}>
+        <Toolbar sx={{ minHeight: { xs: 62, sm: 68 } }}>
+          <IconButton
+            color="inherit"
+            edge="start"
+            onClick={() => setOpen(true)}
+            sx={{ mr: 1, display: { xs: "none", md: "inline-flex" } }}
+          >
             <MenuIcon />
           </IconButton>
           <Stack direction="row" spacing={1} alignItems="center" sx={{ flexGrow: 1 }}>
             <Typography sx={{ fontWeight: 800, letterSpacing: "-0.01em" }}>FRP Клиент</Typography>
             <Chip size="small" label={roleLabel} sx={{ bgcolor: "rgba(0,122,255,0.12)", color: "primary.main" }} />
           </Stack>
+          <IconButton
+            color="inherit"
+            onClick={toggleMode}
+            sx={{
+              mr: 0.5,
+              border: "1px solid",
+              borderColor: "divider",
+              bgcolor: "background.paper",
+            }}
+          >
+            {mode === "dark" ? <LightModeRoundedIcon fontSize="small" /> : <DarkModeRoundedIcon fontSize="small" />}
+          </IconButton>
           <NotificationBell />
           <Typography sx={{ mr: 2, display: { xs: "none", sm: "block" }, color: "text.secondary" }}>{user?.username}</Typography>
           <Button color="inherit" onClick={onLogout} sx={{ color: "text.primary" }}>
@@ -104,13 +126,13 @@ export default function MainLayout({ children }) {
         PaperProps={{
           sx: {
             backdropFilter: "blur(18px) saturate(130%)",
-            backgroundColor: "rgba(255,255,255,0.88)",
-            borderRight: "1px solid rgba(15,23,42,0.08)",
+            backgroundColor: (theme) => (theme.palette.mode === "dark" ? "rgba(15,23,42,0.94)" : "rgba(255,255,255,0.88)"),
+            borderRight: (theme) => `1px solid ${theme.palette.divider}`,
           },
         }}
       >
         <Box sx={{ width: 280 }} role="presentation" onClick={() => setOpen(false)}>
-          <Box sx={{ p: 2, borderBottom: "1px solid #eceff1" }}>
+          <Box sx={{ p: 2, borderBottom: "1px solid", borderColor: "divider" }}>
             <Typography variant="subtitle2" color="text.secondary">Навигация</Typography>
             <Typography variant="h6" sx={{ mt: 0.5 }}>Рабочее место</Typography>
           </Box>
@@ -124,7 +146,7 @@ export default function MainLayout({ children }) {
         </Box>
       </Drawer>
 
-      <Container maxWidth="lg" sx={{ py: 3, pb: { xs: 12, md: 3 } }}>
+      <Container maxWidth="lg" sx={{ py: { xs: 1.5, md: 3 }, pb: { xs: 12, md: 3 } }}>
         {children}
       </Container>
 

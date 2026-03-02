@@ -20,6 +20,7 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
+import { useTheme } from "@mui/material/styles";
 import dayjs from "dayjs";
 import "dayjs/locale/ru";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -126,6 +127,8 @@ const EMPTY_REPLY_FORM = {
 };
 
 export default function ChatPanel({ appointmentId, currentUser, systemEvents = [] }) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === "dark";
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState("");
   const [file, setFile] = useState(null);
@@ -420,7 +423,9 @@ export default function ChatPanel({ appointmentId, currentUser, systemEvents = [
       sx={{
         p: 2.2,
         borderRadius: 3,
-        background: "linear-gradient(160deg, rgba(255,255,255,0.9) 0%, rgba(250,252,255,0.86) 100%)",
+        background: isDark
+          ? "linear-gradient(160deg, rgba(10,17,31,0.92) 0%, rgba(17,24,39,0.88) 100%)"
+          : "linear-gradient(160deg, rgba(255,255,255,0.9) 0%, rgba(250,252,255,0.86) 100%)",
       }}
     >
       <Typography variant="h3" sx={{ mb: 1.25 }}>

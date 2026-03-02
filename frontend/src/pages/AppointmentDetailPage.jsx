@@ -249,6 +249,7 @@ export default function AppointmentDetailPage() {
   const { user, paymentSettings } = useAuth();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+  const isDark = theme.palette.mode === "dark";
 
   const [appointment, setAppointment] = useState(null);
   const [events, setEvents] = useState([]);
@@ -597,7 +598,13 @@ export default function AppointmentDetailPage() {
     borderRadius: 2,
     border: "1px dashed",
     borderColor: paymentDragOver ? "primary.main" : "divider",
-    bgcolor: paymentDragOver ? "rgba(2,132,199,0.06)" : "rgba(255,255,255,0.72)",
+    bgcolor: paymentDragOver
+      ? isDark
+        ? "rgba(90,169,255,0.18)"
+        : "rgba(2,132,199,0.06)"
+      : isDark
+        ? "rgba(15,23,42,0.6)"
+        : "rgba(255,255,255,0.72)",
     transition: "all .2s ease",
     cursor: "pointer",
   };
@@ -793,14 +800,26 @@ export default function AppointmentDetailPage() {
         sx={{
           p: { xs: 1.8, md: 2.2 },
           borderRadius: 3,
-          border: "1px solid rgba(15,23,42,0.08)",
+          border: "1px solid",
+          borderColor: "divider",
           background: isClient
-            ? "linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(244,248,255,0.92) 100%)"
+            ? isDark
+              ? "linear-gradient(135deg, rgba(15,23,42,0.94) 0%, rgba(17,34,56,0.92) 100%)"
+              : "linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(244,248,255,0.92) 100%)"
             : "background.paper",
           backdropFilter: "blur(16px) saturate(130%)",
-          boxShadow: isClient ? "0 18px 40px rgba(15,23,42,0.10)" : undefined,
+          boxShadow: isClient
+            ? isDark
+              ? "0 18px 40px rgba(2,6,23,0.5)"
+              : "0 18px 40px rgba(15,23,42,0.10)"
+            : undefined,
           transition: "box-shadow .24s ease, transform .24s ease, border-color .24s ease",
-          "&:hover": isClient ? { boxShadow: "0 24px 48px rgba(15,23,42,0.14)", borderColor: "rgba(2,132,199,0.22)" } : undefined,
+          "&:hover": isClient
+            ? {
+                boxShadow: isDark ? "0 24px 48px rgba(2,6,23,0.62)" : "0 24px 48px rgba(15,23,42,0.14)",
+                borderColor: "rgba(2,132,199,0.22)",
+              }
+            : undefined,
         }}
       >
         <Stack spacing={1.4}>
@@ -817,7 +836,12 @@ export default function AppointmentDetailPage() {
             />
           </Stack>
 
-          <StatusStepper status={appointment.status} role={user.role} slaBreached={appointment.sla_breached} />
+          <StatusStepper
+            status={appointment.status}
+            role={user.role}
+            slaBreached={appointment.sla_breached}
+            compact={isMobile}
+          />
 
           {isClient ? (
             <Paper
@@ -825,8 +849,11 @@ export default function AppointmentDetailPage() {
               sx={{
                 p: 1.3,
                 borderRadius: 2.5,
-                border: "1px solid rgba(2,132,199,0.16)",
-                background: "linear-gradient(140deg, rgba(237,248,255,0.92) 0%, rgba(255,255,255,0.96) 100%)",
+                border: "1px solid",
+                borderColor: isDark ? "rgba(90,169,255,0.3)" : "rgba(2,132,199,0.16)",
+                background: isDark
+                  ? "linear-gradient(140deg, rgba(16,38,64,0.78) 0%, rgba(12,24,42,0.92) 100%)"
+                  : "linear-gradient(140deg, rgba(237,248,255,0.92) 0%, rgba(255,255,255,0.96) 100%)",
               }}
             >
               <Stack
@@ -857,8 +884,9 @@ export default function AppointmentDetailPage() {
               elevation={0}
               sx={{
                 borderRadius: 2.5,
-                border: "1px solid rgba(15,23,42,0.08)",
-                bgcolor: "rgba(255,255,255,0.78)",
+                border: "1px solid",
+                borderColor: "divider",
+                bgcolor: isDark ? "rgba(15,23,42,0.86)" : "rgba(255,255,255,0.78)",
                 backdropFilter: "blur(10px)",
                 overflow: "hidden",
               }}
@@ -932,12 +960,20 @@ export default function AppointmentDetailPage() {
                 sx={{
                   p: { xs: 1.8, md: 2.2 },
                   borderRadius: 3,
-                  border: "1px solid rgba(15,23,42,0.08)",
+                  border: "1px solid",
+                  borderColor: "divider",
                   background: isClient
-                    ? "linear-gradient(160deg, rgba(255,255,255,0.98) 0%, rgba(248,252,255,0.95) 100%)"
+                    ? isDark
+                      ? "linear-gradient(160deg, rgba(15,23,42,0.94) 0%, rgba(18,31,50,0.9) 100%)"
+                      : "linear-gradient(160deg, rgba(255,255,255,0.98) 0%, rgba(248,252,255,0.95) 100%)"
                     : "background.paper",
                   transition: "box-shadow .24s ease, border-color .24s ease",
-                  "&:hover": isClient ? { boxShadow: "0 14px 30px rgba(15,23,42,0.10)", borderColor: "rgba(2,132,199,0.18)" } : undefined,
+                  "&:hover": isClient
+                    ? {
+                        boxShadow: isDark ? "0 14px 30px rgba(2,6,23,0.5)" : "0 14px 30px rgba(15,23,42,0.10)",
+                        borderColor: "rgba(2,132,199,0.18)",
+                      }
+                    : undefined,
                 }}
               >
                 <Typography variant="h3" sx={{ mb: 1 }}>Данные заявки</Typography>
@@ -1044,14 +1080,21 @@ export default function AppointmentDetailPage() {
                   p: { xs: 1.8, md: 2.2 },
                   borderRadius: 3,
                   border: "1px solid",
-                  borderColor: "warning.light",
+                  borderColor: isDark ? "rgba(255,179,71,0.45)" : "warning.light",
                   background:
                     appointment.status === "AWAITING_PAYMENT"
-                      ? "linear-gradient(155deg, #fffaf0 0%, #ffffff 100%)"
-                      : "linear-gradient(155deg, #f5fbff 0%, #ffffff 100%)",
-                  boxShadow: (theme) => `0 10px 28px ${theme.palette.warning.light}2d`,
+                      ? isDark
+                        ? "linear-gradient(155deg, rgba(54,38,16,0.85) 0%, rgba(20,24,34,0.98) 100%)"
+                        : "linear-gradient(155deg, #fffaf0 0%, #ffffff 100%)"
+                      : isDark
+                        ? "linear-gradient(155deg, rgba(15,28,44,0.85) 0%, rgba(20,24,34,0.98) 100%)"
+                        : "linear-gradient(155deg, #f5fbff 0%, #ffffff 100%)",
+                  boxShadow: (muiTheme) =>
+                    isDark
+                      ? "0 10px 28px rgba(2,6,23,0.5)"
+                      : `0 10px 28px ${muiTheme.palette.warning.light}2d`,
                   transition: "box-shadow .24s ease, border-color .24s ease",
-                  "&:hover": { boxShadow: "0 18px 34px rgba(15,23,42,0.12)" },
+                  "&:hover": { boxShadow: isDark ? "0 18px 34px rgba(2,6,23,0.6)" : "0 18px 34px rgba(15,23,42,0.12)" },
                 }}
               >
                 <Typography variant="h3" sx={{ mb: 0.7 }}>
@@ -1072,7 +1115,16 @@ export default function AppointmentDetailPage() {
                     Открыть быстрый режим оплаты
                   </Button>
                 ) : null}
-                <Stepper activeStep={paymentFlowActiveStep} alternativeLabel sx={{ mb: 1.2 }}>
+                <Stepper
+                  activeStep={paymentFlowActiveStep}
+                  alternativeLabel
+                  sx={{
+                    mb: 1.2,
+                    "& .MuiStepLabel-label": {
+                      fontSize: isMobile ? 11 : undefined,
+                    },
+                  }}
+                >
                   {paymentFlowLabels.map((label) => (
                     <Step key={label}>
                       <StepLabel>{label}</StepLabel>
@@ -1568,7 +1620,9 @@ export default function AppointmentDetailPage() {
               borderTopRightRadius: 20,
               maxHeight: "88vh",
               overflowY: "auto",
-              background: "linear-gradient(160deg, rgba(255,255,255,0.99) 0%, rgba(246,251,255,0.98) 100%)",
+              background: isDark
+                ? "linear-gradient(160deg, rgba(10,17,31,0.98) 0%, rgba(15,23,42,0.98) 100%)"
+                : "linear-gradient(160deg, rgba(255,255,255,0.99) 0%, rgba(246,251,255,0.98) 100%)",
             },
           }}
         >
@@ -1702,8 +1756,11 @@ export default function AppointmentDetailPage() {
         PaperProps={{
           sx: {
             borderRadius: isMobile ? 0 : 3,
-            border: "1px solid rgba(15,23,42,0.08)",
-            background: "linear-gradient(160deg, rgba(255,255,255,0.98) 0%, rgba(246,251,255,0.96) 100%)",
+            border: "1px solid",
+            borderColor: "divider",
+            background: isDark
+              ? "linear-gradient(160deg, rgba(10,17,31,0.98) 0%, rgba(15,23,42,0.96) 100%)"
+              : "linear-gradient(160deg, rgba(255,255,255,0.98) 0%, rgba(246,251,255,0.96) 100%)",
           },
         }}
       >

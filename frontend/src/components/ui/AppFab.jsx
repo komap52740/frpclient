@@ -38,9 +38,15 @@ export default function AppFab({ role }) {
       sx={{
         display: { xs: "inline-flex", md: "none" },
         position: "fixed",
-        right: 16,
+        right: 14,
         bottom: "calc(env(safe-area-inset-bottom, 0px) + 88px)",
         zIndex: 1300,
+        border: "1px solid",
+        borderColor: "divider",
+        boxShadow: (theme) =>
+          theme.palette.mode === "dark" ? "0 12px 28px rgba(2,6,23,0.55)" : "0 12px 28px rgba(15,23,42,0.16)",
+        maxWidth: "calc(100vw - 28px)",
+        whiteSpace: "nowrap",
       }}
     >
       {action.icon}

@@ -60,11 +60,14 @@ export default function AppBottomNav({ role }) {
         bottom: "calc(env(safe-area-inset-bottom, 0px) + 8px)",
         zIndex: 1300,
         borderRadius: 4,
-        border: "1px solid rgba(15,23,42,0.08)",
-        backgroundColor: "rgba(255,255,255,0.86)",
+        border: "1px solid",
+        borderColor: "divider",
+        backgroundColor: (theme) =>
+          theme.palette.mode === "dark" ? "rgba(15,23,42,0.92)" : "rgba(255,255,255,0.86)",
         backdropFilter: "blur(16px) saturate(130%)",
         overflow: "hidden",
-        boxShadow: "0 10px 28px rgba(15,23,42,0.12)",
+        boxShadow: (theme) =>
+          theme.palette.mode === "dark" ? "0 10px 28px rgba(2,6,23,0.5)" : "0 10px 28px rgba(15,23,42,0.12)",
       }}
     >
       <BottomNavigation
@@ -72,10 +75,15 @@ export default function AppBottomNav({ role }) {
         onChange={(_, value) => navigate(value)}
         showLabels
         sx={{
-          minHeight: 58,
+          minHeight: 60,
+          bgcolor: "transparent",
           "& .MuiBottomNavigationAction-root": {
             minWidth: 56,
             color: "text.secondary",
+            py: 0.6,
+            "& .MuiBottomNavigationAction-label": {
+              fontSize: 11.5,
+            },
           },
           "& .Mui-selected": {
             color: "primary.main",
