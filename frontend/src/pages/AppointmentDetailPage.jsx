@@ -554,7 +554,6 @@ export default function AppointmentDetailPage() {
       return normalized;
     }
     const allowedTypes = new Set([
-      "status_changed",
       "price_set",
       "payment_proof_uploaded",
       "payment_confirmed",
@@ -673,6 +672,7 @@ export default function AppointmentDetailPage() {
   }
 
   const isClient = user.role === "client";
+  const isClientMinimal = isClient;
   const isMasterAssigned = user.role === "master" && appointment.assigned_master === user.id;
 
   const showClientPaymentActions =
@@ -683,7 +683,7 @@ export default function AppointmentDetailPage() {
   const showClientRepeat =
     user.role === "client" &&
     ["COMPLETED", "CANCELLED", "DECLINED_BY_MASTER"].includes(appointment.status);
-  const showClientTabs = user.role === "client" && (!clientCompactView || showClientPaymentActions);
+  const showClientTabs = user.role === "client" && !isClientMinimal && (!clientCompactView || showClientPaymentActions);
 
   const showMasterTake = user.role === "master" && appointment.status === "NEW";
   const showMasterReviewAndPrice = isMasterAssigned && appointment.status === "IN_REVIEW";
@@ -694,21 +694,25 @@ export default function AppointmentDetailPage() {
 
   const showAdminControls = user.role === "admin";
   const showAdminPaymentConfirm = showAdminControls && appointment.status === "PAYMENT_PROOF_UPLOADED";
-  const showClientPaymentHighlight = isClient && ["AWAITING_PAYMENT", "PAYMENT_PROOF_UPLOADED"].includes(appointment.status);
+  const showClientPaymentHighlight =
+    isClient && !isClientMinimal && ["AWAITING_PAYMENT", "PAYMENT_PROOF_UPLOADED"].includes(appointment.status);
   const isClientCompact = isClient && clientCompactView;
   const clientDetailsTabEnabled = !isClientCompact;
-  const showClientDesktopSidebar = isClient && !isMobile && !isClientCompact;
+  const showClientDesktopSidebar = isClient && !isMobile && !isClientCompact && !isClientMinimal;
   const showClientPaymentDock =
     showClientDesktopSidebar &&
     ["AWAITING_PAYMENT", "PAYMENT_PROOF_UPLOADED"].includes(appointment.status);
-  const showClientFloatingActionBar = isClient && isMobile && !paymentFocusOpen && !showClientTabs;
-  const showClientQuickRail = isClient && isMobile && !isClientCompact;
+  const showClientFloatingActionBar = isClient && isMobile && !paymentFocusOpen && !showClientTabs && !isClientMinimal;
+  const showClientQuickRail = isClient && isMobile && !isClientCompact && !isClientMinimal;
   const clientPaymentTabDisabled = !showClientPaymentActions;
-  const showClientDataCard = !showClientTabs || (clientTab === "details" && clientDetailsTabEnabled);
-  const showClientPaymentCard = showClientPaymentActions && (!showClientTabs || clientTab === "payment");
+  const showClientDataCard = isClient ? !isClientMinimal && (!showClientTabs || (clientTab === "details" && clientDetailsTabEnabled)) : !showClientTabs || (clientTab === "details" && clientDetailsTabEnabled);
+  const showClientPaymentCard =
+    showClientPaymentActions &&
+    !isClientMinimal &&
+    (!showClientTabs || clientTab === "payment");
   const showClientChatPanel = !showClientTabs || clientTab === "chat";
-  const showClientDetailsCard = showClientTabs && clientTab === "details" && clientDetailsTabEnabled;
-  const showClientSecondaryCards = !isClientCompact && (!showClientTabs || clientTab === "details");
+  const showClientDetailsCard = !isClientMinimal && showClientTabs && clientTab === "details" && clientDetailsTabEnabled;
+  const showClientSecondaryCards = !isClientMinimal && !isClientCompact && (!showClientTabs || clientTab === "details");
   const paymentFlowStatusesDone = ["PAYMENT_PROOF_UPLOADED", "PAID", "IN_PROGRESS", "COMPLETED"];
   const paymentConfirmedStatuses = ["PAID", "IN_PROGRESS", "COMPLETED"];
   const latestPaymentProofEvent = timelineEvents.find((event) => event.event_type === "payment_proof_uploaded");
@@ -902,9 +906,9 @@ export default function AppointmentDetailPage() {
     if (appointment.status === "COMPLETED") {
       return {
         title: "Заявка завершена",
-        description: "Проверьте результат и оставьте отзыв о работе мастера.",
-        actionKey: "leave_review",
-        cta: "Оставить отзыв",
+        description: "Работа завершена. Если появятся вопросы — напишите в чат.",
+        actionKey: isClientMinimal ? "open_chat" : "leave_review",
+        cta: isClientMinimal ? "Открыть чат" : "Оставить отзыв",
       };
     }
     return {
@@ -926,8 +930,10 @@ export default function AppointmentDetailPage() {
   const handlePrimaryAction = async (actionKey) => {
     if (actionKey === "open_payment") {
       if (isClient) {
-        setClientTab("payment");
-        if (isMobile && showClientPaymentActions) {
+        if (showClientTabs) {
+          setClientTab("payment");
+        }
+        if (showClientPaymentActions) {
           setPaymentFocusOpen(true);
         }
       }
@@ -1123,7 +1129,7 @@ export default function AppointmentDetailPage() {
                 label={statusUi.label}
                 sx={{ bgcolor: statusUi.bg, color: statusUi.color, border: `1px solid ${statusUi.color}33`, fontWeight: 700 }}
               />
-              {isClient ? (
+              {isClient && !isClientMinimal ? (
                 <Button
                   size="small"
                   variant={clientCompactView ? "outlined" : "text"}
@@ -1771,7 +1777,8 @@ export default function AppointmentDetailPage() {
                   currentUser={user}
                   systemEvents={mappedSystemEvents}
                   initialView={chatPanelView}
-                  minimalClient={isClientCompact}
+                  minimalClient={isClientMinimal}
+                  downloadLinks={isClient ? sidebarLinks : []}
                 />
               </Box>
             </Fade>

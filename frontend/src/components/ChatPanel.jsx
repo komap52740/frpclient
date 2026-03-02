@@ -163,6 +163,7 @@ export default function ChatPanel({
   systemEvents = [],
   initialView = "messages",
   minimalClient = false,
+  downloadLinks = [],
 }) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
@@ -190,6 +191,10 @@ export default function ChatPanel({
   const isMaster = currentUser.role === "master";
   const isMinimalClientMode = minimalClient && currentUser.role === "client";
   const isSplitClientLayout = isMinimalClientMode && !isMobile;
+  const safeDownloadLinks = useMemo(
+    () => (downloadLinks || []).filter((item) => item?.href && item?.label),
+    [downloadLinks]
+  );
   const quickTemplates = QUICK_TEMPLATES[currentUser.role] || QUICK_TEMPLATES.client;
 
   const quickReplyMap = useMemo(() => {
@@ -689,8 +694,39 @@ export default function ChatPanel({
               />
             </Paper>
             <Stack spacing={0.6}>
+              {safeDownloadLinks.length ? (
+                <Paper
+                  variant="outlined"
+                  sx={{
+                    p: 1,
+                    borderRadius: 2.5,
+                    borderColor: "divider",
+                    bgcolor: isDark ? alpha("#0f172a", 0.62) : alpha("#f8fbff", 0.9),
+                  }}
+                >
+                  <Stack spacing={0.55}>
+                    <Typography variant="caption" color="text.secondary">
+                      Скачать и открыть
+                    </Typography>
+                    {safeDownloadLinks.map((item) => (
+                      <Button
+                        key={`dl-${item.id || item.href}`}
+                        size="small"
+                        variant="outlined"
+                        component="a"
+                        href={item.href}
+                        target="_blank"
+                        rel="noreferrer"
+                        sx={{ justifyContent: "flex-start", borderRadius: 2 }}
+                      >
+                        {item.label}
+                      </Button>
+                    ))}
+                  </Stack>
+                </Paper>
+              ) : null}
               <Typography variant="caption" color="text.secondary" sx={{ px: 0.2 }}>
-                Ссылки из переписки
+                Ссылки из чата
               </Typography>
               {linksPanel}
             </Stack>
