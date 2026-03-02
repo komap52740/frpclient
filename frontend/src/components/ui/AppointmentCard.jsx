@@ -36,14 +36,21 @@ export default function AppointmentCard({
   onPrimaryAction,
   showWorkflowAction = false,
 }) {
+  const isClient = role === "client";
   const statusUi = resolveStatusUI(item.status, item.sla_breached);
   const unreadCount = item.unread_count || 0;
   const riskUi = riskTone(item.client_risk_level);
 
   return (
-    <Card sx={{ transition: "transform 220ms ease, box-shadow 220ms ease", "&:hover": { transform: "translateY(-2px)", boxShadow: 6 } }}>
+    <Card
+      sx={{
+        transition: "transform 220ms ease, box-shadow 220ms ease, border-color 220ms ease",
+        border: "1px solid rgba(15,23,42,0.08)",
+        "&:hover": { transform: "translateY(-2px)", boxShadow: 6, borderColor: "rgba(2,132,199,0.28)" },
+      }}
+    >
       <CardContent>
-        <Stack spacing={1.25}>
+        <Stack spacing={isClient ? 1 : 1.25}>
           <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={1}>
             <Box>
               <Typography variant="h4" sx={{ fontSize: "1.02rem" }}>
@@ -64,7 +71,7 @@ export default function AppointmentCard({
             />
           </Stack>
 
-          {item.description ? (
+          {item.description && !isClient ? (
             <Typography
               variant="body2"
               color="text.secondary"
@@ -76,7 +83,7 @@ export default function AppointmentCard({
 
           <StatusStepper status={item.status} role={role} compact slaBreached={item.sla_breached} />
 
-          <PaperHint hint={statusUi.hint} />
+          {!isClient ? <PaperHint hint={statusUi.hint} /> : null}
 
           <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap alignItems="center">
             <Chip size="small" icon={<ScheduleRoundedIcon />} label={`Обновлено: ${formatLastActivity(item)}`} variant="outlined" />
@@ -102,7 +109,13 @@ export default function AppointmentCard({
                 fullWidth
               />
             ) : null}
-            <Button component={RouterLink} to={linkTo} variant={showWorkflowAction ? "outlined" : "contained"} fullWidth>
+            <Button
+              component={RouterLink}
+              to={linkTo}
+              variant={showWorkflowAction ? "outlined" : "contained"}
+              size={isClient ? "small" : "medium"}
+              fullWidth
+            >
               Открыть заявку
             </Button>
           </Stack>

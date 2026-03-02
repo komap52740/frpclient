@@ -1,7 +1,5 @@
-﻿import AddTaskIcon from "@mui/icons-material/AddTask";
-import BoltRoundedIcon from "@mui/icons-material/BoltRounded";
+﻿import BoltRoundedIcon from "@mui/icons-material/BoltRounded";
 import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
-import ListAltIcon from "@mui/icons-material/ListAlt";
 import SecurityRoundedIcon from "@mui/icons-material/SecurityRounded";
 import {
   Accordion,
@@ -17,6 +15,8 @@ import {
   Paper,
   Stack,
   Switch,
+  Tab,
+  Tabs,
   Typography,
 } from "@mui/material";
 import dayjs from "dayjs";
@@ -52,6 +52,13 @@ const STATUS_PRIORITY = {
   COMPLETED: 20,
   DECLINED_BY_MASTER: 10,
   CANCELLED: 5,
+};
+
+const DETAIL_FOCUS_BY_ACTION = {
+  open_payment: "payment",
+  open_chat: "chat",
+  open_timeline: "timeline",
+  leave_review: "review",
 };
 
 const WAITING_TIPS = {
@@ -213,7 +220,8 @@ export default function ClientHomePage() {
   const [items, setItems] = useState([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [attentionOnly, setAttentionOnly] = useState(false);
+  const [focusMode, setFocusMode] = useState("attention");
+  const [checklistExpanded, setChecklistExpanded] = useState(false);
   const [checklistState, setChecklistState] = useState(() => loadChecklistState());
   const [tipIndex, setTipIndex] = useState(0);
 
@@ -274,7 +282,7 @@ export default function ClientHomePage() {
   }, [checklistState]);
 
   const visibleAppointments = useMemo(() => {
-    const base = attentionOnly
+    const base = focusMode === "attention"
       ? items.filter(
           (item) =>
             (item.unread_count || 0) > 0 ||
@@ -287,14 +295,33 @@ export default function ClientHomePage() {
 
     return [...base]
       .sort((a, b) => dayjs(b.updated_at).valueOf() - dayjs(a.updated_at).valueOf())
-      .slice(0, 4);
-  }, [attentionOnly, items]);
+      .slice(0, focusMode === "attention" ? 3 : 5);
+  }, [focusMode, items]);
+
+  const attentionCount = useMemo(
+    () =>
+      items.filter(
+        (item) =>
+          (item.unread_count || 0) > 0 ||
+          item.status === "AWAITING_PAYMENT" ||
+          item.status === "PAYMENT_PROOF_UPLOADED" ||
+          item.status === "IN_PROGRESS" ||
+          item.status === "IN_REVIEW"
+      ).length,
+    [items]
+  );
 
   const toggleChecklist = (key) => {
     setChecklistState((prev) => ({
       ...prev,
       [key]: !prev[key],
     }));
+  };
+
+  const handleWorkflowAction = (actionKey, item) => {
+    const focus = DETAIL_FOCUS_BY_ACTION[actionKey];
+    const suffix = focus ? `?focus=${focus}` : "";
+    navigate(`/appointments/${item.id}${suffix}`);
   };
 
   return (
@@ -399,10 +426,7 @@ export default function ClientHomePage() {
         <Grid item xs={12} md={5}>
           <Paper sx={{ p: 2.25, borderRadius: 3 }}>
             <Stack spacing={1.2}>
-              <Typography variant="h6">Готовность к сессии</Typography>
-              <Typography variant="body2" color="text.secondary">
-                Отметьте пункты, чтобы снизить риск задержек и ускорить работу мастера.
-              </Typography>
+              <Typography variant="h6">Готовность к сессии: {checklistProgress}%</Typography>
               <LinearProgress
                 variant="determinate"
                 value={checklistProgress}
@@ -414,18 +438,43 @@ export default function ClientHomePage() {
                 }}
               />
               <Typography variant="caption" color="text.secondary">
-                Готовность: {checklistProgress}%
+                Чем выше готовность, тем меньше пауз во время удаленной сессии.
               </Typography>
 
-              <Stack spacing={0.25}>
-                {CHECKLIST_ITEMS.map((item) => (
-                  <FormControlLabel
-                    key={item.key}
-                    control={<Switch checked={Boolean(checklistState[item.key])} onChange={() => toggleChecklist(item.key)} />}
-                    label={<Typography variant="body2">{item.label}</Typography>}
-                  />
-                ))}
-              </Stack>
+              <Accordion
+                disableGutters
+                expanded={checklistExpanded}
+                onChange={(_, expanded) => setChecklistExpanded(expanded)}
+                sx={{
+                  mt: 0.5,
+                  borderRadius: 2.5,
+                  border: "1px solid rgba(15,23,42,0.08)",
+                  boxShadow: "none",
+                  "&:before": { display: "none" },
+                }}
+              >
+                <AccordionSummary expandIcon={<ExpandMoreRoundedIcon />}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                    Проверить готовность
+                  </Typography>
+                </AccordionSummary>
+                <AccordionDetails>
+                  <Stack spacing={0.25}>
+                    {CHECKLIST_ITEMS.map((item) => (
+                      <FormControlLabel
+                        key={item.key}
+                        control={
+                          <Switch
+                            checked={Boolean(checklistState[item.key])}
+                            onChange={() => toggleChecklist(item.key)}
+                          />
+                        }
+                        label={<Typography variant="body2">{item.label}</Typography>}
+                      />
+                    ))}
+                  </Stack>
+                </AccordionDetails>
+              </Accordion>
             </Stack>
           </Paper>
         </Grid>
@@ -446,24 +495,39 @@ export default function ClientHomePage() {
         </Grid>
       </Grid>
 
-      <Stack direction={{ xs: "column", sm: "row" }} spacing={1} justifyContent="space-between" alignItems={{ xs: "flex-start", sm: "center" }}>
-        <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
-          <Button component={RouterLink} to="/client/create" variant="contained" startIcon={<AddTaskIcon />}>
-            Новая заявка
-          </Button>
-          <Button component={RouterLink} to="/client/my" variant="outlined" startIcon={<ListAltIcon />}>
-            Все мои заявки
-          </Button>
-        </Stack>
-
-        <FormControlLabel
-          control={<Switch checked={attentionOnly} onChange={(event) => setAttentionOnly(event.target.checked)} />}
-          label="Только требующие внимания"
-        />
-      </Stack>
-
       <Paper sx={{ p: 2, borderRadius: 3 }}>
-        <Typography variant="h6" mb={1}>Фокус-заявки</Typography>
+        <Stack
+          direction={{ xs: "column", md: "row" }}
+          spacing={1}
+          alignItems={{ xs: "flex-start", md: "center" }}
+          justifyContent="space-between"
+          sx={{ mb: 1 }}
+        >
+          <Typography variant="h6">Фокус-заявки</Typography>
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ width: { xs: "100%", md: "auto" } }}>
+            <Tabs
+              value={focusMode}
+              onChange={(_, value) => setFocusMode(value)}
+              variant="fullWidth"
+              sx={{
+                minHeight: 38,
+                "& .MuiTab-root": { minHeight: 38, textTransform: "none", fontWeight: 700, fontSize: 13.5 },
+              }}
+            >
+              <Tab value="attention" label={`Требуют внимания (${attentionCount})`} />
+              <Tab value="all" label={`Все (${items.length})`} />
+            </Tabs>
+            <Button
+              component={RouterLink}
+              to="/client/my"
+              variant="outlined"
+              size="small"
+              sx={{ minWidth: { xs: "100%", md: 130 } }}
+            >
+              Все заявки
+            </Button>
+          </Stack>
+        </Stack>
         {loading && !visibleAppointments.length ? (
           <Stack spacing={1.25}>
             <AppointmentCardSkeleton />
@@ -472,13 +536,24 @@ export default function ClientHomePage() {
         ) : visibleAppointments.length ? (
           <Stack spacing={1.25}>
             {visibleAppointments.map((item) => (
-              <AppointmentCard key={item.id} item={item} role="client" linkTo={`/appointments/${item.id}`} />
+              <AppointmentCard
+                key={item.id}
+                item={item}
+                role="client"
+                linkTo={`/appointments/${item.id}`}
+                showWorkflowAction
+                onPrimaryAction={handleWorkflowAction}
+              />
             ))}
           </Stack>
         ) : (
           <EmptyState
-            title="Пока нет активных задач"
-            description="Создайте первую заявку, и мастер сможет взять ее в работу."
+            title={focusMode === "attention" ? "Срочных задач нет" : "Пока нет заявок"}
+            description={
+              focusMode === "attention"
+                ? "Сейчас ничего не требует срочного действия. Можно открыть все заявки или создать новую."
+                : "Создайте первую заявку, и мастер сможет взять ее в работу."
+            }
             actionLabel="Создать заявку"
             onAction={() => navigate("/client/create")}
           />

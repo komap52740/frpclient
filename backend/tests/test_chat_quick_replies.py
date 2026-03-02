@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import pytest
+from django.core.files.uploadedfile import SimpleUploadedFile
 from rest_framework.test import APIClient
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from apps.accounts.models import RoleChoices, User
 from apps.appointments.models import Appointment, AppointmentStatusChoices
-from apps.chat.models import MasterQuickReply
+from apps.chat.models import MasterQuickReply, Message
 
 
 def auth_as(user: User) -> APIClient:
@@ -97,3 +98,76 @@ def test_master_message_expands_quick_reply_command(master_user, client_user):
     assert second_response.status_code == 201
     assert "Скачайте программу и откройте ее." in second_response.data["text"]
     assert "После установки напишите в чат." in second_response.data["text"]
+
+
+@pytest.mark.django_db
+def test_client_message_with_profanity_is_rejected(client_user, master_user):
+    appointment = Appointment.objects.create(
+        client=client_user,
+        assigned_master=master_user,
+        brand="Samsung",
+        model="A50",
+        lock_type="PIN",
+        has_pc=True,
+        description="desc",
+        status=AppointmentStatusChoices.IN_PROGRESS,
+    )
+
+    response = auth_as(client_user).post(
+        f"/api/appointments/{appointment.id}/messages/",
+        {"text": "ты пидор"},
+        format="json",
+    )
+
+    assert response.status_code == 400
+    assert "недопустимую лексику" in response.data["detail"].lower()
+    assert Message.objects.filter(appointment=appointment).count() == 0
+
+
+@pytest.mark.django_db
+def test_client_spam_like_message_is_rejected(client_user, master_user):
+    appointment = Appointment.objects.create(
+        client=client_user,
+        assigned_master=master_user,
+        brand="Samsung",
+        model="A50",
+        lock_type="PIN",
+        has_pc=True,
+        description="desc",
+        status=AppointmentStatusChoices.IN_PROGRESS,
+    )
+
+    response = auth_as(client_user).post(
+        f"/api/appointments/{appointment.id}/messages/",
+        {"text": "ааааааааааааааа"},
+        format="json",
+    )
+
+    assert response.status_code == 400
+    assert "спам" in response.data["detail"].lower()
+    assert Message.objects.filter(appointment=appointment).count() == 0
+
+
+@pytest.mark.django_db
+def test_client_file_message_without_text_is_allowed(client_user, master_user):
+    appointment = Appointment.objects.create(
+        client=client_user,
+        assigned_master=master_user,
+        brand="Samsung",
+        model="A50",
+        lock_type="PIN",
+        has_pc=True,
+        description="desc",
+        status=AppointmentStatusChoices.IN_PROGRESS,
+    )
+
+    test_file = SimpleUploadedFile("check.jpg", b"fake-jpeg", content_type="image/jpeg")
+    response = auth_as(client_user).post(
+        f"/api/appointments/{appointment.id}/messages/",
+        {"file": test_file},
+        format="multipart",
+    )
+
+    assert response.status_code == 201
+    assert response.data["text"] in ("", None)
+    assert Message.objects.filter(appointment=appointment).count() == 1

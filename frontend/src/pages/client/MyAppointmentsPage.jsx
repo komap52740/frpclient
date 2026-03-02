@@ -5,15 +5,17 @@ import {
   Alert,
   Box,
   Button,
-  Chip,
+  FormControlLabel,
   InputAdornment,
+  LinearProgress,
   MenuItem,
   Paper,
   Stack,
   Switch,
+  Tab,
+  Tabs,
   TextField,
   Typography,
-  FormControlLabel,
 } from "@mui/material";
 import dayjs from "dayjs";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -52,14 +54,27 @@ const PRIORITY_WEIGHT = {
   CANCELLED: 5,
 };
 
+const DETAIL_FOCUS_BY_ACTION = {
+  open_payment: "payment",
+  open_chat: "chat",
+  open_timeline: "timeline",
+  leave_review: "review",
+};
+
 function matchesFilter(item, filter) {
   if (filter === "ALL") {
     return true;
   }
   if (filter === "ACTIVE") {
-    return ["NEW", "IN_REVIEW", "AWAITING_PAYMENT", "PAYMENT_PROOF_UPLOADED", "PAID", "IN_PROGRESS"].includes(item.status);
+    return ["NEW", "IN_REVIEW", "AWAITING_PAYMENT", "PAYMENT_PROOF_UPLOADED", "PAID", "IN_PROGRESS"].includes(
+      item.status
+    );
   }
   return item.status === filter;
+}
+
+function countForFilter(items, filter) {
+  return items.filter((item) => matchesFilter(item, filter)).length;
 }
 
 function sortItems(items, sortValue) {
@@ -86,15 +101,9 @@ function sortItems(items, sortValue) {
   return [...items].sort((a, b) => dayjs(b.updated_at).valueOf() - dayjs(a.updated_at).valueOf());
 }
 
-const DETAIL_FOCUS_BY_ACTION = {
-  open_payment: "payment",
-  open_chat: "chat",
-  open_timeline: "timeline",
-  leave_review: "review",
-};
-
 function resolveAttentionAction(item) {
   if (!item) return null;
+
   if (item.status === "AWAITING_PAYMENT") {
     return {
       actionKey: "open_payment",
@@ -115,7 +124,7 @@ function resolveAttentionAction(item) {
     return {
       actionKey: "open_chat",
       title: `Заявка #${item.id}: есть новые сообщения`,
-      helper: "Ответ в чате ускоряет весь процесс.",
+      helper: "Быстрый ответ в чате ускоряет весь процесс.",
       cta: "Перейти к диалогу",
     };
   }
@@ -123,7 +132,7 @@ function resolveAttentionAction(item) {
     return {
       actionKey: "open_timeline",
       title: `Заявка #${item.id}: работа в процессе`,
-      helper: "Проверьте актуальный статус и последние события заявки.",
+      helper: "Проверьте текущий статус и последние события по заявке.",
       cta: "Открыть статус",
     };
   }
@@ -132,9 +141,11 @@ function resolveAttentionAction(item) {
 
 export default function MyAppointmentsPage() {
   const navigate = useNavigate();
+
   const [items, setItems] = useState([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [autoRefreshing, setAutoRefreshing] = useState(false);
 
   const [search, setSearch] = useState("");
   const [activeFilter, setActiveFilter] = useState("ALL");
@@ -164,9 +175,26 @@ export default function MyAppointmentsPage() {
     load();
   }, [load]);
 
-  useAutoRefresh(() => load({ silent: true, withLoading: false }), { intervalMs: 6000 });
+  useAutoRefresh(
+    async () => {
+      setAutoRefreshing(true);
+      try {
+        await load({ silent: true, withLoading: false });
+      } finally {
+        setAutoRefreshing(false);
+      }
+    },
+    { intervalMs: 5000 }
+  );
 
   const unreadTotal = useMemo(() => items.reduce((sum, item) => sum + (item.unread_count || 0), 0), [items]);
+  const filterCounts = useMemo(
+    () =>
+      Object.fromEntries(
+        FILTERS.map((filter) => [filter.key, countForFilter(items, filter.key)])
+      ),
+    [items]
+  );
 
   const filteredItems = useMemo(() => {
     const normalizedQuery = search.trim().toLowerCase();
@@ -223,38 +251,136 @@ export default function MyAppointmentsPage() {
 
   return (
     <Stack spacing={2}>
-      <Stack
-        direction={{ xs: "column", sm: "row" }}
-        spacing={1}
-        justifyContent="space-between"
-        alignItems={{ xs: "flex-start", sm: "center" }}
+      <Paper
+        sx={{
+          p: { xs: 1.6, md: 2 },
+          borderRadius: 3,
+          border: "1px solid rgba(15,23,42,0.08)",
+          background: "linear-gradient(145deg, rgba(255,255,255,0.96) 0%, rgba(239,248,255,0.9) 100%)",
+        }}
       >
-        <Typography variant="h5">Мои заявки</Typography>
-        <Button variant="outlined" startIcon={<RefreshIcon />} onClick={load} disabled={loading}>
-          Обновить
-        </Button>
-      </Stack>
-
-      <Paper sx={{ p: 2, borderRadius: 3 }}>
         <Stack spacing={1.2}>
-          <Typography variant="body2" color="text.secondary">
-            Всего заявок: {items.length} | Непрочитанных сообщений: {unreadTotal}
-          </Typography>
+          <Stack
+            direction={{ xs: "column", md: "row" }}
+            spacing={1}
+            justifyContent="space-between"
+            alignItems={{ xs: "flex-start", md: "center" }}
+          >
+            <Box>
+              <Typography variant="h2">Мои заявки</Typography>
+              <Typography variant="body2" color="text.secondary">
+                Один экран для статуса, оплаты и чата без лишнего шума.
+              </Typography>
+            </Box>
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ width: { xs: "100%", md: "auto" } }}>
+              <Button
+                variant="outlined"
+                startIcon={<RefreshIcon />}
+                onClick={() => load()}
+                disabled={loading}
+                sx={{ minWidth: { xs: "100%", sm: 124 } }}
+              >
+                Обновить
+              </Button>
+              <Button
+                variant="contained"
+                onClick={() => navigate("/client/create")}
+                sx={{ minWidth: { xs: "100%", sm: 164 } }}
+              >
+                Новая заявка
+              </Button>
+            </Stack>
+          </Stack>
 
-          <Stack direction={{ xs: "column", md: "row" }} spacing={1}>
-            <TextField
-              fullWidth
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              label="Поиск по заявкам"
-              placeholder="Номер, модель, описание"
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <SearchRoundedIcon fontSize="small" />
-                  </InputAdornment>
-                ),
+          <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+            <Chip size="small" variant="outlined" label={`Всего: ${items.length}`} />
+            <Chip size="small" color={unreadTotal ? "primary" : "default"} variant={unreadTotal ? "filled" : "outlined"} label={`Непрочитанные: ${unreadTotal}`} />
+          </Stack>
+
+          {autoRefreshing ? <LinearProgress sx={{ borderRadius: 999 }} /> : null}
+
+          {attentionAction ? (
+            <Paper
+              elevation={0}
+              sx={{
+                p: 1.2,
+                borderRadius: 2.5,
+                border: "1px solid rgba(2,132,199,0.18)",
+                background: "linear-gradient(140deg, rgba(238,249,255,0.95) 0%, rgba(255,255,255,0.95) 100%)",
               }}
+            >
+              <Stack spacing={0.6}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
+                  Что важно сейчас
+                </Typography>
+                <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                  {attentionAction.title}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  {attentionAction.helper}
+                </Typography>
+                <Button
+                  variant="contained"
+                  size="small"
+                  sx={{ alignSelf: "flex-start" }}
+                  onClick={() => handleWorkflowAction(attentionAction.actionKey, priorityItem)}
+                >
+                  {attentionAction.cta}
+                </Button>
+              </Stack>
+            </Paper>
+          ) : null}
+        </Stack>
+      </Paper>
+
+      <Paper sx={{ p: { xs: 1.2, md: 1.5 }, borderRadius: 3 }}>
+        <Stack spacing={1.1}>
+          <TextField
+            fullWidth
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            label="Поиск по заявкам"
+            placeholder="Номер, модель, комментарий"
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchRoundedIcon fontSize="small" />
+                </InputAdornment>
+              ),
+            }}
+          />
+
+          <Tabs
+            value={activeFilter}
+            onChange={(_, value) => setActiveFilter(value)}
+            variant="scrollable"
+            allowScrollButtonsMobile
+            sx={{
+              minHeight: 40,
+              "& .MuiTab-root": {
+                minHeight: 40,
+                textTransform: "none",
+                fontSize: 13.5,
+                fontWeight: 700,
+                px: 1.2,
+              },
+            }}
+          >
+            {FILTERS.map((filter) => (
+              <Tab
+                key={filter.key}
+                value={filter.key}
+                label={`${filter.label} (${filterCounts[filter.key] || 0})`}
+              />
+            ))}
+          </Tabs>
+
+          <Stack direction={{ xs: "column", md: "row" }} spacing={1} justifyContent="space-between">
+            <FormControlLabel
+              control={
+                <Switch checked={onlyUnread} onChange={(event) => setOnlyUnread(event.target.checked)} />
+              }
+              label="Только с непрочитанными"
             />
 
             <TextField
@@ -262,7 +388,7 @@ export default function MyAppointmentsPage() {
               label="Сортировка"
               value={sortValue}
               onChange={(event) => setSortValue(event.target.value)}
-              sx={{ minWidth: { xs: "100%", md: 240 } }}
+              sx={{ minWidth: { xs: "100%", md: 260 } }}
             >
               {SORT_OPTIONS.map((option) => (
                 <MenuItem key={option.value} value={option.value}>
@@ -271,59 +397,10 @@ export default function MyAppointmentsPage() {
               ))}
             </TextField>
           </Stack>
-
-          <Stack direction="row" spacing={0.8} flexWrap="wrap" useFlexGap>
-            {FILTERS.map((filter) => (
-              <Chip
-                key={filter.key}
-                label={filter.label}
-                color={activeFilter === filter.key ? "primary" : "default"}
-                variant={activeFilter === filter.key ? "filled" : "outlined"}
-                onClick={() => setActiveFilter(filter.key)}
-              />
-            ))}
-          </Stack>
-
-          <Box>
-            <FormControlLabel
-              control={<Switch checked={onlyUnread} onChange={(event) => setOnlyUnread(event.target.checked)} />}
-              label="Только с непрочитанными сообщениями"
-            />
-          </Box>
         </Stack>
       </Paper>
 
-      {attentionAction ? (
-        <Paper
-          sx={{
-            p: 1.6,
-            borderRadius: 3,
-            border: "1px solid #dce6f0",
-            background: "linear-gradient(140deg, #edf7ff 0%, #ffffff 60%)",
-          }}
-        >
-          <Stack spacing={0.7}>
-            <Typography variant="subtitle1" sx={{ fontWeight: 800 }}>
-              Главный шаг сейчас
-            </Typography>
-            <Typography variant="body2" sx={{ fontWeight: 700 }}>
-              {attentionAction.title}
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              {attentionAction.helper}
-            </Typography>
-            <Button
-              variant="contained"
-              sx={{ alignSelf: "flex-start" }}
-              onClick={() => handleWorkflowAction(attentionAction.actionKey, priorityItem)}
-            >
-              {attentionAction.cta}
-            </Button>
-          </Stack>
-        </Paper>
-      ) : null}
-
-      {error && <Alert severity="error">{error}</Alert>}
+      {error ? <Alert severity="error">{error}</Alert> : null}
 
       {loading && !items.length ? (
         <Stack spacing={1.25}>
@@ -345,11 +422,12 @@ export default function MyAppointmentsPage() {
               {["COMPLETED", "DECLINED_BY_MASTER", "CANCELLED"].includes(item.status) ? (
                 <Button
                   variant="text"
+                  size="small"
                   startIcon={<ReplayRoundedIcon fontSize="small" />}
                   onClick={() => repeatAppointment(item.id)}
                   sx={{ alignSelf: "flex-start" }}
                 >
-                  Создать похожую заявку
+                  Повторить заявку
                 </Button>
               ) : null}
             </Stack>
@@ -357,8 +435,8 @@ export default function MyAppointmentsPage() {
         </Stack>
       ) : (
         <EmptyState
-          title="По заданным фильтрам ничего не найдено"
-          description="Попробуйте сбросить фильтры или создать новую заявку."
+          title="По этим фильтрам ничего не найдено"
+          description="Сбросьте фильтры или создайте новую заявку."
           actionLabel="Создать заявку"
           onAction={() => navigate("/client/create")}
         />

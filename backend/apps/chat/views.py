@@ -22,6 +22,7 @@ from .serializers import (
 )
 from .services import notify_client_about_chat_message
 from .services import notify_master_about_client_chat_message
+from .text_moderation import ChatMessageRejected, validate_client_chat_text
 
 
 def apply_master_quick_reply(user, text: str) -> str:
@@ -66,6 +67,11 @@ class AppointmentMessagesView(APIView):
         serializer = MessageCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         resolved_text = apply_master_quick_reply(request.user, serializer.validated_data.get("text", ""))
+        if request.user.role == RoleChoices.CLIENT:
+            try:
+                resolved_text = validate_client_chat_text(resolved_text)
+            except ChatMessageRejected as exc:
+                return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         message = serializer.save(appointment=appointment, sender=request.user, text=resolved_text)
         if request.user.role == RoleChoices.MASTER and appointment.assigned_master_id == request.user.id:
             evaluate_response_sla(appointment, request.user)

@@ -19,6 +19,7 @@ from apps.appointments.models import Appointment
 from apps.appointments.services import initialize_response_deadline
 from apps.chat.models import Message
 from apps.chat.services import notify_master_about_client_chat_message
+from apps.chat.text_moderation import ChatMessageRejected, validate_client_chat_text
 from apps.platform.services import create_notification, emit_event
 
 from .models import RoleChoices, User
@@ -469,6 +470,12 @@ class ClientTelegramBot:
             return
 
         normalized = (text or "").strip()
+        if normalized:
+            try:
+                normalized = validate_client_chat_text(normalized)
+            except ChatMessageRejected as exc:
+                self.send_message(chat_id, str(exc))
+                return
         has_file = bool(file_payload)
         if not normalized and not has_file:
             self.send_message(chat_id, "Пустое сообщение не отправлено.")

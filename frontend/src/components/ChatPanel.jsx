@@ -123,7 +123,6 @@ export default function ChatPanel({ appointmentId, currentUser, systemEvents = [
   const threadRef = useRef(null);
 
   const isMaster = currentUser.role === "master";
-  const isClient = currentUser.role === "client";
   const quickTemplates = QUICK_TEMPLATES[currentUser.role] || QUICK_TEMPLATES.client;
 
   const quickReplyMap = useMemo(() => {
@@ -297,9 +296,9 @@ export default function ChatPanel({ appointmentId, currentUser, systemEvents = [
       setNewIncomingCount(0);
       window.requestAnimationFrame(scrollToBottom);
       setError("");
-    } catch {
+    } catch (error) {
       setMessages((prev) => prev.filter((item) => item.id !== optimisticId));
-      setError("Не удалось отправить сообщение");
+      setError(error?.response?.data?.detail || "Не удалось отправить сообщение");
     } finally {
       setIsSending(false);
     }
@@ -408,8 +407,11 @@ export default function ChatPanel({ appointmentId, currentUser, systemEvents = [
         Чат по заявке
       </Typography>
 
-      {!isClient ? (
-        <Stack direction="row" spacing={0.7} flexWrap="wrap" useFlexGap sx={{ mb: 1.1 }}>
+      <Stack spacing={0.65} sx={{ mb: 1.1 }}>
+        <Typography variant="caption" color="text.secondary">
+          {isMaster ? "Быстрые фразы и команды" : "Быстрые фразы"}
+        </Typography>
+        <Stack direction="row" spacing={0.7} flexWrap="wrap" useFlexGap>
           {quickTemplates.map((template) => (
             <Chip
               key={template}
@@ -433,7 +435,7 @@ export default function ChatPanel({ appointmentId, currentUser, systemEvents = [
               ))
             : null}
         </Stack>
-      ) : null}
+      </Stack>
 
       {isMaster ? (
         <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
@@ -452,12 +454,17 @@ export default function ChatPanel({ appointmentId, currentUser, systemEvents = [
 
       {error ? <Alert severity="error" sx={{ mb: 1 }}>{error}</Alert> : null}
       {fileError ? <Alert severity="warning" sx={{ mb: 1 }}>{fileError}</Alert> : null}
+      {file && !fileError ? (
+        <Alert severity="success" sx={{ mb: 1 }}>
+          Файл готов к отправке: {file.name}
+        </Alert>
+      ) : null}
 
       {newIncomingCount > 0 ? (
         <Button
           size="small"
-          variant="outlined"
-          sx={{ mb: 1, alignSelf: "flex-start" }}
+          variant="contained"
+          sx={{ mb: 1, alignSelf: "flex-start", boxShadow: 2 }}
           onClick={() => {
             setNewIncomingCount(0);
             scrollToBottom();
