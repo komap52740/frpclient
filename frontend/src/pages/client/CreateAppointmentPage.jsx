@@ -1,9 +1,14 @@
 import AddPhotoAlternateRoundedIcon from "@mui/icons-material/AddPhotoAlternateRounded";
 import HelpOutlineRoundedIcon from "@mui/icons-material/HelpOutlineRounded";
+import LockOpenRoundedIcon from "@mui/icons-material/LockOpenRounded";
+import VisibilityOffRoundedIcon from "@mui/icons-material/VisibilityOffRounded";
+import VisibilityRoundedIcon from "@mui/icons-material/VisibilityRounded";
 import {
   Alert,
   Button,
   FormControlLabel,
+  IconButton,
+  InputAdornment,
   MenuItem,
   Paper,
   Stack,
@@ -11,7 +16,7 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { appointmentsApi } from "../../api/client";
@@ -22,6 +27,12 @@ const ISSUE_TEMPLATES = [
   "Забыл PIN-код",
   "Телефон просит Google-аккаунт после сброса",
   "Нужно срочно разблокировать сегодня",
+];
+const DEVICE_TEMPLATES = [
+  "Samsung A54",
+  "Redmi Note 12",
+  "Honor 90",
+  "iPhone 11",
 ];
 
 function splitDevice(rawDevice) {
@@ -41,46 +52,48 @@ function splitDevice(rawDevice) {
   };
 }
 
+function readStoredDefaults() {
+  if (typeof window === "undefined") {
+    return {};
+  }
+
+  try {
+    const raw = window.localStorage.getItem(CREATE_DEFAULTS_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
 export default function CreateAppointmentPage() {
   const navigate = useNavigate();
-  const [form, setForm] = useState(() => {
-    const fallback = {
-      device: "",
-      lock_type: "OTHER",
-      has_pc: true,
-      description: "",
-      rustdesk_id: "",
-      rustdesk_password: "",
-      photo_lock_screen: null,
-    };
+  const storedDefaults = useMemo(() => readStoredDefaults(), []);
 
-    if (typeof window === "undefined") {
-      return fallback;
-    }
-
-    try {
-      const raw = window.localStorage.getItem(CREATE_DEFAULTS_KEY);
-      if (!raw) {
-        return fallback;
-      }
-      const parsed = JSON.parse(raw);
-      return {
-        ...fallback,
-        rustdesk_id: parsed.rustdesk_id || "",
-        rustdesk_password: parsed.rustdesk_password || "",
-        lock_type: parsed.lock_type || "OTHER",
-        has_pc: parsed.has_pc ?? true,
-      };
-    } catch {
-      return fallback;
-    }
+  const [form, setForm] = useState({
+    device: "",
+    lock_type: storedDefaults.lock_type || "OTHER",
+    has_pc: storedDefaults.has_pc ?? true,
+    description: "",
+    rustdesk_id: storedDefaults.rustdesk_id || "",
+    rustdesk_password: storedDefaults.rustdesk_password || "",
+    photo_lock_screen: null,
   });
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
+  const hasStoredAccess = Boolean(storedDefaults.rustdesk_id || storedDefaults.rustdesk_password);
+
   const updateField = (key, value) => {
     setForm((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const appendIssueTemplate = (template) => {
+    updateField(
+      "description",
+      form.description.trim() ? `${form.description.trim()}\n${template}` : template
+    );
   };
 
   const onSubmit = async (event) => {
@@ -145,41 +158,43 @@ export default function CreateAppointmentPage() {
   };
 
   return (
-    <Paper sx={{ p: { xs: 2, md: 3 }, borderRadius: 3 }}>
+    <Paper sx={{ p: { xs: 2, md: 3 }, borderRadius: 3.2 }}>
       <Stack spacing={0.7} sx={{ mb: 2 }}>
         <Typography variant="h5">Новая заявка</Typography>
         <Typography variant="body2" color="text.secondary">
-          Минимум шагов: устройство, что случилось, RuDesktop. Остальное можно уточнить в чате.
+          4 шага: устройство, проблема, RuDesktop ID, пароль. Остальное можно уточнить в чате.
         </Typography>
       </Stack>
 
-      {error ? <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert> : null}
+      {hasStoredAccess ? (
+        <Alert severity="info" sx={{ mb: 1.4 }}>
+          Данные RuDesktop подставлены из последней заявки. Проверьте перед отправкой.
+        </Alert>
+      ) : null}
+      {error ? <Alert severity="error" sx={{ mb: 1.4 }}>{error}</Alert> : null}
 
-      <Stack component="form" spacing={1.4} onSubmit={onSubmit}>
+      <Stack component="form" spacing={1.3} onSubmit={onSubmit}>
         <TextField
-          label="Устройство (марка + модель)"
+          label="Устройство"
           placeholder="Например: Samsung A54"
           value={form.device}
           onChange={(event) => updateField("device", event.target.value)}
           required
         />
 
-        <TextField
-          label="Ваш логин/ID RuDesktop"
-          placeholder="Например: 123 456 789"
-          value={form.rustdesk_id}
-          onChange={(event) => updateField("rustdesk_id", event.target.value)}
-          helperText="Без этого мастер не сможет подключиться."
-          required
-        />
-
-        <TextField
-          label="Пароль RuDesktop"
-          value={form.rustdesk_password}
-          onChange={(event) => updateField("rustdesk_password", event.target.value)}
-          helperText="Укажите пароль для подключения мастера."
-          required
-        />
+        <Stack direction="row" spacing={0.7} flexWrap="wrap" useFlexGap>
+          {DEVICE_TEMPLATES.map((template) => (
+            <Button
+              key={template}
+              size="small"
+              variant="text"
+              onClick={() => updateField("device", template)}
+              sx={{ borderRadius: 999, px: 1.2 }}
+            >
+              {template}
+            </Button>
+          ))}
+        </Stack>
 
         <TextField
           label="Что случилось?"
@@ -190,24 +205,47 @@ export default function CreateAppointmentPage() {
           onChange={(event) => updateField("description", event.target.value)}
           required
         />
+
         <Stack direction="row" spacing={0.7} flexWrap="wrap" useFlexGap>
           {ISSUE_TEMPLATES.map((template) => (
             <Button
               key={template}
               size="small"
               variant="text"
-              onClick={() =>
-                updateField(
-                  "description",
-                  form.description.trim() ? `${form.description.trim()}\n${template}` : template
-                )
-              }
+              onClick={() => appendIssueTemplate(template)}
               sx={{ borderRadius: 999, px: 1.2 }}
             >
               {template}
             </Button>
           ))}
         </Stack>
+
+        <TextField
+          label="Логин/ID RuDesktop"
+          placeholder="Например: 123 456 789"
+          value={form.rustdesk_id}
+          onChange={(event) => updateField("rustdesk_id", event.target.value)}
+          helperText="Без этого мастер не сможет подключиться."
+          required
+        />
+
+        <TextField
+          label="Пароль RuDesktop"
+          type={showPassword ? "text" : "password"}
+          value={form.rustdesk_password}
+          onChange={(event) => updateField("rustdesk_password", event.target.value)}
+          helperText="Пароль нужен для подключения мастера."
+          required
+          InputProps={{
+            endAdornment: (
+              <InputAdornment position="end">
+                <IconButton edge="end" onClick={() => setShowPassword((prev) => !prev)}>
+                  {showPassword ? <VisibilityOffRoundedIcon /> : <VisibilityRoundedIcon />}
+                </IconButton>
+              </InputAdornment>
+            ),
+          }}
+        />
 
         <Button
           variant={showAdvanced ? "outlined" : "text"}
@@ -255,8 +293,15 @@ export default function CreateAppointmentPage() {
           </Stack>
         ) : null}
 
-        <Button type="submit" variant="contained" size="large" disabled={submitting}>
-          {submitting ? "Создаем заявку..." : "Создать заявку"}
+        <Button
+          type="submit"
+          variant="contained"
+          size="large"
+          disabled={submitting}
+          startIcon={<LockOpenRoundedIcon />}
+          sx={{ minHeight: 50, borderRadius: 2.4, fontWeight: 800 }}
+        >
+          {submitting ? "Отправляем заявку..." : "Создать заявку"}
         </Button>
       </Stack>
     </Paper>
