@@ -1,9 +1,11 @@
-﻿import AddRoundedIcon from "@mui/icons-material/AddRounded";
+import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import AttachFileIcon from "@mui/icons-material/AttachFile";
+import ContentCopyRoundedIcon from "@mui/icons-material/ContentCopyRounded";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import ExpandLessRoundedIcon from "@mui/icons-material/ExpandLessRounded";
 import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
+import LinkRoundedIcon from "@mui/icons-material/LinkRounded";
 import SendIcon from "@mui/icons-material/Send";
 import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
 import {
@@ -19,10 +21,12 @@ import {
   IconButton,
   Paper,
   Stack,
+  Tab,
+  Tabs,
   TextField,
   Typography,
 } from "@mui/material";
-import { useTheme } from "@mui/material/styles";
+import { alpha, useTheme } from "@mui/material/styles";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import dayjs from "dayjs";
 import "dayjs/locale/ru";
@@ -36,6 +40,7 @@ dayjs.locale("ru");
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const ALLOWED_EXTENSIONS = ["jpg", "jpeg", "png", "pdf", "txt", "log", "zip"];
+const URL_REGEX = /\bhttps?:\/\/[^\s<>"']+/gi;
 
 const QUICK_TEMPLATES = {
   client: [
@@ -81,45 +86,68 @@ function mapSystemEvents(systemEvents = []) {
 }
 
 function validateAttachment(file) {
-  if (!file) {
-    return "";
-  }
+  if (!file) return "";
 
   const extension = (file.name.split(".").pop() || "").toLowerCase();
   if (!ALLOWED_EXTENSIONS.includes(extension)) {
     return "Файл должен быть в формате jpg/jpeg/png/pdf/txt/log/zip";
   }
-
   if (file.size > MAX_FILE_SIZE) {
     return "Размер файла не должен превышать 10 МБ";
   }
-
   return "";
 }
 
 function normalizeCommand(value) {
   const raw = (value || "").trim();
-  if (!raw) {
-    return "";
-  }
-  const withoutSlash = raw.startsWith("/") ? raw.slice(1) : raw;
-  return withoutSlash.toLowerCase();
+  if (!raw) return "";
+  return raw.startsWith("/") ? raw.slice(1).toLowerCase() : raw.toLowerCase();
 }
 
 function splitCommandText(rawText) {
   const text = (rawText || "").trim();
-  if (!text.startsWith("/") || text.startsWith("//")) {
-    return null;
-  }
+  if (!text.startsWith("/") || text.startsWith("//")) return null;
 
   const firstToken = text.split(" ")[0];
   const command = normalizeCommand(firstToken);
-  if (!command) {
-    return null;
-  }
+  if (!command) return null;
 
-  const tail = text.slice(firstToken.length).trim();
-  return { command, tail };
+  return { command, tail: text.slice(firstToken.length).trim() };
+}
+
+function normalizeUrl(rawUrl) {
+  const url = String(rawUrl || "").trim().replace(/[),.;!?]+$/g, "");
+  return url;
+}
+
+function extractUrls(text) {
+  if (!text) return [];
+  const matches = String(text).match(URL_REGEX) || [];
+  return matches.map(normalizeUrl).filter(Boolean);
+}
+
+function buildLinkItems(messages = []) {
+  const items = [];
+  const seen = new Set();
+
+  messages.forEach((message) => {
+    if (message.is_deleted) return;
+
+    extractUrls(message.text).forEach((url, index) => {
+      const key = `${message.id}-${url}-${index}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      items.push({
+        id: key,
+        url,
+        sender_username: message.sender_username || "Пользователь",
+        created_at: message.created_at,
+        message_text: message.text || "",
+      });
+    });
+  });
+
+  return items.sort((a, b) => dayjs(b.created_at).valueOf() - dayjs(a.created_at).valueOf());
 }
 
 const EMPTY_REPLY_FORM = {
@@ -133,6 +161,7 @@ export default function ChatPanel({ appointmentId, currentUser, systemEvents = [
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const isDark = theme.palette.mode === "dark";
+
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState("");
   const [file, setFile] = useState(null);
@@ -140,13 +169,15 @@ export default function ChatPanel({ appointmentId, currentUser, systemEvents = [
   const [fileError, setFileError] = useState("");
   const [isSending, setIsSending] = useState(false);
 
+  const [chatView, setChatView] = useState("messages");
+  const [newIncomingCount, setNewIncomingCount] = useState(0);
+  const [quickPhrasesOpen, setQuickPhrasesOpen] = useState(!isMobile);
+
   const [quickReplies, setQuickReplies] = useState([]);
   const [quickRepliesOpen, setQuickRepliesOpen] = useState(false);
   const [quickReplyError, setQuickReplyError] = useState("");
   const [quickReplySaving, setQuickReplySaving] = useState(false);
   const [replyForm, setReplyForm] = useState(EMPTY_REPLY_FORM);
-  const [newIncomingCount, setNewIncomingCount] = useState(0);
-  const [quickPhrasesOpen, setQuickPhrasesOpen] = useState(!isMobile);
 
   const threadRef = useRef(null);
 
@@ -170,6 +201,8 @@ export default function ChatPanel({ appointmentId, currentUser, systemEvents = [
     return [...messageItems, ...eventItems].sort((a, b) => dayjs(a.created_at).valueOf() - dayjs(b.created_at).valueOf());
   }, [messages, systemEvents]);
 
+  const linkItems = useMemo(() => buildLinkItems(messages), [messages]);
+
   const isNearBottom = useCallback(() => {
     const el = threadRef.current;
     if (!el) return true;
@@ -189,6 +222,7 @@ export default function ChatPanel({ appointmentId, currentUser, systemEvents = [
         if (response.data.length) {
           const shouldStickToBottom = isNearBottom();
           const hasForeignMessages = response.data.some((item) => item.sender !== currentUser.id);
+
           setMessages((prev) => {
             const merged = [...prev.filter((item) => !item.is_pending), ...response.data];
             const dedup = new Map();
@@ -228,6 +262,7 @@ export default function ChatPanel({ appointmentId, currentUser, systemEvents = [
   useEffect(() => {
     setMessages([]);
     setNewIncomingCount(0);
+    setChatView("messages");
     loadMessages(0);
   }, [appointmentId, loadMessages]);
 
@@ -255,27 +290,16 @@ export default function ChatPanel({ appointmentId, currentUser, systemEvents = [
   const resolveQuickReplyText = useCallback(
     (rawText) => {
       const normalized = (rawText || "").trim();
-      if (!isMaster || !normalized) {
-        return normalized;
-      }
-      if (normalized.startsWith("//")) {
-        return normalized.slice(1);
-      }
+      if (!isMaster || !normalized) return normalized;
+      if (normalized.startsWith("//")) return normalized.slice(1);
 
       const parsed = splitCommandText(normalized);
-      if (!parsed) {
-        return normalized;
-      }
+      if (!parsed) return normalized;
 
       const matched = quickReplyMap.get(parsed.command);
-      if (!matched) {
-        return normalized;
-      }
+      if (!matched) return normalized;
 
-      if (parsed.tail) {
-        return `${matched.text}\n\n${parsed.tail}`;
-      }
-      return matched.text;
+      return parsed.tail ? `${matched.text}\n\n${parsed.tail}` : matched.text;
     },
     [isMaster, quickReplyMap]
   );
@@ -286,9 +310,7 @@ export default function ChatPanel({ appointmentId, currentUser, systemEvents = [
 
     const attachmentError = validateAttachment(file);
     setFileError(attachmentError);
-    if (attachmentError) {
-      return;
-    }
+    if (attachmentError) return;
 
     const resolvedText = resolveQuickReplyText(rawText);
 
@@ -307,12 +329,8 @@ export default function ChatPanel({ appointmentId, currentUser, systemEvents = [
     setMessages((prev) => [...prev, optimisticMessage]);
 
     const formData = new FormData();
-    if (resolvedText) {
-      formData.append("text", resolvedText);
-    }
-    if (file) {
-      formData.append("file", file);
-    }
+    if (resolvedText) formData.append("text", resolvedText);
+    if (file) formData.append("file", file);
 
     setText("");
     setFile(null);
@@ -328,9 +346,9 @@ export default function ChatPanel({ appointmentId, currentUser, systemEvents = [
       setNewIncomingCount(0);
       window.requestAnimationFrame(scrollToBottom);
       setError("");
-    } catch (error) {
+    } catch (sendError) {
       setMessages((prev) => prev.filter((item) => item.id !== optimisticId));
-      setError(error?.response?.data?.detail || "Не удалось отправить сообщение");
+      setError(sendError?.response?.data?.detail || "Не удалось отправить сообщение");
     } finally {
       setIsSending(false);
     }
@@ -352,12 +370,7 @@ export default function ChatPanel({ appointmentId, currentUser, systemEvents = [
   };
 
   const applyTemplate = (templateText) => {
-    setText((prev) => {
-      if (!prev.trim()) {
-        return templateText;
-      }
-      return `${prev.trim()} ${templateText}`;
-    });
+    setText((prev) => (!prev.trim() ? templateText : `${prev.trim()} ${templateText}`));
   };
 
   const applyQuickReplyCommand = (command) => {
@@ -367,6 +380,14 @@ export default function ChatPanel({ appointmentId, currentUser, systemEvents = [
   const onFileChange = (nextFile) => {
     setFile(nextFile);
     setFileError(validateAttachment(nextFile));
+  };
+
+  const copyLink = async (link) => {
+    try {
+      await navigator.clipboard.writeText(link);
+    } catch {
+      setError("Не удалось скопировать ссылку");
+    }
   };
 
   const resetReplyForm = () => {
@@ -430,162 +451,266 @@ export default function ChatPanel({ appointmentId, currentUser, systemEvents = [
   return (
     <Paper
       sx={{
-        p: { xs: 1.4, sm: 2.2 },
-        borderRadius: 3,
+        p: { xs: 1.4, sm: 2.1 },
+        borderRadius: 3.2,
         background: isDark
           ? "linear-gradient(160deg, rgba(10,17,31,0.92) 0%, rgba(17,24,39,0.88) 100%)"
           : "linear-gradient(160deg, rgba(255,255,255,0.9) 0%, rgba(250,252,255,0.86) 100%)",
       }}
     >
-      <Typography variant="h3" sx={{ mb: 1.25 }}>
-        Чат по заявке
-      </Typography>
-
-      <Stack spacing={0.65} sx={{ mb: 1.1 }}>
+      <Stack spacing={1.1}>
         <Stack direction="row" justifyContent="space-between" alignItems="center">
-          <Typography variant="caption" color="text.secondary">
-            {isMaster ? "Быстрые фразы и команды" : "Быстрые фразы"}
-          </Typography>
-          <Button
+          <Typography variant="h3">Чат по заявке</Typography>
+          <Chip
             size="small"
-            variant="text"
-            endIcon={quickPhrasesOpen ? <ExpandLessRoundedIcon fontSize="small" /> : <ExpandMoreRoundedIcon fontSize="small" />}
-            onClick={() => setQuickPhrasesOpen((prev) => !prev)}
-            sx={{ minHeight: 28, px: 1 }}
-          >
-            {quickPhrasesOpen ? "Скрыть" : "Показать"}
-          </Button>
+            icon={<LinkRoundedIcon />}
+            label={`Ссылки: ${linkItems.length}`}
+            variant="outlined"
+          />
         </Stack>
-        {quickPhrasesOpen ? (
-          <Stack
-            direction="row"
-            spacing={0.7}
-            flexWrap={isMobile ? "nowrap" : "wrap"}
-            useFlexGap={!isMobile}
-            sx={{ overflowX: isMobile ? "auto" : "visible", pb: isMobile ? 0.4 : 0 }}
-          >
-            {quickTemplates.map((template) => (
-              <Chip
-                key={template}
-                label={template}
-                variant="outlined"
-                onClick={() => applyTemplate(template)}
-                sx={{ cursor: "pointer" }}
-              />
-            ))}
 
-            {isMaster
-              ? quickReplies.map((item) => (
-                  <Chip
-                    key={item.id}
-                    label={item.title ? `/${item.command} — ${item.title}` : `/${item.command}`}
-                    color="primary"
-                    variant="outlined"
-                    onClick={() => applyQuickReplyCommand(item.command)}
-                    sx={{ cursor: "pointer" }}
-                  />
-                ))
-              : null}
-          </Stack>
-        ) : null}
-      </Stack>
-
-      {isMaster ? (
-        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
-          <Typography variant="caption" color="text.secondary">
-            Быстрые команды мастера: введите `/команда`, например `/1`.
-          </Typography>
-          <Button
-            size="small"
-            startIcon={<SettingsRoundedIcon fontSize="small" />}
-            onClick={() => setQuickRepliesOpen(true)}
-          >
-            Управлять
-          </Button>
-        </Stack>
-      ) : null}
-
-      {error ? <Alert severity="error" sx={{ mb: 1 }}>{error}</Alert> : null}
-      {fileError ? <Alert severity="warning" sx={{ mb: 1 }}>{fileError}</Alert> : null}
-      {file && !fileError ? (
-        <Alert severity="success" sx={{ mb: 1 }}>
-          Файл готов к отправке: {file.name}
-        </Alert>
-      ) : null}
-
-      {newIncomingCount > 0 ? (
-        <Button
-          size="small"
-          variant="contained"
-          sx={{ mb: 1, alignSelf: "flex-start", boxShadow: 2 }}
-          onClick={() => {
-            setNewIncomingCount(0);
-            scrollToBottom();
+        <Tabs
+          value={chatView}
+          onChange={(_, value) => setChatView(value)}
+          variant="fullWidth"
+          sx={{
+            borderRadius: 2.4,
+            bgcolor: (themeValue) =>
+              themeValue.palette.mode === "dark" ? alpha("#0f172a", 0.66) : alpha("#e5eefb", 0.62),
+            minHeight: 40,
+            "& .MuiTab-root": {
+              minHeight: 40,
+              textTransform: "none",
+              fontWeight: 700,
+            },
           }}
         >
-          Новые сообщения: {newIncomingCount}
-        </Button>
-      ) : null}
+          <Tab value="messages" label="Сообщения" />
+          <Tab value="links" label={`Ссылки (${linkItems.length})`} />
+        </Tabs>
 
-      <ChatThread
-        items={threadItems}
-        currentUserId={currentUser.id}
-        currentUserRole={currentUser.role}
-        onDeleteMessage={onDelete}
-        containerRef={threadRef}
-        onScroll={onThreadScroll}
-      />
-
-      <Paper
-        elevation={0}
-        sx={{
-          mt: 1.75,
-          p: 1,
-          borderRadius: 2.5,
-          border: "1px solid",
-          borderColor: "divider",
-          position: isMobile ? "sticky" : "static",
-          bottom: isMobile ? 2 : "auto",
-          zIndex: 4,
-          backdropFilter: "blur(10px)",
-          background: isDark ? "rgba(12,18,31,0.9)" : "rgba(255,255,255,0.92)",
-        }}
-      >
-        <Stack spacing={1}>
-          <TextField
-            label="Сообщение"
-            multiline
-            minRows={isMobile ? 2.4 : 2}
-            value={text}
-            onChange={(event) => setText(event.target.value)}
-            onKeyDown={(event) => {
-              if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
-                event.preventDefault();
-                onSend();
-              }
-            }}
-            helperText={
-              text.trim().length
-                ? "Сообщение готово к отправке. Ctrl+Enter для быстрой отправки"
-                : isMaster
-                  ? "Можно писать /команда (пример: /1). Ctrl+Enter для быстрой отправки"
-                  : "Напишите мастеру коротко и по делу. Ctrl+Enter для быстрой отправки"
-            }
-          />
-          <Stack direction="row" spacing={1} alignItems="center">
-            <Button component="label" variant="outlined" startIcon={<AttachFileIcon />}>
-              Файл
-              <input hidden type="file" onChange={(event) => onFileChange(event.target.files?.[0] || null)} />
-            </Button>
-            <Typography variant="body2" sx={{ flexGrow: 1 }}>
-              {file ? file.name : "Файл не выбран"}
+        <Stack spacing={0.65}>
+          <Stack direction="row" justifyContent="space-between" alignItems="center">
+            <Typography variant="caption" color="text.secondary">
+              {isMaster ? "Быстрые фразы и команды" : "Быстрые фразы"}
             </Typography>
-            <Button variant="contained" onClick={onSend} endIcon={<SendIcon />} disabled={isSending || Boolean(fileError)}>
-              {isSending ? "Отправка..." : "Отправить"}
+            <Button
+              size="small"
+              variant="text"
+              endIcon={quickPhrasesOpen ? <ExpandLessRoundedIcon fontSize="small" /> : <ExpandMoreRoundedIcon fontSize="small" />}
+              onClick={() => setQuickPhrasesOpen((prev) => !prev)}
+              sx={{ minHeight: 28, px: 1 }}
+            >
+              {quickPhrasesOpen ? "Скрыть" : "Показать"}
             </Button>
           </Stack>
+          {quickPhrasesOpen ? (
+            <Stack
+              direction="row"
+              spacing={0.7}
+              flexWrap={isMobile ? "nowrap" : "wrap"}
+              useFlexGap={!isMobile}
+              sx={{ overflowX: isMobile ? "auto" : "visible", pb: isMobile ? 0.4 : 0 }}
+            >
+              {quickTemplates.map((template) => (
+                <Chip
+                  key={template}
+                  label={template}
+                  variant="outlined"
+                  onClick={() => applyTemplate(template)}
+                  sx={{ cursor: "pointer" }}
+                />
+              ))}
+              {isMaster
+                ? quickReplies.map((item) => (
+                    <Chip
+                      key={item.id}
+                      label={item.title ? `/${item.command} — ${item.title}` : `/${item.command}`}
+                      color="primary"
+                      variant="outlined"
+                      onClick={() => applyQuickReplyCommand(item.command)}
+                      sx={{ cursor: "pointer" }}
+                    />
+                  ))
+                : null}
+            </Stack>
+          ) : null}
         </Stack>
-      </Paper>
+
+        {isMaster ? (
+          <Stack direction="row" justifyContent="space-between" alignItems="center">
+            <Typography variant="caption" color="text.secondary">
+              Команды мастера: введите `/команда`, например `/1`.
+            </Typography>
+            <Button
+              size="small"
+              startIcon={<SettingsRoundedIcon fontSize="small" />}
+              onClick={() => setQuickRepliesOpen(true)}
+            >
+              Управлять
+            </Button>
+          </Stack>
+        ) : null}
+
+        {error ? <Alert severity="error">{error}</Alert> : null}
+        {fileError ? <Alert severity="warning">{fileError}</Alert> : null}
+        {file && !fileError ? <Alert severity="success">Файл готов к отправке: {file.name}</Alert> : null}
+
+        {chatView === "messages" ? (
+          <>
+            {newIncomingCount > 0 ? (
+              <Button
+                size="small"
+                variant="contained"
+                sx={{ alignSelf: "flex-start", boxShadow: 2 }}
+                onClick={() => {
+                  setNewIncomingCount(0);
+                  scrollToBottom();
+                }}
+              >
+                Новые сообщения: {newIncomingCount}
+              </Button>
+            ) : null}
+
+            <ChatThread
+              items={threadItems}
+              currentUserId={currentUser.id}
+              currentUserRole={currentUser.role}
+              onDeleteMessage={onDelete}
+              containerRef={threadRef}
+              onScroll={onThreadScroll}
+            />
+          </>
+        ) : (
+          <Paper
+            variant="outlined"
+            sx={{
+              p: 1.1,
+              borderRadius: 2.5,
+              maxHeight: isMobile ? 400 : 440,
+              overflowY: "auto",
+              bgcolor: isDark ? alpha("#0f172a", 0.7) : alpha("#f8fbff", 0.95),
+            }}
+          >
+            {linkItems.length ? (
+              <Stack spacing={0.9}>
+                {linkItems.map((item) => (
+                  <Paper
+                    key={item.id}
+                    elevation={0}
+                    sx={{
+                      p: 1,
+                      borderRadius: 2.2,
+                      border: "1px solid",
+                      borderColor: "divider",
+                      bgcolor: isDark ? alpha("#111b2f", 0.8) : "#ffffff",
+                    }}
+                  >
+                    <Stack spacing={0.45}>
+                      <Typography variant="caption" color="text.secondary">
+                        {item.sender_username} · {dayjs(item.created_at).format("DD.MM.YYYY HH:mm")}
+                      </Typography>
+                      <Typography
+                        component="a"
+                        href={item.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        variant="body2"
+                        sx={{
+                          color: "primary.main",
+                          fontWeight: 700,
+                          textDecoration: "none",
+                          wordBreak: "break-all",
+                        }}
+                      >
+                        {item.url}
+                      </Typography>
+                      <Stack direction="row" spacing={0.8}>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          component="a"
+                          href={item.url}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          Открыть
+                        </Button>
+                        <Button
+                          size="small"
+                          variant="text"
+                          startIcon={<ContentCopyRoundedIcon fontSize="small" />}
+                          onClick={() => copyLink(item.url)}
+                        >
+                          Копировать
+                        </Button>
+                      </Stack>
+                    </Stack>
+                  </Paper>
+                ))}
+              </Stack>
+            ) : (
+              <Typography variant="body2" color="text.secondary">
+                Ссылок пока нет. Отправьте сообщение с `https://...`, и ссылка появится здесь автоматически.
+              </Typography>
+            )}
+          </Paper>
+        )}
+
+        <Paper
+          elevation={0}
+          sx={{
+            mt: 0.2,
+            p: 1,
+            borderRadius: 2.5,
+            border: "1px solid",
+            borderColor: "divider",
+            position: isMobile ? "sticky" : "static",
+            bottom: isMobile ? 2 : "auto",
+            zIndex: 4,
+            backdropFilter: "blur(10px)",
+            background: isDark ? "rgba(12,18,31,0.9)" : "rgba(255,255,255,0.92)",
+          }}
+        >
+          <Stack spacing={1}>
+            <TextField
+              label={chatView === "links" ? "Ссылка или сообщение" : "Сообщение"}
+              placeholder={chatView === "links" ? "Вставьте ссылку вида https://..." : ""}
+              multiline
+              minRows={isMobile ? 2.3 : 2}
+              value={text}
+              onChange={(event) => setText(event.target.value)}
+              onKeyDown={(event) => {
+                if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+                  event.preventDefault();
+                  onSend();
+                }
+              }}
+              helperText={
+                chatView === "links"
+                  ? "Режим «Ссылки»: вставьте URL, чтобы он появился во вкладке ссылок. Ctrl+Enter для отправки."
+                  : text.trim().length
+                    ? "Сообщение готово к отправке. Ctrl+Enter для быстрой отправки"
+                    : isMaster
+                      ? "Можно писать /команда (пример: /1). Ctrl+Enter для быстрой отправки"
+                      : "Пишите коротко и по делу. Ctrl+Enter для быстрой отправки"
+              }
+            />
+            <Stack direction="row" spacing={1} alignItems="center">
+              <Button component="label" variant="outlined" startIcon={<AttachFileIcon />}>
+                Файл
+                <input hidden type="file" onChange={(event) => onFileChange(event.target.files?.[0] || null)} />
+              </Button>
+              <Typography variant="body2" sx={{ flexGrow: 1 }}>
+                {file ? file.name : "Файл не выбран"}
+              </Typography>
+              <Button variant="contained" onClick={onSend} endIcon={<SendIcon />} disabled={isSending || Boolean(fileError)}>
+                {isSending ? "Отправка..." : "Отправить"}
+              </Button>
+            </Stack>
+          </Stack>
+        </Paper>
+      </Stack>
 
       <Dialog open={quickRepliesOpen} onClose={() => setQuickRepliesOpen(false)} fullWidth maxWidth="md">
         <DialogTitle>Быстрые ответы мастера</DialogTitle>
