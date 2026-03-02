@@ -761,7 +761,6 @@ export default function AppointmentDetailPage() {
   const lastSyncLabel = dayjs(lastSyncedAt).format("HH:mm:ss");
   const visibleTimelineEvents = isClient ? timelineEvents.slice(0, isClientCompact ? 3 : 6) : timelineEvents;
   const sidebarTimelineEvents = isClient ? visibleTimelineEvents.slice(0, isClientCompact ? 2 : 4) : visibleTimelineEvents;
-  const contactPhone = (appointment.contact_phone || "").trim();
   const rustdeskId = (appointment.rustdesk_id || "").trim();
   const rustdeskPassword = (appointment.rustdesk_password || "").trim();
   const ruDesktopConnectAllowedStatuses = ["PAID", "IN_PROGRESS"];
@@ -1142,14 +1141,16 @@ export default function AppointmentDetailPage() {
             </Stack>
           </Stack>
 
-          <StatusStepper
-            status={appointment.status}
-            role={user.role}
-            slaBreached={appointment.sla_breached}
-            compact={isMobile}
-          />
+          {!isClientMinimal ? (
+            <StatusStepper
+              status={appointment.status}
+              role={user.role}
+              slaBreached={appointment.sla_breached}
+              compact={isMobile}
+            />
+          ) : null}
 
-          {isClient ? (
+          {isClient && (!isClientMinimal || showClientPaymentActions) ? (
             <Paper
               elevation={0}
               sx={{
@@ -1189,9 +1190,9 @@ export default function AppointmentDetailPage() {
                 </Button>
               </Stack>
             </Paper>
-          ) : (
+          ) : !isClient ? (
             <PrimaryCTA status={appointment.status} role={user.role} onAction={handlePrimaryAction} />
-          )}
+          ) : null}
 
           {showClientTabs ? (
             <Paper
@@ -1370,7 +1371,6 @@ export default function AppointmentDetailPage() {
                         {clientDataExpanded ? (
                           <Stack spacing={0.55}>
                             <Typography variant="body2"><b>Тип блокировки:</b> {getLockTypeLabel(appointment.lock_type)}</Typography>
-                            {contactPhone ? <Typography variant="body2"><b>Телефон:</b> {contactPhone}</Typography> : null}
                             {rustdeskId ? <Typography variant="body2"><b>RuDesktop ID:</b> {rustdeskId}</Typography> : null}
                             {appointment.description ? (
                               <Typography variant="body2" color="text.secondary">
@@ -1386,7 +1386,6 @@ export default function AppointmentDetailPage() {
                         <Typography variant="body2"><b>Тип блокировки:</b> {getLockTypeLabel(appointment.lock_type)}</Typography>
                         <Typography variant="body2"><b>Цена:</b> {appointment.total_price ? `${appointment.total_price} руб.` : "Не выставлена"}</Typography>
                         <Typography variant="body2"><b>Мастер:</b> {normalizeRuText(appointment.master_username) || appointment.assigned_master || "Пока не назначен"}</Typography>
-                        <Typography variant="body2"><b>Телефон клиента:</b> {contactPhone || "Не указан"}</Typography>
                         <Typography variant="body2"><b>Логин/ID RuDesktop:</b> {rustdeskId || "Не указан"}</Typography>
                         {rustdeskPassword ? <Typography variant="body2"><b>RuDesktop пароль:</b> {rustdeskPassword}</Typography> : null}
                         {appointment.description ? (

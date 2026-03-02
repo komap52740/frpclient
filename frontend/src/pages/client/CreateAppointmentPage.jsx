@@ -17,6 +17,13 @@ import { useNavigate } from "react-router-dom";
 import { appointmentsApi } from "../../api/client";
 import { getLockTypeLabel } from "../../constants/labels";
 
+const CREATE_DEFAULTS_KEY = "frp_create_defaults_v1";
+const ISSUE_TEMPLATES = [
+  "Забыл PIN-код",
+  "Телефон просит Google-аккаунт после сброса",
+  "Нужно срочно разблокировать сегодня",
+];
+
 function splitDevice(rawDevice) {
   const normalized = (rawDevice || "").trim().replace(/\s+/g, " ");
   if (!normalized) {
@@ -36,14 +43,37 @@ function splitDevice(rawDevice) {
 
 export default function CreateAppointmentPage() {
   const navigate = useNavigate();
-  const [form, setForm] = useState({
-    device: "",
-    lock_type: "OTHER",
-    has_pc: true,
-    description: "",
-    rustdesk_id: "",
-    rustdesk_password: "",
-    photo_lock_screen: null,
+  const [form, setForm] = useState(() => {
+    const fallback = {
+      device: "",
+      lock_type: "OTHER",
+      has_pc: true,
+      description: "",
+      rustdesk_id: "",
+      rustdesk_password: "",
+      photo_lock_screen: null,
+    };
+
+    if (typeof window === "undefined") {
+      return fallback;
+    }
+
+    try {
+      const raw = window.localStorage.getItem(CREATE_DEFAULTS_KEY);
+      if (!raw) {
+        return fallback;
+      }
+      const parsed = JSON.parse(raw);
+      return {
+        ...fallback,
+        rustdesk_id: parsed.rustdesk_id || "",
+        rustdesk_password: parsed.rustdesk_password || "",
+        lock_type: parsed.lock_type || "OTHER",
+        has_pc: parsed.has_pc ?? true,
+      };
+    } catch {
+      return fallback;
+    }
   });
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -95,6 +125,17 @@ export default function CreateAppointmentPage() {
 
     try {
       const response = await appointmentsApi.create(payload);
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(
+          CREATE_DEFAULTS_KEY,
+          JSON.stringify({
+            rustdesk_id: form.rustdesk_id.trim(),
+            rustdesk_password: form.rustdesk_password.trim(),
+            lock_type: form.lock_type,
+            has_pc: form.has_pc,
+          })
+        );
+      }
       navigate(`/appointments/${response.data.id}`);
     } catch (err) {
       setError(err.response?.data?.detail || "Не удалось создать заявку");
@@ -149,6 +190,24 @@ export default function CreateAppointmentPage() {
           onChange={(event) => updateField("description", event.target.value)}
           required
         />
+        <Stack direction="row" spacing={0.7} flexWrap="wrap" useFlexGap>
+          {ISSUE_TEMPLATES.map((template) => (
+            <Button
+              key={template}
+              size="small"
+              variant="text"
+              onClick={() =>
+                updateField(
+                  "description",
+                  form.description.trim() ? `${form.description.trim()}\n${template}` : template
+                )
+              }
+              sx={{ borderRadius: 999, px: 1.2 }}
+            >
+              {template}
+            </Button>
+          ))}
+        </Stack>
 
         <Button
           variant={showAdvanced ? "outlined" : "text"}
