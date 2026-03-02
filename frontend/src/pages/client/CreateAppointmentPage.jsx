@@ -103,7 +103,7 @@ export default function CreateAppointmentPage() {
       <Stack spacing={0.7} sx={{ mb: 2 }}>
         <Typography variant="h5">Новая заявка</Typography>
         <Typography variant="body2" color="text.secondary">
-          Минимум шагов: устройство, что случилось, RustDesk. Остальное можно уточнить в чате.
+          Минимум шагов: устройство, что случилось, RuDesktop. Остальное можно уточнить в чате.
         </Typography>
       </Stack>
 
@@ -119,7 +119,7 @@ export default function CreateAppointmentPage() {
         />
 
         <TextField
-          label="Ваш RustDesk ID"
+          label="Ваш RuDesktop ID"
           placeholder="Например: 123 456 789"
           value={form.rustdesk_id}
           onChange={(event) => updateField("rustdesk_id", event.target.value)}
@@ -148,7 +148,7 @@ export default function CreateAppointmentPage() {
         {showAdvanced ? (
           <Stack spacing={1.2}>
             <TextField
-              label="Пароль RustDesk (если есть)"
+              label="Пароль RuDesktop (если есть)"
               value={form.rustdesk_password}
               onChange={(event) => updateField("rustdesk_password", event.target.value)}
             />

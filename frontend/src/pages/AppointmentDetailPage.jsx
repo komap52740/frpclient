@@ -600,6 +600,27 @@ export default function AppointmentDetailPage() {
     }
   };
 
+  const openRuDesktopSession = async (remoteId, remotePassword = "") => {
+    const preparedId = String(remoteId || "").trim();
+    if (!preparedId) {
+      setError("RuDesktop ID не указан");
+      return;
+    }
+
+    const payload = remotePassword
+      ? `RuDesktop ID: ${preparedId}\nПароль: ${remotePassword}`
+      : `RuDesktop ID: ${preparedId}`;
+
+    try {
+      await navigator.clipboard.writeText(payload);
+      setSuccess("Данные подключения скопированы. Открываем RuDesktop...");
+    } catch {
+      setSuccess("Открываем RuDesktop. Если нужно — скопируйте ID вручную.");
+    }
+
+    window.location.href = "rustdesk://";
+  };
+
   if (!appointment) {
     return <AppointmentDetailSkeleton />;
   }
@@ -692,15 +713,18 @@ export default function AppointmentDetailPage() {
   const sidebarTimelineEvents = isClient ? visibleTimelineEvents.slice(0, isClientCompact ? 2 : 4) : visibleTimelineEvents;
   const rustdeskId = (appointment.rustdesk_id || "").trim();
   const rustdeskPassword = (appointment.rustdesk_password || "").trim();
+  const ruDesktopConnectAllowedStatuses = ["PAID", "IN_PROGRESS"];
+  const hasRuDesktopCredentials = Boolean(rustdeskId) && ["master", "admin"].includes(user.role);
+  const canLaunchRuDesktop = hasRuDesktopCredentials && ruDesktopConnectAllowedStatuses.includes(appointment.status);
   const sidebarLinks = [
     {
       id: "rustdesk_download",
-      label: "Скачать RustDesk",
+      label: "Скачать RuDesktop",
       href: "https://rustdesk.com/download",
     },
     {
       id: "rustdesk_guide",
-      label: "Инструкция подключения",
+      label: "Инструкция по RuDesktop",
       href: "https://rustdesk.com/docs/en/",
     },
     ...(appointment.photo_lock_screen_url
@@ -1245,7 +1269,7 @@ export default function AppointmentDetailPage() {
                           <Chip size="small" label={`Блокировка: ${getLockTypeLabel(appointment.lock_type)}`} />
                           <Chip size="small" color={appointment.total_price ? "warning" : "default"} label={appointment.total_price ? `К оплате: ${appointment.total_price} руб.` : "Цена уточняется"} />
                           <Chip size="small" label={`Мастер: ${normalizeRuText(appointment.master_username) || "пока не назначен"}`} />
-                          {rustdeskId ? <Chip size="small" icon={<ComputerRoundedIcon fontSize="small" />} label={`RustDesk: ${rustdeskId}`} /> : null}
+                          {rustdeskId ? <Chip size="small" icon={<ComputerRoundedIcon fontSize="small" />} label={`RuDesktop: ${rustdeskId}`} /> : null}
                         </Stack>
                         {appointment.description ? (
                           <Typography variant="body2" color="text.secondary">
@@ -1259,8 +1283,8 @@ export default function AppointmentDetailPage() {
                         <Typography variant="body2"><b>Тип блокировки:</b> {getLockTypeLabel(appointment.lock_type)}</Typography>
                         <Typography variant="body2"><b>Цена:</b> {appointment.total_price ? `${appointment.total_price} руб.` : "Не выставлена"}</Typography>
                         <Typography variant="body2"><b>Мастер:</b> {normalizeRuText(appointment.master_username) || appointment.assigned_master || "Пока не назначен"}</Typography>
-                        <Typography variant="body2"><b>RustDesk ID:</b> {rustdeskId || "Не указан"}</Typography>
-                        {rustdeskPassword ? <Typography variant="body2"><b>RustDesk пароль:</b> {rustdeskPassword}</Typography> : null}
+                        <Typography variant="body2"><b>RuDesktop ID:</b> {rustdeskId || "Не указан"}</Typography>
+                        {rustdeskPassword ? <Typography variant="body2"><b>RuDesktop пароль:</b> {rustdeskPassword}</Typography> : null}
                         {appointment.description ? (
                           <Typography variant="body2"><b>Комментарий:</b> {normalizeRuText(appointment.description)}</Typography>
                         ) : null}
@@ -1775,15 +1799,27 @@ export default function AppointmentDetailPage() {
                       <Chip
                         size="small"
                         icon={<ComputerRoundedIcon fontSize="small" />}
-                        label={`RustDesk ID: ${rustdeskId}`}
+                        label={`RuDesktop ID: ${rustdeskId}`}
                         sx={{ alignSelf: "flex-start" }}
                       />
+                      {hasRuDesktopCredentials ? (
+                        <Button
+                          size="small"
+                          variant="contained"
+                          startIcon={<ComputerRoundedIcon fontSize="small" />}
+                          onClick={() => openRuDesktopSession(rustdeskId, rustdeskPassword)}
+                          sx={{ alignSelf: "flex-start" }}
+                          disabled={!canLaunchRuDesktop}
+                        >
+                          Подключиться через сайт
+                        </Button>
+                      ) : null}
                       <Stack direction="row" spacing={0.7} flexWrap="wrap" useFlexGap>
                         <Button
                           size="small"
                           variant="outlined"
                           startIcon={<ContentCopyRoundedIcon fontSize="small" />}
-                          onClick={() => copyToClipboard(rustdeskId, "RustDesk ID не указан")}
+                          onClick={() => copyToClipboard(rustdeskId, "RuDesktop ID не указан")}
                         >
                           Копировать ID
                         </Button>
@@ -1792,12 +1828,19 @@ export default function AppointmentDetailPage() {
                             size="small"
                             variant="outlined"
                             startIcon={<ContentCopyRoundedIcon fontSize="small" />}
-                            onClick={() => copyToClipboard(rustdeskPassword, "Пароль RustDesk не указан")}
+                            onClick={() => copyToClipboard(rustdeskPassword, "Пароль RuDesktop не указан")}
                           >
                             Копировать пароль
                           </Button>
                         ) : null}
                       </Stack>
+                      {hasRuDesktopCredentials ? (
+                        <Typography variant="caption" color="text.secondary">
+                          {canLaunchRuDesktop
+                            ? "Кнопка откроет RuDesktop на вашем устройстве и скопирует ID/пароль в буфер."
+                            : "Подключение станет доступно после подтверждения оплаты и перехода заявки в работу."}
+                        </Typography>
+                      ) : null}
                     </Stack>
                   ) : (
                     <Alert
@@ -1809,8 +1852,8 @@ export default function AppointmentDetailPage() {
                       )}
                     >
                       {isClient
-                        ? "RustDesk ID пока не указан. Отправьте его в чат, чтобы мастер подключился быстрее."
-                        : "Клиент еще не указал RustDesk ID. Запросите его в чате."}
+                        ? "RuDesktop ID пока не указан. Отправьте его в чат, чтобы мастер подключился быстрее."
+                        : "Клиент еще не указал RuDesktop ID. Запросите его в чате."}
                     </Alert>
                   )}
 
