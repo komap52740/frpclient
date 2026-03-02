@@ -738,7 +738,7 @@ def test_create_appointment_calls_master_telegram_notifications(client_user):
 
 
 @pytest.mark.django_db
-def test_create_wholesale_appointment_updates_client_wholesale_profile(client_user):
+def test_create_appointment_ignores_wholesale_fields_from_payload(client_user):
     service_photo = SimpleUploadedFile("service1.jpg", b"photo-data", content_type="image/jpeg")
     payload = {
         "brand": "Samsung",
@@ -758,14 +758,36 @@ def test_create_wholesale_appointment_updates_client_wholesale_profile(client_us
 
     response = auth_as(client_user).post("/api/appointments/", payload, format="multipart")
     assert response.status_code == 201
-    assert response.data["is_wholesale_request"] is True
+    assert response.data["is_wholesale_request"] is False
 
     client_user.refresh_from_db()
-    assert client_user.is_service_center is True
-    assert client_user.wholesale_status == WholesaleStatusChoices.PENDING
-    assert client_user.wholesale_company_name == "FixLab"
-    assert client_user.wholesale_service_details
-    assert bool(client_user.wholesale_service_photo_1)
+    assert client_user.is_service_center is False
+    assert client_user.wholesale_status == WholesaleStatusChoices.NONE
+    assert client_user.wholesale_company_name == ""
+
+
+@pytest.mark.django_db
+def test_create_appointment_auto_marks_wholesale_for_approved_service(client_user):
+    client_user.is_service_center = True
+    client_user.wholesale_status = WholesaleStatusChoices.APPROVED
+    client_user.wholesale_discount_percent = 20
+    client_user.save(
+        update_fields=["is_service_center", "wholesale_status", "wholesale_discount_percent", "updated_at"]
+    )
+
+    payload = {
+        "brand": "Samsung",
+        "model": "A55",
+        "lock_type": "PIN",
+        "has_pc": True,
+        "description": "desc",
+        "rustdesk_id": "123456789",
+        "rustdesk_password": "test-pass",
+    }
+
+    response = auth_as(client_user).post("/api/appointments/", payload, format="json")
+    assert response.status_code == 201
+    assert response.data["is_wholesale_request"] is True
 
 
 @pytest.mark.django_db

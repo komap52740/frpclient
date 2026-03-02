@@ -1,18 +1,17 @@
 ﻿from __future__ import annotations
 
-from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.accounts.models import MasterLevelChoices, RoleChoices, User, WholesaleStatusChoices
+from apps.accounts.models import MasterLevelChoices, RoleChoices, WholesaleStatusChoices
 from apps.accounts.notifications import notify_masters_about_new_appointment
 from apps.accounts.permissions import IsAdminRole, IsAuthenticatedAndNotBanned
 from apps.accounts.services import recalculate_client_stats
 from apps.appointments.access import get_appointment_for_user
-from apps.platform.services import create_notification, emit_event
+from apps.platform.services import emit_event
 
 from .client_actions import can_client_signal, create_client_signal, repeat_client_appointment
 from .models import Appointment, AppointmentEventType, AppointmentStatusChoices
@@ -46,106 +45,11 @@ class AppointmentCreateView(APIView):
 
         serializer = AppointmentCreateSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
-        is_service_center = bool(serializer.validated_data.get("is_service_center"))
-        wholesale_company_name = (
-            (serializer.validated_data.get("wholesale_company_name") or "").strip()
-            or (request.user.wholesale_company_name or "").strip()
-        )
-        wholesale_comment = (
-            (serializer.validated_data.get("wholesale_comment") or "").strip()
-            or (request.user.wholesale_comment or "").strip()
-        )
-        wholesale_service_details = (
-            (serializer.validated_data.get("wholesale_service_details") or "").strip()
-            or (request.user.wholesale_service_details or "").strip()
-        )
-        wholesale_service_photo_1 = serializer.validated_data.get("wholesale_service_photo_1")
-        wholesale_service_photo_2 = serializer.validated_data.get("wholesale_service_photo_2")
-
         appointment = serializer.save(client=request.user)
 
-        if appointment.is_wholesale_request and is_service_center:
-            client_user = request.user
-            previous_status = client_user.wholesale_status
-            effective_photo_1 = (
-                wholesale_service_photo_1
-                if wholesale_service_photo_1 is not None
-                else client_user.wholesale_service_photo_1
-            )
-            effective_photo_2 = (
-                wholesale_service_photo_2
-                if wholesale_service_photo_2 is not None
-                else client_user.wholesale_service_photo_2
-            )
-            update_fields = [
-                "is_service_center",
-                "wholesale_company_name",
-                "wholesale_comment",
-                "wholesale_service_details",
-                "updated_at",
-            ]
-
-            client_user.is_service_center = True
-            client_user.wholesale_company_name = wholesale_company_name
-            client_user.wholesale_comment = wholesale_comment
-            client_user.wholesale_service_details = wholesale_service_details
-
-            if len(wholesale_service_details) < 20:
-                return Response(
-                    {"detail": "Добавьте подробное описание сервиса (минимум 20 символов)"},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-            if not effective_photo_1 and not effective_photo_2:
-                return Response(
-                    {"detail": "Добавьте хотя бы одно фото сервиса"},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-
-            if wholesale_service_photo_1 is not None:
-                client_user.wholesale_service_photo_1 = wholesale_service_photo_1
-                update_fields.append("wholesale_service_photo_1")
-            if wholesale_service_photo_2 is not None:
-                client_user.wholesale_service_photo_2 = wholesale_service_photo_2
-                update_fields.append("wholesale_service_photo_2")
-
-            if client_user.wholesale_status != WholesaleStatusChoices.APPROVED:
-                client_user.wholesale_status = WholesaleStatusChoices.PENDING
-                client_user.wholesale_requested_at = timezone.now()
-                client_user.wholesale_reviewed_at = None
-                client_user.wholesale_review_comment = ""
-                update_fields.extend(
-                    [
-                        "wholesale_status",
-                        "wholesale_requested_at",
-                        "wholesale_reviewed_at",
-                        "wholesale_review_comment",
-                    ]
-                )
-
-            client_user.save(update_fields=sorted(set(update_fields)))
-
-            if previous_status != WholesaleStatusChoices.PENDING and client_user.wholesale_status == WholesaleStatusChoices.PENDING:
-                emit_event(
-                    "wholesale.requested",
-                    client_user,
-                    actor=client_user,
-                    payload={
-                        "company": wholesale_company_name,
-                        "comment": wholesale_comment,
-                        "appointment_id": appointment.id,
-                        "has_photo_1": bool(client_user.wholesale_service_photo_1),
-                        "has_photo_2": bool(client_user.wholesale_service_photo_2),
-                    },
-                )
-                admins = User.objects.filter(Q(role=RoleChoices.ADMIN) | Q(is_superuser=True)).distinct()
-                for admin in admins:
-                    create_notification(
-                        user=admin,
-                        type="system",
-                        title="Новая оптовая заявка",
-                        message=f"Клиент @{client_user.username} запросил оптовую скидку",
-                        payload={"client_id": client_user.id, "appointment_id": appointment.id},
-                    )
+        if request.user.is_service_center and request.user.wholesale_status == WholesaleStatusChoices.APPROVED:
+            appointment.is_wholesale_request = True
+            appointment.save(update_fields=["is_wholesale_request", "updated_at"])
 
         initialize_response_deadline(appointment)
         emit_event(

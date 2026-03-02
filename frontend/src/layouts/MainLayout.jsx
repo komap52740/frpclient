@@ -71,6 +71,38 @@ function getRoleLabel(role) {
   return "Пользователь";
 }
 
+function buildWholesaleBadge(user) {
+  if (!user || user.role !== "client") {
+    return null;
+  }
+
+  const status = user.wholesale_status || "none";
+  const discountPercent = Number(user.wholesale_discount_percent || 0);
+
+  if (status === "approved") {
+    return {
+      label: discountPercent > 0 ? `Оптовый сервис ${discountPercent}%` : "Оптовый сервис",
+      color: "success",
+      variant: "filled",
+    };
+  }
+  if (status === "pending") {
+    return {
+      label: "Опт: на проверке",
+      color: "warning",
+      variant: "outlined",
+    };
+  }
+  if (status === "rejected") {
+    return {
+      label: "Опт: отклонено",
+      color: "error",
+      variant: "outlined",
+    };
+  }
+  return null;
+}
+
 function resolveRouteContext(role, pathname) {
   if (pathname.startsWith("/appointments/")) {
     return {
@@ -127,6 +159,7 @@ export default function MainLayout({ children }) {
 
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
   const roleLabel = useMemo(() => getRoleLabel(user?.role), [user?.role]);
+  const wholesaleBadge = useMemo(() => buildWholesaleBadge(user), [user]);
   const route = useMemo(
     () => resolveRouteContext(user?.role, location.pathname),
     [user?.role, location.pathname]
@@ -235,6 +268,15 @@ export default function MainLayout({ children }) {
               borderColor: "divider",
             }}
           />
+          {wholesaleBadge ? (
+            <Chip
+              size="small"
+              label={wholesaleBadge.label}
+              color={wholesaleBadge.color}
+              variant={wholesaleBadge.variant}
+              sx={{ display: { xs: "none", md: "inline-flex" } }}
+            />
+          ) : null}
 
           <IconButton
             color="inherit"
@@ -289,6 +331,15 @@ export default function MainLayout({ children }) {
           <Typography variant="caption" color="text.secondary">
             {user?.username || "Пользователь"} · {roleLabel}
           </Typography>
+          {wholesaleBadge ? (
+            <Chip
+              size="small"
+              label={wholesaleBadge.label}
+              color={wholesaleBadge.color}
+              variant={wholesaleBadge.variant}
+              sx={{ alignSelf: "flex-start" }}
+            />
+          ) : null}
         </Stack>
         <Divider />
         <List sx={{ p: 1 }}>

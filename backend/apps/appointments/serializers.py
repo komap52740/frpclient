@@ -131,6 +131,7 @@ class AppointmentSerializer(serializers.ModelSerializer):
 
 
 class AppointmentCreateSerializer(serializers.ModelSerializer):
+    is_wholesale_request = serializers.BooleanField(write_only=True, required=False, default=False)
     is_service_center = serializers.BooleanField(write_only=True, required=False, default=False)
     wholesale_company_name = serializers.CharField(write_only=True, required=False, allow_blank=True, max_length=255)
     wholesale_comment = serializers.CharField(write_only=True, required=False, allow_blank=True, max_length=500)
@@ -139,34 +140,15 @@ class AppointmentCreateSerializer(serializers.ModelSerializer):
     wholesale_service_photo_2 = serializers.FileField(write_only=True, required=False, allow_null=True)
 
     def validate(self, attrs):
-        request = self.context.get("request")
-        current_user = getattr(request, "user", None)
         rustdesk_id = (attrs.get("rustdesk_id") or "").strip()
         rustdesk_password = (attrs.get("rustdesk_password") or "").strip()
         contact_phone = (attrs.get("contact_phone") or "").strip()
-        current_company = (getattr(current_user, "wholesale_company_name", "") or "").strip()
-        current_details = (getattr(current_user, "wholesale_service_details", "") or "").strip()
-        current_photo_1 = getattr(current_user, "wholesale_service_photo_1", None)
-        current_photo_2 = getattr(current_user, "wholesale_service_photo_2", None)
 
         errors = {}
         if not rustdesk_id:
             errors["rustdesk_id"] = "Укажите логин/ID RuDesktop"
         if not rustdesk_password:
             errors["rustdesk_password"] = "Укажите пароль RuDesktop"
-        if attrs.get("is_wholesale_request") and not attrs.get("is_service_center"):
-            errors["is_service_center"] = "Для оптовой заявки подтвердите, что вы сервисный центр"
-        if attrs.get("is_wholesale_request") and not ((attrs.get("wholesale_company_name") or "").strip() or current_company):
-            errors["wholesale_company_name"] = "Укажите название сервисного центра"
-
-        effective_details = (attrs.get("wholesale_service_details") or "").strip() or current_details
-        if attrs.get("is_wholesale_request") and len(effective_details) < 20:
-            errors["wholesale_service_details"] = "Добавьте описание сервиса (минимум 20 символов)"
-
-        effective_photo_1 = attrs.get("wholesale_service_photo_1") or current_photo_1
-        effective_photo_2 = attrs.get("wholesale_service_photo_2") or current_photo_2
-        if attrs.get("is_wholesale_request") and not effective_photo_1 and not effective_photo_2:
-            errors["wholesale_service_photo_1"] = "Добавьте хотя бы одно фото сервиса"
 
         if errors:
             raise serializers.ValidationError(errors)
@@ -177,6 +159,7 @@ class AppointmentCreateSerializer(serializers.ModelSerializer):
         return attrs
 
     def create(self, validated_data):
+        validated_data.pop("is_wholesale_request", None)
         validated_data.pop("is_service_center", None)
         validated_data.pop("wholesale_company_name", None)
         validated_data.pop("wholesale_comment", None)

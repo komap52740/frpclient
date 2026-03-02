@@ -2,15 +2,17 @@
 import ChatRoundedIcon from "@mui/icons-material/ChatRounded";
 import LockRoundedIcon from "@mui/icons-material/LockRounded";
 import RocketLaunchRoundedIcon from "@mui/icons-material/RocketLaunchRounded";
+import AddPhotoAlternateRoundedIcon from "@mui/icons-material/AddPhotoAlternateRounded";
 import StorefrontRoundedIcon from "@mui/icons-material/StorefrontRounded";
 import TrendingUpRoundedIcon from "@mui/icons-material/TrendingUpRounded";
-import { Box, Button, Chip, Divider, Paper, Stack, Typography } from "@mui/material";
+import { Alert, Box, Button, Chip, Divider, Paper, Stack, TextField, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import dayjs from "dayjs";
 import "dayjs/locale/ru";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
+import { authApi } from "../../api/client";
 import { useAuth } from "../../auth/AuthContext";
 
 dayjs.locale("ru");
@@ -72,13 +74,23 @@ function ProfileKpi({ title, value, helper, icon }) {
 }
 
 export default function ClientProfilePage() {
-  const { user } = useAuth();
+  const { user, reloadMe } = useAuth();
   const navigate = useNavigate();
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
 
   const stats = user?.client_stats || {};
   const wholesaleDiscount = Number(user?.wholesale_discount_percent || 0);
+  const [serviceForm, setServiceForm] = useState({
+    wholesale_company_name: user?.wholesale_company_name || "",
+    wholesale_comment: user?.wholesale_comment || "",
+    wholesale_service_details: user?.wholesale_service_details || "",
+    wholesale_service_photo_1: null,
+    wholesale_service_photo_2: null,
+  });
+  const [requestLoading, setRequestLoading] = useState(false);
+  const [requestError, setRequestError] = useState("");
+  const [requestSuccess, setRequestSuccess] = useState("");
 
   const avatarText = useMemo(() => {
     const username = (user?.username || "Клиент").trim();
@@ -88,6 +100,65 @@ export default function ClientProfilePage() {
   const riskLabel = resolveRiskLabel(stats.risk_level);
   const levelLabel = resolveLevelLabel(stats.level);
   const wholesaleLabel = resolveWholesaleLabel(user?.wholesale_status);
+  const isWholesaleApproved = user?.wholesale_status === "approved";
+  const hasExistingServicePhoto = Boolean(user?.wholesale_service_photo_1_url || user?.wholesale_service_photo_2_url);
+
+  const updateServiceField = (key, value) => {
+    setServiceForm((prev) => ({ ...prev, [key]: value }));
+    if (requestError) {
+      setRequestError("");
+    }
+    if (requestSuccess) {
+      setRequestSuccess("");
+    }
+  };
+
+  const submitWholesaleRequest = async () => {
+    const company = (serviceForm.wholesale_company_name || "").trim();
+    const details = (serviceForm.wholesale_service_details || "").trim();
+    if (!company) {
+      setRequestError("Укажите название сервисного центра");
+      return;
+    }
+    if (details.length < 20) {
+      setRequestError("Добавьте описание сервиса минимум 20 символов");
+      return;
+    }
+    if (!serviceForm.wholesale_service_photo_1 && !serviceForm.wholesale_service_photo_2 && !hasExistingServicePhoto) {
+      setRequestError("Добавьте хотя бы одно фото сервиса");
+      return;
+    }
+
+    setRequestLoading(true);
+    setRequestError("");
+    setRequestSuccess("");
+    try {
+      const payload = new FormData();
+      payload.append("is_service_center", "true");
+      payload.append("wholesale_company_name", company);
+      payload.append("wholesale_comment", (serviceForm.wholesale_comment || "").trim());
+      payload.append("wholesale_service_details", details);
+      if (serviceForm.wholesale_service_photo_1) {
+        payload.append("wholesale_service_photo_1", serviceForm.wholesale_service_photo_1);
+      }
+      if (serviceForm.wholesale_service_photo_2) {
+        payload.append("wholesale_service_photo_2", serviceForm.wholesale_service_photo_2);
+      }
+      await authApi.requestWholesale(payload);
+      await reloadMe();
+      setRequestSuccess("Заявка на оптовый статус отправлена. Ожидайте проверку администратора.");
+      setServiceForm((prev) => ({
+        ...prev,
+        wholesale_service_photo_1: null,
+        wholesale_service_photo_2: null,
+      }));
+    } catch (error) {
+      const detail = error?.response?.data?.detail;
+      setRequestError(detail || "Не удалось отправить заявку на оптовый статус");
+    } finally {
+      setRequestLoading(false);
+    }
+  };
 
   return (
     <Stack spacing={1.5}>
@@ -182,17 +253,107 @@ export default function ClientProfilePage() {
 
       <Paper sx={{ p: 1.4, borderRadius: 3 }}>
         <Stack spacing={1}>
-          <Typography variant="h3">Оптовая скидка для сервиса</Typography>
+          <Typography variant="h3">Статус сервиса</Typography>
+          <Stack direction="row" spacing={0.8} flexWrap="wrap" useFlexGap alignItems="center">
+            <Chip
+              icon={<StorefrontRoundedIcon />}
+              label={isWholesaleApproved ? "Оптовый сервис" : "Обычный клиент"}
+              color={isWholesaleApproved ? "success" : "default"}
+              variant={isWholesaleApproved ? "filled" : "outlined"}
+            />
+            <Chip
+              label={`Статус: ${wholesaleLabel}${wholesaleDiscount > 0 ? ` (${wholesaleDiscount}%)` : ""}`}
+              variant="outlined"
+            />
+          </Stack>
           <Typography variant="caption" color="text.secondary">
-            {user?.wholesale_status === "approved"
-              ? `Скидка ${wholesaleDiscount}% уже активна и применяется в оптовых заявках.`
+            {isWholesaleApproved
+              ? `Ваш профиль отмечен как оптовый сервис. Скидка ${wholesaleDiscount}% применяется автоматически.`
               : user?.wholesale_status === "pending"
-                ? "Оптовая заявка отправлена. Ожидайте решение администратора."
-                : "Если вы сервисный центр, включите оптовую заявку при создании нового заказа."}
+                ? "Заявка на оптовый статус отправлена. После проверки появится пометка в профиле."
+                : "Оптовый статус оформляется только в профиле, в заявке этот блок больше не показывается."}
           </Typography>
-          <Button variant="outlined" onClick={() => navigate("/client/create")} sx={{ alignSelf: "flex-start" }}>
-            Создать оптовую заявку
-          </Button>
+
+          {!isWholesaleApproved ? (
+            <Stack spacing={1}>
+              {requestError ? <Alert severity="error">{requestError}</Alert> : null}
+              {requestSuccess ? <Alert severity="success">{requestSuccess}</Alert> : null}
+              <TextField
+                label="Название сервиса"
+                value={serviceForm.wholesale_company_name}
+                onChange={(event) => updateServiceField("wholesale_company_name", event.target.value)}
+                placeholder="Например: ServiceHub Москва"
+              />
+              <TextField
+                label="Описание сервиса"
+                multiline
+                minRows={3}
+                value={serviceForm.wholesale_service_details}
+                onChange={(event) => updateServiceField("wholesale_service_details", event.target.value)}
+                placeholder="Какие устройства обслуживаете, средний поток заявок, специализация"
+                helperText="Минимум 20 символов"
+              />
+              <TextField
+                label="Комментарий (опционально)"
+                multiline
+                minRows={2}
+                value={serviceForm.wholesale_comment}
+                onChange={(event) => updateServiceField("wholesale_comment", event.target.value)}
+                placeholder="Город, график, дополнительные данные"
+              />
+              <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+                <Button
+                  component="label"
+                  variant="outlined"
+                  startIcon={<AddPhotoAlternateRoundedIcon />}
+                >
+                  Фото сервиса 1
+                  <input
+                    hidden
+                    type="file"
+                    accept=".jpg,.jpeg,.png,.webp"
+                    onChange={(event) => updateServiceField("wholesale_service_photo_1", event.target.files?.[0] || null)}
+                  />
+                </Button>
+                <Button
+                  component="label"
+                  variant="outlined"
+                  startIcon={<AddPhotoAlternateRoundedIcon />}
+                >
+                  Фото сервиса 2
+                  <input
+                    hidden
+                    type="file"
+                    accept=".jpg,.jpeg,.png,.webp"
+                    onChange={(event) => updateServiceField("wholesale_service_photo_2", event.target.files?.[0] || null)}
+                  />
+                </Button>
+              </Stack>
+              {serviceForm.wholesale_service_photo_1 ? (
+                <Typography variant="caption" color="text.secondary">
+                  Фото 1: {serviceForm.wholesale_service_photo_1.name}
+                </Typography>
+              ) : null}
+              {serviceForm.wholesale_service_photo_2 ? (
+                <Typography variant="caption" color="text.secondary">
+                  Фото 2: {serviceForm.wholesale_service_photo_2.name}
+                </Typography>
+              ) : null}
+              {hasExistingServicePhoto ? (
+                <Typography variant="caption" color="text.secondary">
+                  Фото сервиса уже сохранены в профиле, можно отправить без повторной загрузки.
+                </Typography>
+              ) : null}
+              <Button
+                variant="contained"
+                onClick={submitWholesaleRequest}
+                disabled={requestLoading}
+                sx={{ alignSelf: "flex-start" }}
+              >
+                {requestLoading ? "Отправляем..." : "Отправить заявку на оптовый статус"}
+              </Button>
+            </Stack>
+          ) : null}
         </Stack>
       </Paper>
 

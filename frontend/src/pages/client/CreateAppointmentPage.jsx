@@ -1,13 +1,9 @@
 ﻿import AddPhotoAlternateRoundedIcon from "@mui/icons-material/AddPhotoAlternateRounded";
 import LockOpenRoundedIcon from "@mui/icons-material/LockOpenRounded";
-import VisibilityOffRoundedIcon from "@mui/icons-material/VisibilityOffRounded";
-import VisibilityRoundedIcon from "@mui/icons-material/VisibilityRounded";
 import {
   Alert,
   Button,
   FormControlLabel,
-  IconButton,
-  InputAdornment,
   MenuItem,
   Paper,
   Stack,
@@ -19,7 +15,6 @@ import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { appointmentsApi } from "../../api/client";
-import { useAuth } from "../../auth/AuthContext";
 import { getLockTypeLabel } from "../../constants/labels";
 
 const CREATE_DEFAULTS_KEY = "frp_create_defaults_v1";
@@ -97,7 +92,6 @@ function buildAutoTemplate({ device, lockType, hasPc }) {
 
 export default function CreateAppointmentPage() {
   const navigate = useNavigate();
-  const { user } = useAuth();
   const storedDefaults = useMemo(() => readStoredDefaults(), []);
 
   const [form, setForm] = useState({
@@ -108,16 +102,9 @@ export default function CreateAppointmentPage() {
     rustdesk_id: storedDefaults.rustdesk_id || "",
     rustdesk_password: storedDefaults.rustdesk_password || "",
     photo_lock_screen: null,
-    is_wholesale_request: false,
-    is_service_center: false,
-    wholesale_company_name: user?.wholesale_company_name || "",
-    wholesale_comment: user?.wholesale_comment || "",
-    wholesale_service_details: user?.wholesale_service_details || "",
-    wholesale_service_photo_1: null,
-    wholesale_service_photo_2: null,
   });
   const [showAdvanced, setShowAdvanced] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
+  const [ruInputsUnlocked, setRuInputsUnlocked] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [touched, setTouched] = useState({
@@ -127,11 +114,6 @@ export default function CreateAppointmentPage() {
   });
 
   const hasStoredAccess = Boolean(storedDefaults.rustdesk_id || storedDefaults.rustdesk_password);
-  const wholesaleStatus = user?.wholesale_status || "none";
-  const wholesaleDiscount = Number(user?.wholesale_discount_percent || 0);
-  const hasExistingWholesalePhoto = Boolean(
-    user?.wholesale_service_photo_1_url || user?.wholesale_service_photo_2_url
-  );
 
   const autoTemplate = useMemo(
     () =>
@@ -153,46 +135,11 @@ export default function CreateAppointmentPage() {
     () => validateRustdeskPassword(form.rustdesk_password),
     [form.rustdesk_password]
   );
-  const wholesaleCompanyError = useMemo(() => {
-    if (!form.is_wholesale_request) {
-      return "";
-    }
-    return form.wholesale_company_name.trim() ? "" : "Укажите название сервисного центра";
-  }, [form.is_wholesale_request, form.wholesale_company_name]);
-  const wholesaleDetailsError = useMemo(() => {
-    if (!form.is_wholesale_request) {
-      return "";
-    }
-    return form.wholesale_service_details.trim().length >= 20
-      ? ""
-      : "Опишите сервис минимум в 20 символах";
-  }, [form.is_wholesale_request, form.wholesale_service_details]);
-  const wholesalePhotoError = useMemo(() => {
-    if (!form.is_wholesale_request) {
-      return "";
-    }
-    return form.wholesale_service_photo_1 || form.wholesale_service_photo_2 || hasExistingWholesalePhoto
-      ? ""
-      : "Добавьте хотя бы одно фото сервиса";
-  }, [
-    form.is_wholesale_request,
-    form.wholesale_service_photo_1,
-    form.wholesale_service_photo_2,
-    hasExistingWholesalePhoto,
-  ]);
-
   const showDeviceError = touched.device && Boolean(deviceError);
   const showRustdeskIdError = touched.rustdesk_id && Boolean(rustdeskIdError);
   const showRustdeskPasswordError = touched.rustdesk_password && Boolean(rustdeskPasswordError);
 
-  const canSubmit =
-    !submitting &&
-    !deviceError &&
-    !rustdeskIdError &&
-    !rustdeskPasswordError &&
-    !wholesaleCompanyError &&
-    !wholesaleDetailsError &&
-    !wholesalePhotoError;
+  const canSubmit = !submitting && !deviceError && !rustdeskIdError && !rustdeskPasswordError;
 
   const updateField = (key, value) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -205,6 +152,12 @@ export default function CreateAppointmentPage() {
     setTouched((prev) => ({ ...prev, [key]: true }));
   };
 
+  const unlockRuInputs = () => {
+    if (!ruInputsUnlocked) {
+      setRuInputsUnlocked(true);
+    }
+  };
+
   const onSubmit = async (event) => {
     event.preventDefault();
     setSubmitting(true);
@@ -215,22 +168,8 @@ export default function CreateAppointmentPage() {
       rustdesk_password: true,
     });
 
-    if (
-      deviceError ||
-      rustdeskIdError ||
-      rustdeskPasswordError ||
-      wholesaleCompanyError ||
-      wholesaleDetailsError ||
-      wholesalePhotoError
-    ) {
-      setError(
-        deviceError ||
-          rustdeskIdError ||
-          rustdeskPasswordError ||
-          wholesaleCompanyError ||
-          wholesaleDetailsError ||
-          wholesalePhotoError
-      );
+    if (deviceError || rustdeskIdError || rustdeskPasswordError) {
+      setError(deviceError || rustdeskIdError || rustdeskPasswordError);
       setSubmitting(false);
       return;
     }
@@ -247,23 +186,6 @@ export default function CreateAppointmentPage() {
     payload.append("description", description);
     payload.append("rustdesk_id", normalizeRustdeskId(form.rustdesk_id));
     payload.append("rustdesk_password", form.rustdesk_password.trim());
-    payload.append("is_wholesale_request", String(Boolean(form.is_wholesale_request)));
-    payload.append("is_service_center", String(Boolean(form.is_service_center)));
-    if (form.wholesale_company_name.trim()) {
-      payload.append("wholesale_company_name", form.wholesale_company_name.trim());
-    }
-    if (form.wholesale_comment.trim()) {
-      payload.append("wholesale_comment", form.wholesale_comment.trim());
-    }
-    if (form.wholesale_service_details.trim()) {
-      payload.append("wholesale_service_details", form.wholesale_service_details.trim());
-    }
-    if (form.wholesale_service_photo_1) {
-      payload.append("wholesale_service_photo_1", form.wholesale_service_photo_1);
-    }
-    if (form.wholesale_service_photo_2) {
-      payload.append("wholesale_service_photo_2", form.wholesale_service_photo_2);
-    }
     if (form.photo_lock_screen) {
       payload.append("photo_lock_screen", form.photo_lock_screen);
     }
@@ -304,16 +226,6 @@ export default function CreateAppointmentPage() {
           Данные RuDesktop подставлены из последней заявки. Проверьте их перед отправкой.
         </Alert>
       ) : null}
-      {wholesaleStatus === "pending" ? (
-        <Alert severity="warning" sx={{ mb: 1.4 }}>
-          Ваша оптовая заявка уже на рассмотрении. До одобрения цена выставляется без скидки.
-        </Alert>
-      ) : null}
-      {wholesaleStatus === "approved" ? (
-        <Alert severity="success" sx={{ mb: 1.4 }}>
-          Оптовая скидка одобрена: {wholesaleDiscount}%. При оптовой заявке скидка применяется автоматически.
-        </Alert>
-      ) : null}
       {error ? (
         <Alert severity="error" sx={{ mb: 1.4 }}>
           {error}
@@ -321,23 +233,6 @@ export default function CreateAppointmentPage() {
       ) : null}
 
       <Stack component="form" spacing={1.3} onSubmit={onSubmit} autoComplete="off" noValidate>
-        {/* Trap browser credential autofill so it does not pollute RuDesktop fields. */}
-        <input
-          type="text"
-          name="username"
-          autoComplete="username"
-          tabIndex={-1}
-          aria-hidden="true"
-          style={{ position: "absolute", opacity: 0, pointerEvents: "none", height: 0 }}
-        />
-        <input
-          type="password"
-          name="password"
-          autoComplete="current-password"
-          tabIndex={-1}
-          aria-hidden="true"
-          style={{ position: "absolute", opacity: 0, pointerEvents: "none", height: 0 }}
-        />
 
         <TextField
           label="Устройство"
@@ -356,6 +251,8 @@ export default function CreateAppointmentPage() {
           value={form.rustdesk_id}
           onChange={(event) => updateField("rustdesk_id", event.target.value)}
           onBlur={() => markTouched("rustdesk_id")}
+          onFocus={unlockRuInputs}
+          onPointerDown={unlockRuInputs}
           error={showRustdeskIdError}
           color={form.rustdesk_id && !rustdeskIdError ? "success" : "primary"}
           helperText={
@@ -369,19 +266,26 @@ export default function CreateAppointmentPage() {
           autoComplete="off"
           inputProps={{
             autoComplete: "off",
-            name: "rustdesk_remote_id",
+            name: "rd_remote_id",
             inputMode: "numeric",
+            readOnly: !ruInputsUnlocked,
+            spellCheck: "false",
+            autoCorrect: "off",
+            autoCapitalize: "off",
             "data-lpignore": "true",
             "data-1p-ignore": "true",
+            "data-form-type": "other",
           }}
         />
 
         <TextField
           label="Код доступа RuDesktop"
-          type={showPassword ? "text" : "password"}
+          type="text"
           value={form.rustdesk_password}
           onChange={(event) => updateField("rustdesk_password", event.target.value)}
           onBlur={() => markTouched("rustdesk_password")}
+          onFocus={unlockRuInputs}
+          onPointerDown={unlockRuInputs}
           error={showRustdeskPasswordError}
           color={form.rustdesk_password && !rustdeskPasswordError ? "success" : "primary"}
           helperText={
@@ -389,135 +293,24 @@ export default function CreateAppointmentPage() {
               ? rustdeskPasswordError
               : form.rustdesk_password && !rustdeskPasswordError
                 ? "Код доступа выглядит корректно"
-                : "Код доступа из RuDesktop для подключения мастера"
+                : "Динамический код доступа из RuDesktop (вводится открыто)"
           }
           required
-          autoComplete="new-password"
+          autoComplete="off"
           inputProps={{
-            autoComplete: "new-password",
-            name: "rustdesk_access_code",
+            autoComplete: "one-time-code",
+            name: "rd_dynamic_code",
+            readOnly: !ruInputsUnlocked,
+            spellCheck: "false",
+            autoCorrect: "off",
+            autoCapitalize: "off",
             "data-lpignore": "true",
             "data-1p-ignore": "true",
-          }}
-          InputProps={{
-            endAdornment: (
-              <InputAdornment position="end">
-                <IconButton edge="end" onClick={() => setShowPassword((prev) => !prev)}>
-                  {showPassword ? <VisibilityOffRoundedIcon /> : <VisibilityRoundedIcon />}
-                </IconButton>
-              </InputAdornment>
-            ),
+            "data-form-type": "other",
           }}
         />
 
         <Alert severity="info">Автошаблон заявки: {autoTemplate}</Alert>
-
-        <Paper variant="outlined" sx={{ p: 1.2, borderRadius: 2.1 }}>
-          <Stack spacing={1}>
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={form.is_wholesale_request}
-                  onChange={(event) => {
-                    const checked = event.target.checked;
-                    updateField("is_wholesale_request", checked);
-                    updateField("is_service_center", checked);
-                  }}
-                />
-              }
-              label="Оптовая заявка для сервисного центра"
-            />
-            {form.is_wholesale_request ? (
-              <Stack spacing={1}>
-                <TextField
-                  label="Название сервиса"
-                  placeholder="Например: ServiceHub Москва"
-                  value={form.wholesale_company_name}
-                  onChange={(event) => updateField("wholesale_company_name", event.target.value)}
-                  error={Boolean(wholesaleCompanyError)}
-                  helperText={
-                    wholesaleCompanyError || "По этой заявке будет отправлен запрос на оптовую скидку"
-                  }
-                  required
-                />
-                <TextField
-                  label="Комментарий для одобрения (опционально)"
-                  placeholder="Сколько заявок в месяц, город, условия"
-                  value={form.wholesale_comment}
-                  onChange={(event) => updateField("wholesale_comment", event.target.value)}
-                  multiline
-                  minRows={2}
-                />
-                <TextField
-                  label="Описание сервиса"
-                  placeholder="Какие устройства обслуживаете, объём заявок, специализация"
-                  value={form.wholesale_service_details}
-                  onChange={(event) => updateField("wholesale_service_details", event.target.value)}
-                  error={Boolean(wholesaleDetailsError)}
-                  helperText={wholesaleDetailsError || "Минимум 20 символов"}
-                  multiline
-                  minRows={3}
-                  required
-                />
-                <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
-                  <Button
-                    component="label"
-                    variant="outlined"
-                    startIcon={<AddPhotoAlternateRoundedIcon fontSize="small" />}
-                  >
-                    Фото сервиса 1 (обязательно)
-                    <input
-                      hidden
-                      type="file"
-                      accept=".jpg,.jpeg,.png,.webp"
-                      onChange={(event) => updateField("wholesale_service_photo_1", event.target.files?.[0] || null)}
-                    />
-                  </Button>
-                  <Button
-                    component="label"
-                    variant="outlined"
-                    startIcon={<AddPhotoAlternateRoundedIcon fontSize="small" />}
-                  >
-                    Фото сервиса 2 (опционально)
-                    <input
-                      hidden
-                      type="file"
-                      accept=".jpg,.jpeg,.png,.webp"
-                      onChange={(event) => updateField("wholesale_service_photo_2", event.target.files?.[0] || null)}
-                    />
-                  </Button>
-                </Stack>
-                {form.wholesale_service_photo_1 ? (
-                  <Typography variant="caption" color="text.secondary">
-                    Фото 1: {form.wholesale_service_photo_1.name}
-                  </Typography>
-                ) : null}
-                {form.wholesale_service_photo_2 ? (
-                  <Typography variant="caption" color="text.secondary">
-                    Фото 2: {form.wholesale_service_photo_2.name}
-                  </Typography>
-                ) : null}
-                {hasExistingWholesalePhoto && !form.wholesale_service_photo_1 && !form.wholesale_service_photo_2 ? (
-                  <Typography variant="caption" color="text.secondary">
-                    Фото сервиса уже сохранены в профиле, можно отправить заявку без повторной загрузки.
-                  </Typography>
-                ) : null}
-                {wholesalePhotoError ? (
-                  <Typography variant="caption" color="error.main">
-                    {wholesalePhotoError}
-                  </Typography>
-                ) : (
-                  <Typography variant="caption" color="text.secondary">
-                    Форматы: jpg/jpeg/png/webp, до 10 МБ
-                  </Typography>
-                )}
-                <Alert severity="warning" sx={{ py: 0.5 }}>
-                  Оптовая скидка начнет применяться после одобрения администратором.
-                </Alert>
-              </Stack>
-            ) : null}
-          </Stack>
-        </Paper>
 
         <Button
           variant={showAdvanced ? "outlined" : "text"}
