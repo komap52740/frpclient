@@ -16,6 +16,7 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
+import { useTheme } from "@mui/material/styles";
 import dayjs from "dayjs";
 import "dayjs/locale/ru";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -26,11 +27,11 @@ import useAutoRefresh from "../../hooks/useAutoRefresh";
 
 dayjs.locale("ru");
 
-function ratingTone(rating) {
-  if (rating >= 5) return { color: "#087443", bg: "#e8f7ef" };
-  if (rating >= 4) return { color: "#0f6ba8", bg: "#e9f2ff" };
-  if (rating >= 3) return { color: "#9a6700", bg: "#fff8e1" };
-  return { color: "#b42318", bg: "#fee4e2" };
+function ratingTone(rating, isDark) {
+  if (rating >= 5) return { color: isDark ? "#77e2ac" : "#087443", bg: isDark ? "rgba(30,88,61,0.42)" : "#e8f7ef" };
+  if (rating >= 4) return { color: isDark ? "#8ac8ff" : "#0f6ba8", bg: isDark ? "rgba(20,52,82,0.42)" : "#e9f2ff" };
+  if (rating >= 3) return { color: isDark ? "#ffd98f" : "#9a6700", bg: isDark ? "rgba(87,63,22,0.4)" : "#fff8e1" };
+  return { color: isDark ? "#ff9a94" : "#b42318", bg: isDark ? "rgba(101,31,35,0.45)" : "#fee4e2" };
 }
 
 function matchesQuery(row, query) {
@@ -47,6 +48,8 @@ function matchesQuery(row, query) {
 }
 
 export default function MasterReviewsPage() {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === "dark";
   const [rows, setRows] = useState([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -124,13 +127,13 @@ export default function MasterReviewsPage() {
             size="small"
             icon={<ThumbUpAltRoundedIcon fontSize="small" />}
             label={`Положительных: ${positiveCount}`}
-            sx={{ bgcolor: "#ecfdf3", color: "#027a48" }}
+            sx={{ bgcolor: isDark ? "rgba(24,84,58,0.45)" : "#ecfdf3", color: isDark ? "#77e2ac" : "#027a48" }}
           />
           <Chip
             size="small"
             icon={<ReportProblemRoundedIcon fontSize="small" />}
             label={`Риск-отзывы: ${riskCount}`}
-            sx={{ bgcolor: "#fee4e2", color: "#b42318" }}
+            sx={{ bgcolor: isDark ? "rgba(101,31,35,0.45)" : "#fee4e2", color: isDark ? "#ff9a94" : "#b42318" }}
           />
         </Stack>
       </Paper>
@@ -188,9 +191,18 @@ export default function MasterReviewsPage() {
       ) : (
         <Stack spacing={1.1}>
           {filteredRows.map((row) => {
-            const tone = ratingTone(row.rating || 0);
+            const tone = ratingTone(row.rating || 0, isDark);
             return (
-              <Paper key={row.id} sx={{ p: 1.5 }}>
+              <Paper
+                key={row.id}
+                sx={{
+                  p: 1.5,
+                  borderRadius: 3,
+                  background: isDark
+                    ? "linear-gradient(150deg, rgba(15,23,42,0.9) 0%, rgba(17,30,48,0.86) 100%)"
+                    : "linear-gradient(150deg, rgba(255,255,255,0.96) 0%, rgba(247,251,255,0.92) 100%)",
+                }}
+              >
                 <Stack spacing={0.6}>
                   <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={1}>
                     <Stack direction="row" spacing={0.8} alignItems="center">

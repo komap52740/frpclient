@@ -17,6 +17,8 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
+import { useTheme } from "@mui/material/styles";
+import useMediaQuery from "@mui/material/useMediaQuery";
 import dayjs from "dayjs";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -141,6 +143,9 @@ function resolveAttentionAction(item) {
 
 export default function MyAppointmentsPage() {
   const navigate = useNavigate();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+  const isDark = theme.palette.mode === "dark";
 
   const [items, setItems] = useState([]);
   const [error, setError] = useState("");
@@ -253,10 +258,13 @@ export default function MyAppointmentsPage() {
     <Stack spacing={2}>
       <Paper
         sx={{
-          p: { xs: 1.6, md: 2 },
+          p: { xs: 1.25, md: 2 },
           borderRadius: 3,
-          border: "1px solid rgba(15,23,42,0.08)",
-          background: "linear-gradient(145deg, rgba(255,255,255,0.96) 0%, rgba(239,248,255,0.9) 100%)",
+          border: "1px solid",
+          borderColor: "divider",
+          background: isDark
+            ? "linear-gradient(145deg, rgba(15,23,42,0.94) 0%, rgba(18,32,50,0.9) 100%)"
+            : "linear-gradient(145deg, rgba(255,255,255,0.96) 0%, rgba(239,248,255,0.9) 100%)",
         }}
       >
         <Stack spacing={1.2}>
@@ -278,14 +286,14 @@ export default function MyAppointmentsPage() {
                 startIcon={<RefreshIcon />}
                 onClick={() => load()}
                 disabled={loading}
-                sx={{ minWidth: { xs: "100%", sm: 124 } }}
+                sx={{ minWidth: { xs: "100%", sm: 124 }, minHeight: { xs: 40, sm: 42 } }}
               >
                 Обновить
               </Button>
               <Button
                 variant="contained"
                 onClick={() => navigate("/client/create")}
-                sx={{ minWidth: { xs: "100%", sm: 164 } }}
+                sx={{ minWidth: { xs: "100%", sm: 164 }, minHeight: { xs: 40, sm: 42 } }}
               >
                 Новая заявка
               </Button>
@@ -303,10 +311,13 @@ export default function MyAppointmentsPage() {
             <Paper
               elevation={0}
               sx={{
-                p: 1.2,
+                p: { xs: 1, md: 1.2 },
                 borderRadius: 2.5,
-                border: "1px solid rgba(2,132,199,0.18)",
-                background: "linear-gradient(140deg, rgba(238,249,255,0.95) 0%, rgba(255,255,255,0.95) 100%)",
+                border: "1px solid",
+                borderColor: "divider",
+                background: isDark
+                  ? "linear-gradient(140deg, rgba(14,28,46,0.9) 0%, rgba(18,34,54,0.86) 100%)"
+                  : "linear-gradient(140deg, rgba(238,249,255,0.95) 0%, rgba(255,255,255,0.95) 100%)",
               }}
             >
               <Stack spacing={0.6}>
@@ -322,7 +333,7 @@ export default function MyAppointmentsPage() {
                 <Button
                   variant="contained"
                   size="small"
-                  sx={{ alignSelf: "flex-start" }}
+                  sx={{ alignSelf: "flex-start", minWidth: { xs: "100%", sm: "auto" } }}
                   onClick={() => handleWorkflowAction(attentionAction.actionKey, priorityItem)}
                 >
                   {attentionAction.cta}
@@ -333,7 +344,7 @@ export default function MyAppointmentsPage() {
         </Stack>
       </Paper>
 
-      <Paper sx={{ p: { xs: 1.2, md: 1.5 }, borderRadius: 3 }}>
+      <Paper sx={{ p: { xs: 1, md: 1.5 }, borderRadius: 3 }}>
         <Stack spacing={1.1}>
           <TextField
             fullWidth
@@ -360,7 +371,7 @@ export default function MyAppointmentsPage() {
               "& .MuiTab-root": {
                 minHeight: 40,
                 textTransform: "none",
-                fontSize: 13.5,
+                fontSize: isMobile ? 12.5 : 13.5,
                 fontWeight: 700,
                 px: 1.2,
               },
@@ -409,7 +420,7 @@ export default function MyAppointmentsPage() {
           <AppointmentCardSkeleton />
         </Stack>
       ) : filteredItems.length ? (
-        <Stack spacing={1.25}>
+        <Stack spacing={1}>
           {filteredItems.map((item) => (
             <Stack key={item.id} spacing={0.7}>
               <AppointmentCard

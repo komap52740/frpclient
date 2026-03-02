@@ -12,6 +12,7 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
+import { useTheme } from "@mui/material/styles";
 import dayjs from "dayjs";
 import "dayjs/locale/ru";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -66,6 +67,8 @@ function applyClientFilters(rows, { query, minRating }) {
 }
 
 export default function AdminReviewsPage() {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === "dark";
   const [rows, setRows] = useState([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -139,8 +142,16 @@ export default function AdminReviewsPage() {
             color="primary"
             variant="outlined"
           />
-          <Chip size="small" label={`Низкие (<=2): ${lowCount}`} sx={{ bgcolor: "#fee4e2", color: "#b42318" }} />
-          <Chip size="small" label={`Сегодня: ${todayCount}`} sx={{ bgcolor: "#e9f2ff", color: "#0f6ba8" }} />
+          <Chip
+            size="small"
+            label={`Низкие (<=2): ${lowCount}`}
+            sx={{ bgcolor: isDark ? "rgba(101,31,35,0.45)" : "#fee4e2", color: isDark ? "#ff9a94" : "#b42318" }}
+          />
+          <Chip
+            size="small"
+            label={`Сегодня: ${todayCount}`}
+            sx={{ bgcolor: isDark ? "rgba(20,52,82,0.42)" : "#e9f2ff", color: isDark ? "#8ac8ff" : "#0f6ba8" }}
+          />
         </Stack>
       </Paper>
 
@@ -224,7 +235,16 @@ export default function AdminReviewsPage() {
       ) : (
         <Stack spacing={1.1}>
           {filteredRows.map((row) => (
-            <Paper key={row.id} sx={{ p: 1.5 }}>
+            <Paper
+              key={row.id}
+              sx={{
+                p: 1.5,
+                borderRadius: 3,
+                background: isDark
+                  ? "linear-gradient(150deg, rgba(15,23,42,0.9) 0%, rgba(17,30,48,0.86) 100%)"
+                  : "linear-gradient(150deg, rgba(255,255,255,0.96) 0%, rgba(247,251,255,0.92) 100%)",
+              }}
+            >
               <Stack spacing={0.6}>
                 <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={1}>
                   <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
@@ -233,10 +253,10 @@ export default function AdminReviewsPage() {
                       {row.review_type === "master_review" ? "Клиент -> Мастер" : "Мастер -> Клиент"}
                     </Typography>
                   </Stack>
-                  <Stack direction="row" spacing={0.6} alignItems="center">
-                    <StarRoundedIcon sx={{ fontSize: 18, color: "#f59e0b" }} />
+                <Stack direction="row" spacing={0.6} alignItems="center">
+                    <StarRoundedIcon sx={{ fontSize: 18, color: isDark ? "#ffd166" : "#f59e0b" }} />
                     <Typography variant="subtitle2">{row.rating}/5</Typography>
-                  </Stack>
+                </Stack>
                 </Stack>
 
                 <Typography variant="body2" color="text.secondary">

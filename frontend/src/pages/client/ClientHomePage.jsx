@@ -19,6 +19,8 @@ import {
   Tabs,
   Typography,
 } from "@mui/material";
+import { useTheme } from "@mui/material/styles";
+import useMediaQuery from "@mui/material/useMediaQuery";
 import dayjs from "dayjs";
 import "dayjs/locale/ru";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -216,6 +218,9 @@ function resolveScenario(appointment) {
 
 export default function ClientHomePage() {
   const navigate = useNavigate();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+  const isDark = theme.palette.mode === "dark";
   const [summary, setSummary] = useState(null);
   const [items, setItems] = useState([]);
   const [error, setError] = useState("");
@@ -328,9 +333,11 @@ export default function ClientHomePage() {
     <Stack spacing={2}>
       <Paper
         sx={{
-          p: 3,
+          p: { xs: 1.7, md: 3 },
           borderRadius: 3,
-          background: "linear-gradient(135deg, #0d6e9f 0%, #2e8a66 48%, #1c9a4d 100%)",
+          background: isDark
+            ? "linear-gradient(135deg, #10213a 0%, #143744 48%, #174b3a 100%)"
+            : "linear-gradient(135deg, #0d6e9f 0%, #2e8a66 48%, #1c9a4d 100%)",
           color: "#fff",
           position: "relative",
           overflow: "hidden",
@@ -347,12 +354,12 @@ export default function ClientHomePage() {
             background: "rgba(255,255,255,0.16)",
           }}
         />
-        <Stack spacing={1} sx={{ position: "relative" }}>
-          <Typography variant="h5">Личный кабинет клиента</Typography>
-          <Typography variant="body1" sx={{ opacity: 0.95, maxWidth: 760 }}>
-            Вся работа по заявке в одном месте: прогресс, оплата, чат и история действий без лишних переходов.
-          </Typography>
-        </Stack>
+          <Stack spacing={1} sx={{ position: "relative" }}>
+            <Typography variant="h5">Личный кабинет клиента</Typography>
+            <Typography variant="body1" sx={{ opacity: 0.95, maxWidth: 760 }}>
+              Вся работа по заявке в одном месте: прогресс, оплата, чат и история действий без лишних переходов.
+            </Typography>
+          </Stack>
       </Paper>
 
       {error && <Alert severity="error">{error}</Alert>}
@@ -361,10 +368,13 @@ export default function ClientHomePage() {
         <Grid item xs={12} md={7}>
           <Paper
             sx={{
-              p: 2.25,
+              p: { xs: 1.45, md: 2.25 },
               borderRadius: 3,
-              border: `1px solid ${scenario.tone}33`,
-              background: `linear-gradient(140deg, ${scenario.tone}12 0%, #ffffff 45%)`,
+              border: "1px solid",
+              borderColor: isDark ? "divider" : `${scenario.tone}33`,
+              background: isDark
+                ? "linear-gradient(140deg, rgba(15,23,42,0.92) 0%, rgba(17,30,48,0.88) 100%)"
+                : `linear-gradient(140deg, ${scenario.tone}12 0%, #ffffff 45%)`,
             }}
           >
             <Stack spacing={1.25}>
@@ -415,7 +425,7 @@ export default function ClientHomePage() {
                 to={scenario.to}
                 variant="contained"
                 size="large"
-                sx={{ alignSelf: "flex-start", minWidth: 220 }}
+                sx={{ alignSelf: "flex-start", minWidth: { xs: "100%", sm: 220 } }}
               >
                 {scenario.ctaLabel}
               </Button>
@@ -424,7 +434,7 @@ export default function ClientHomePage() {
         </Grid>
 
         <Grid item xs={12} md={5}>
-          <Paper sx={{ p: 2.25, borderRadius: 3 }}>
+          <Paper sx={{ p: { xs: 1.45, md: 2.25 }, borderRadius: 3 }}>
             <Stack spacing={1.2}>
               <Typography variant="h6">Готовность к сессии: {checklistProgress}%</Typography>
               <LinearProgress
@@ -433,7 +443,7 @@ export default function ClientHomePage() {
                 sx={{
                   height: 8,
                   borderRadius: 999,
-                  bgcolor: "#ecf2f8",
+                  bgcolor: isDark ? "rgba(148,163,184,0.24)" : "#ecf2f8",
                   "& .MuiLinearProgress-bar": { borderRadius: 999 },
                 }}
               />
@@ -481,21 +491,21 @@ export default function ClientHomePage() {
       </Grid>
 
       <Grid container spacing={2}>
-        <Grid item xs={12} sm={6} lg={3}>
+        <Grid item xs={6} sm={6} lg={3}>
           <KpiCard title="Всего заявок" value={summary?.appointments_total ?? "-"} />
         </Grid>
-        <Grid item xs={12} sm={6} lg={3}>
+        <Grid item xs={6} sm={6} lg={3}>
           <KpiCard title="Активные" value={summary?.appointments_active ?? "-"} accent="#2e8a66" />
         </Grid>
-        <Grid item xs={12} sm={6} lg={3}>
+        <Grid item xs={6} sm={6} lg={3}>
           <KpiCard title="Ожидают оплату" value={summary?.awaiting_payment ?? "-"} accent="#c97a00" />
         </Grid>
-        <Grid item xs={12} sm={6} lg={3}>
+        <Grid item xs={6} sm={6} lg={3}>
           <KpiCard title="Непрочитанные" value={summary?.unread_total ?? "-"} accent="#7b2cbf" />
         </Grid>
       </Grid>
 
-      <Paper sx={{ p: 2, borderRadius: 3 }}>
+      <Paper sx={{ p: { xs: 1.25, md: 2 }, borderRadius: 3 }}>
         <Stack
           direction={{ xs: "column", md: "row" }}
           spacing={1}
@@ -514,7 +524,7 @@ export default function ClientHomePage() {
                 "& .MuiTab-root": { minHeight: 38, textTransform: "none", fontWeight: 700, fontSize: 13.5 },
               }}
             >
-              <Tab value="attention" label={`Требуют внимания (${attentionCount})`} />
+              <Tab value="attention" label={isMobile ? `Важные (${attentionCount})` : `Требуют внимания (${attentionCount})`} />
               <Tab value="all" label={`Все (${items.length})`} />
             </Tabs>
             <Button

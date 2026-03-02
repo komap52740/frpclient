@@ -21,6 +21,7 @@ import {
   Typography,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
+import useMediaQuery from "@mui/material/useMediaQuery";
 import dayjs from "dayjs";
 import "dayjs/locale/ru";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -128,6 +129,7 @@ const EMPTY_REPLY_FORM = {
 
 export default function ChatPanel({ appointmentId, currentUser, systemEvents = [] }) {
   const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const isDark = theme.palette.mode === "dark";
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState("");
@@ -421,7 +423,7 @@ export default function ChatPanel({ appointmentId, currentUser, systemEvents = [
   return (
     <Paper
       sx={{
-        p: 2.2,
+        p: { xs: 1.4, sm: 2.2 },
         borderRadius: 3,
         background: isDark
           ? "linear-gradient(160deg, rgba(10,17,31,0.92) 0%, rgba(17,24,39,0.88) 100%)"
@@ -436,7 +438,13 @@ export default function ChatPanel({ appointmentId, currentUser, systemEvents = [
         <Typography variant="caption" color="text.secondary">
           {isMaster ? "Быстрые фразы и команды" : "Быстрые фразы"}
         </Typography>
-        <Stack direction="row" spacing={0.7} flexWrap="wrap" useFlexGap>
+        <Stack
+          direction="row"
+          spacing={0.7}
+          flexWrap={isMobile ? "nowrap" : "wrap"}
+          useFlexGap={!isMobile}
+          sx={{ overflowX: isMobile ? "auto" : "visible", pb: isMobile ? 0.4 : 0 }}
+        >
           {quickTemplates.map((template) => (
             <Chip
               key={template}
@@ -512,7 +520,7 @@ export default function ChatPanel({ appointmentId, currentUser, systemEvents = [
         <TextField
           label="Сообщение"
           multiline
-          minRows={2}
+          minRows={isMobile ? 2.4 : 2}
           value={text}
           onChange={(event) => setText(event.target.value)}
           onKeyDown={(event) => {

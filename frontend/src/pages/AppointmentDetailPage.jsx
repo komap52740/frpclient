@@ -4,6 +4,7 @@ import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
 import ReplayRoundedIcon from "@mui/icons-material/ReplayRounded";
 import ShieldRoundedIcon from "@mui/icons-material/ShieldRounded";
 import TimelineRoundedIcon from "@mui/icons-material/TimelineRounded";
+import UploadFileRoundedIcon from "@mui/icons-material/UploadFileRounded";
 import {
   Accordion,
   AccordionDetails,
@@ -283,7 +284,9 @@ export default function AppointmentDetailPage() {
   const chatRef = useRef(null);
   const reviewRef = useRef(null);
   const timelineRef = useRef(null);
+  const paymentFileInputRef = useRef(null);
   const lastEventIdRef = useRef(0);
+  const lastKnownStatusRef = useRef(null);
 
   const mergeEvents = useCallback((incomingEvents = []) => {
     if (!incomingEvents.length) {
@@ -301,6 +304,16 @@ export default function AppointmentDetailPage() {
   const loadDetail = useCallback(async ({ preserveDrafts = false, silent = false } = {}) => {
     try {
       const appointmentResponse = await appointmentsApi.detail(id);
+      const nextStatus = appointmentResponse.data?.status || null;
+      const previousStatus = lastKnownStatusRef.current;
+      if (previousStatus && nextStatus && previousStatus !== nextStatus) {
+        setToast({
+          open: true,
+          severity: "info",
+          message: `Статус обновился: ${getStatusLabel(nextStatus)}`,
+        });
+      }
+      lastKnownStatusRef.current = nextStatus;
       setAppointment(appointmentResponse.data);
       if (!preserveDrafts) {
         setPrice(appointmentResponse.data.total_price || "");
@@ -559,8 +572,11 @@ export default function AppointmentDetailPage() {
   const showAdminControls = user.role === "admin";
   const showAdminPaymentConfirm = showAdminControls && appointment.status === "PAYMENT_PROOF_UPLOADED";
   const showClientPaymentHighlight = false;
-  const showClientPaymentDock = false;
-  const showClientFloatingActionBar = false;
+  const showClientDesktopSidebar = isClient && !isMobile;
+  const showClientPaymentDock =
+    showClientDesktopSidebar &&
+    ["AWAITING_PAYMENT", "PAYMENT_PROOF_UPLOADED"].includes(appointment.status);
+  const showClientFloatingActionBar = isClient && isMobile && !paymentFocusOpen;
   const clientPaymentTabDisabled = !showClientPaymentActions;
   const showClientDataCard = !showClientTabs || clientTab === "details";
   const showClientPaymentCard = showClientPaymentActions && (!showClientTabs || clientTab === "payment");
@@ -593,6 +609,9 @@ export default function AppointmentDetailPage() {
   const isPaymentProofUploaded = appointment.status === "PAYMENT_PROOF_UPLOADED";
   const paymentFlowLabels = ["Оплата", "Чек", "Подтверждение"];
   const canUploadPaymentProof = Boolean(paymentProofFile) && !paymentFileError && !uploadingProof;
+  const paymentProofMeta = paymentProofFile
+    ? `${paymentProofFile.name} • ${(paymentProofFile.size / (1024 * 1024)).toFixed(2)} МБ`
+    : "Файл не выбран";
   const paymentDropZoneSx = {
     p: 1.1,
     borderRadius: 2,
@@ -610,6 +629,7 @@ export default function AppointmentDetailPage() {
   };
   const lastSyncLabel = dayjs(lastSyncedAt).format("HH:mm:ss");
   const visibleTimelineEvents = isClient ? timelineEvents.slice(0, 8) : timelineEvents;
+  const sidebarTimelineEvents = isClient ? visibleTimelineEvents.slice(0, 4) : visibleTimelineEvents;
 
   const statusUi = resolveStatusUI(appointment.status, appointment.sla_breached);
   const clientFocus = (() => {
@@ -736,6 +756,10 @@ export default function AppointmentDetailPage() {
     setPaymentFileError(selected ? validatePaymentFile(selected) : "");
   };
 
+  const triggerPaymentFilePicker = () => {
+    paymentFileInputRef.current?.click();
+  };
+
   const onPaymentDrop = (event) => {
     event.preventDefault();
     event.stopPropagation();
@@ -796,6 +820,12 @@ export default function AppointmentDetailPage() {
 
   return (
     <Stack spacing={2}>
+      <input
+        ref={paymentFileInputRef}
+        hidden
+        type="file"
+        onChange={(event) => onSelectPaymentFile(event.target.files?.[0] || null)}
+      />
       <Paper
         sx={{
           p: { xs: 1.8, md: 2.2 },
@@ -953,7 +983,7 @@ export default function AppointmentDetailPage() {
       ) : null}
 
       <Grid container spacing={2}>
-        <Grid item xs={12} lg={isClient ? 12 : 8}>
+        <Grid item xs={12} lg={(!isClient || showClientDesktopSidebar) ? 8 : 12}>
           <Stack spacing={2}>
             {showClientDataCard ? (
               <Paper
@@ -1168,8 +1198,8 @@ export default function AppointmentDetailPage() {
 
                 <Stack spacing={1}>
                   <Box
-                    component="label"
                     sx={paymentDropZoneSx}
+                    onClick={triggerPaymentFilePicker}
                     onDragOver={(event) => {
                       event.preventDefault();
                       setPaymentDragOver(true);
@@ -1188,9 +1218,25 @@ export default function AppointmentDetailPage() {
                         Форматы: jpg, jpeg, png, pdf. Максимум 10 МБ.
                       </Typography>
                     </Stack>
-                    <input hidden type="file" onChange={(event) => onSelectPaymentFile(event.target.files?.[0] || null)} />
                   </Box>
-                  <Typography variant="body2">{paymentProofFile ? paymentProofFile.name : "Файл не выбран"}</Typography>
+                  <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      startIcon={<UploadFileRoundedIcon fontSize="small" />}
+                      onClick={triggerPaymentFilePicker}
+                    >
+                      Выбрать файл
+                    </Button>
+                    {paymentProofFile ? (
+                      <Button size="small" variant="text" color="inherit" onClick={() => onSelectPaymentFile(null)}>
+                        Очистить
+                      </Button>
+                    ) : null}
+                  </Stack>
+                  <Typography variant="body2" sx={{ fontWeight: paymentProofFile ? 700 : 500 }}>
+                    {paymentProofMeta}
+                  </Typography>
                   {paymentFileError ? <Alert severity="warning">{paymentFileError}</Alert> : null}
 
                   <TextField select label="Способ оплаты" value={paymentMethod} onChange={(event) => setPaymentMethod(event.target.value)}>
@@ -1201,6 +1247,7 @@ export default function AppointmentDetailPage() {
                   <Button variant="contained" size="large" onClick={uploadPaymentProof} disabled={!canUploadPaymentProof}>
                     {uploadingProof ? "Загружаем чек..." : appointment.status === "AWAITING_PAYMENT" ? "Загрузить чек и продолжить" : "Отправить новый чек"}
                   </Button>
+                  {uploadingProof ? <LinearProgress sx={{ borderRadius: 999 }} /> : null}
 
                   {appointment.status === "AWAITING_PAYMENT" ? (
                     <Stack spacing={0.5}>
@@ -1372,8 +1419,9 @@ export default function AppointmentDetailPage() {
                   disableGutters
                   sx={{
                     borderRadius: 3,
-                    border: "1px solid rgba(15,23,42,0.08)",
-                    boxShadow: "0 8px 24px rgba(15,23,42,0.06)",
+                    border: "1px solid",
+                    borderColor: "divider",
+                    boxShadow: isDark ? "0 8px 24px rgba(2,6,23,0.45)" : "0 8px 24px rgba(15,23,42,0.06)",
                     overflow: "hidden",
                   }}
                 >
@@ -1419,13 +1467,13 @@ export default function AppointmentDetailPage() {
           </Stack>
         </Grid>
 
-        {!isClient ? (
+        {(!isClient || showClientDesktopSidebar) ? (
           <Grid item xs={12} lg={4}>
-            <Stack spacing={2}>
+            <Stack spacing={2} sx={{ position: { lg: "sticky" }, top: { lg: 88 } }}>
               <Paper sx={{ p: 2.2 }}>
               <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}>
                 <ShieldRoundedIcon color="primary" fontSize="small" />
-                <Typography variant="h3">Доверие и прозрачность</Typography>
+                <Typography variant="h3">{isClient ? "Быстрый контроль" : "Доверие и прозрачность"}</Typography>
               </Stack>
 
               <Stack spacing={0.7}>
@@ -1456,31 +1504,58 @@ export default function AppointmentDetailPage() {
                     <Typography variant="caption">Обычно назначение мастера занимает 5-15 минут.</Typography>
                     <Typography variant="caption">Если не получается — напишите в чат, мы подключимся.</Typography>
                   </>
-                ) : null}
+                ) : (
+                  <>
+                    <Divider sx={{ my: 0.7 }} />
+                    <Button
+                      variant="contained"
+                      size="small"
+                      onClick={() =>
+                        handlePrimaryAction(
+                          ["AWAITING_PAYMENT", "PAYMENT_PROOF_UPLOADED"].includes(appointment.status)
+                            ? "open_payment"
+                            : "open_chat"
+                        )
+                      }
+                    >
+                      {["AWAITING_PAYMENT", "PAYMENT_PROOF_UPLOADED"].includes(appointment.status)
+                        ? "Оплата и чек"
+                        : "Открыть чат"}
+                    </Button>
+                    <Button variant="outlined" size="small" onClick={() => handlePrimaryAction("open_timeline")}>
+                      Лента событий
+                    </Button>
+                  </>
+                )}
               </Stack>
             </Paper>
 
               <Paper ref={timelineRef} sx={{ p: 2.2 }}>
                 <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}>
                   <TimelineRoundedIcon color="primary" fontSize="small" />
-                  <Typography variant="h3">Лента событий</Typography>
+                  <Typography variant="h3">{isClient ? "Статус и история" : "Лента событий"}</Typography>
                 </Stack>
                 <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1 }}>
                   Обновляется автоматически каждые 3-4 секунды
                 </Typography>
 
-                {visibleTimelineEvents.length ? (
+                {sidebarTimelineEvents.length ? (
                   <Stack spacing={1}>
-                    {visibleTimelineEvents.map((event, index) => (
+                    {sidebarTimelineEvents.map((event, index) => (
                       <Stack key={event.id} spacing={0.35}>
                         <Typography variant="body2" sx={{ fontWeight: 700 }}>{getEventTitle(event)}</Typography>
                         {event.note ? <Typography variant="caption" color="text.secondary">{event.note}</Typography> : null}
                         <Typography variant="caption" color="text.secondary">
                           {event.actor_username || "Система"} • {dayjs(event.created_at).format("DD.MM.YYYY HH:mm")}
                         </Typography>
-                        {index < visibleTimelineEvents.length - 1 ? <Divider /> : null}
+                        {index < sidebarTimelineEvents.length - 1 ? <Divider /> : null}
                       </Stack>
                     ))}
+                    {isClient && visibleTimelineEvents.length > sidebarTimelineEvents.length ? (
+                      <Button size="small" variant="text" onClick={() => handlePrimaryAction("open_timeline")}>
+                        Показать больше событий
+                      </Button>
+                    ) : null}
                   </Stack>
                 ) : (
                   <Typography variant="body2" color="text.secondary">События пока отсутствуют.</Typography>
@@ -1502,7 +1577,10 @@ export default function AppointmentDetailPage() {
             zIndex: 1285,
             p: 0.8,
             borderRadius: 2.5,
-            border: "1px solid #dce6f0",
+            border: "1px solid",
+            borderColor: "divider",
+            bgcolor: isDark ? "rgba(15,23,42,0.92)" : "rgba(255,255,255,0.92)",
+            backdropFilter: "blur(12px) saturate(125%)",
           }}
         >
           <Stack direction="row" spacing={0.6}>
@@ -1542,9 +1620,10 @@ export default function AppointmentDetailPage() {
             p: 1.2,
             borderRadius: 2.5,
             border: "1px solid",
-            borderColor: "warning.light",
-            boxShadow: (theme) => `0 18px 42px ${theme.palette.warning.light}55`,
-            bgcolor: "#fffdfa",
+            borderColor: isDark ? "rgba(255,179,71,0.5)" : "warning.light",
+            boxShadow: (theme) =>
+              isDark ? "0 18px 42px rgba(2,6,23,0.62)" : `0 18px 42px ${theme.palette.warning.light}55`,
+            bgcolor: isDark ? "rgba(22,27,38,0.95)" : "#fffdfa",
           }}
         >
           <Stack spacing={0.8}>
@@ -1687,8 +1766,8 @@ export default function AppointmentDetailPage() {
             </TextField>
 
             <Box
-              component="label"
               sx={paymentDropZoneSx}
+              onClick={triggerPaymentFilePicker}
               onDragOver={(event) => {
                 event.preventDefault();
                 setPaymentDragOver(true);
@@ -1707,10 +1786,27 @@ export default function AppointmentDetailPage() {
                   Форматы: jpg, jpeg, png, pdf. Максимум 10 МБ.
                 </Typography>
               </Stack>
-              <input hidden type="file" onChange={(event) => onSelectPaymentFile(event.target.files?.[0] || null)} />
             </Box>
+            <Stack direction="row" spacing={1}>
+              <Button
+                fullWidth
+                variant="outlined"
+                size="small"
+                startIcon={<UploadFileRoundedIcon fontSize="small" />}
+                onClick={triggerPaymentFilePicker}
+              >
+                Выбрать файл
+              </Button>
+              {paymentProofFile ? (
+                <Button fullWidth size="small" onClick={() => onSelectPaymentFile(null)}>
+                  Очистить
+                </Button>
+              ) : null}
+            </Stack>
 
-            <Typography variant="body2">{paymentProofFile ? paymentProofFile.name : "Файл не выбран"}</Typography>
+            <Typography variant="body2" sx={{ fontWeight: paymentProofFile ? 700 : 500 }}>
+              {paymentProofMeta}
+            </Typography>
             {paymentFileError ? <Alert severity="warning">{paymentFileError}</Alert> : null}
 
             <Button
@@ -1725,6 +1821,7 @@ export default function AppointmentDetailPage() {
                   ? "Загрузить чек и продолжить"
                   : "Отправить новый чек"}
             </Button>
+            {uploadingProof ? <LinearProgress sx={{ borderRadius: 999 }} /> : null}
 
             {isAwaitingPayment ? (
               <Button size="small" variant="text" onClick={() => runAction(() => appointmentsApi.markPaid(id, paymentMethod))}>
@@ -1892,8 +1989,10 @@ export default function AppointmentDetailPage() {
         PaperProps={{
           sx: {
             borderRadius: 3,
-            border: "1px solid rgba(15,23,42,0.08)",
-            background: "linear-gradient(145deg, rgba(255,255,255,0.96) 0%, rgba(243,249,255,0.94) 100%)",
+            border: isDark ? "1px solid rgba(90,169,255,0.28)" : "1px solid rgba(15,23,42,0.08)",
+            background: isDark
+              ? "linear-gradient(145deg, rgba(10,17,31,0.96) 0%, rgba(17,30,48,0.94) 100%)"
+              : "linear-gradient(145deg, rgba(255,255,255,0.96) 0%, rgba(243,249,255,0.94) 100%)",
           },
         }}
       >
@@ -1957,8 +2056,10 @@ export default function AppointmentDetailPage() {
         PaperProps={{
           sx: {
             borderRadius: 3,
-            border: "1px solid rgba(16,185,129,0.25)",
-            background: "linear-gradient(145deg, rgba(255,255,255,0.98) 0%, rgba(236,253,245,0.98) 100%)",
+            border: isDark ? "1px solid rgba(67,209,122,0.35)" : "1px solid rgba(16,185,129,0.25)",
+            background: isDark
+              ? "linear-gradient(145deg, rgba(11,22,34,0.98) 0%, rgba(14,38,31,0.96) 100%)"
+              : "linear-gradient(145deg, rgba(255,255,255,0.98) 0%, rgba(236,253,245,0.98) 100%)",
           },
         }}
       >
