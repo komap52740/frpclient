@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import pytest
 from rest_framework.test import APIClient
@@ -31,8 +31,8 @@ def test_rule_creates_notification_on_event():
             "type": "create_notification",
             "target": "role",
             "role": "admin",
-            "title": "Новая заявка",
-            "message": "Проверьте входящую заявку",
+            "title": "РќРѕРІР°СЏ Р·Р°СЏРІРєР°",
+            "message": "РџСЂРѕРІРµСЂСЊС‚Рµ РІС…РѕРґСЏС‰СѓСЋ Р·Р°СЏРІРєСѓ",
         },
     )
 
@@ -48,7 +48,7 @@ def test_rule_creates_notification_on_event():
         format="json",
     )
     assert response.status_code == 201
-    assert Notification.objects.filter(user=admin_user, title="Новая заявка").exists()
+    assert Notification.objects.filter(user=admin_user, title="РќРѕРІР°СЏ Р·Р°СЏРІРєР°").exists()
 
 
 @pytest.mark.django_db
@@ -58,6 +58,7 @@ def test_rule_can_change_appointment_status_with_safe_transition():
         password="x",
         role=RoleChoices.MASTER,
         is_master_active=True,
+        master_quality_approved=True,
     )
     client_user = User.objects.create_user(username="rule-client-2", password="x", role=RoleChoices.CLIENT)
     appointment = Appointment.objects.create(
@@ -135,3 +136,4 @@ def test_admin_rule_crud_api():
     patch_response = client.patch(f"/api/v1/admin/rules/{rule_id}/", {"is_active": False}, format="json")
     assert patch_response.status_code == 200
     assert patch_response.data["is_active"] is False
+

@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from unittest.mock import patch
 
@@ -7,7 +7,8 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from rest_framework.test import APIClient
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from apps.accounts.models import RoleChoices, User
+from apps.accounts.models import MasterLevelChoices, RoleChoices, User
+from apps.accounts.notifications import notify_masters_about_new_appointment
 from apps.appointments.models import Appointment, AppointmentStatusChoices
 from apps.chat.models import Message
 from apps.platform.models import Notification
@@ -31,6 +32,7 @@ def master_user(db):
         password="x",
         role=RoleChoices.MASTER,
         is_master_active=True,
+        master_quality_approved=True,
     )
 
 
@@ -41,6 +43,7 @@ def master_user_2(db):
         password="x",
         role=RoleChoices.MASTER,
         is_master_active=True,
+        master_quality_approved=True,
     )
 
 
@@ -84,6 +87,124 @@ def test_take_appointment_locking(client_user, master_user, master_user_2):
 
 
 @pytest.mark.django_db
+def test_take_appointment_requires_master_quality_approval(client_user):
+    master_pending = User.objects.create_user(
+        username="master_pending_quality",
+        password="x",
+        role=RoleChoices.MASTER,
+        is_master_active=True,
+        master_quality_approved=False,
+    )
+    appointment = Appointment.objects.create(
+        client=client_user,
+        brand="Samsung",
+        model="A14",
+        lock_type="PIN",
+        has_pc=True,
+        description="desc",
+    )
+
+    response = auth_as(master_pending).post(f"/api/appointments/{appointment.id}/take/")
+    assert response.status_code == 403
+    assert "допущен" in str(response.data.get("detail", "")).lower()
+
+
+@pytest.mark.django_db
+def test_take_appointment_rejects_trainee_master(client_user):
+    master_trainee = User.objects.create_user(
+        username="master_trainee",
+        password="x",
+        role=RoleChoices.MASTER,
+        is_master_active=True,
+        master_quality_approved=True,
+        master_level=MasterLevelChoices.TRAINEE,
+    )
+    appointment = Appointment.objects.create(
+        client=client_user,
+        brand="Samsung",
+        model="A22",
+        lock_type="PIN",
+        has_pc=True,
+        description="desc",
+    )
+
+    response = auth_as(master_trainee).post(f"/api/appointments/{appointment.id}/take/")
+    assert response.status_code == 403
+    assert "уровень" in str(response.data.get("detail", "")).lower()
+
+
+@pytest.mark.django_db
+def test_admin_can_update_master_quality(admin_user):
+    master = User.objects.create_user(
+        username="master_quality_edit",
+        password="x",
+        role=RoleChoices.MASTER,
+        is_master_active=True,
+        master_quality_approved=False,
+    )
+
+    response = auth_as(admin_user).post(
+        f"/api/admin/masters/{master.id}/quality/",
+        {
+            "master_level": "senior",
+            "master_specializations": "Samsung FRP, Xiaomi",
+            "master_quality_comment": "Подтвержден для сервисных центров",
+            "master_quality_approved": True,
+        },
+        format="json",
+    )
+    assert response.status_code == 200
+    assert response.data["master_level"] == "senior"
+    assert response.data["master_quality_approved"] is True
+    assert "Samsung" in response.data["master_specializations"]
+
+
+@pytest.mark.django_db
+def test_notify_new_appointment_targets_only_quality_approved_masters(client_user):
+    master_allowed = User.objects.create_user(
+        username="master_allowed",
+        password="x",
+        role=RoleChoices.MASTER,
+        is_master_active=True,
+        master_quality_approved=True,
+        master_level=MasterLevelChoices.SENIOR,
+        telegram_id=11111111,
+    )
+    User.objects.create_user(
+        username="master_pending_quality_2",
+        password="x",
+        role=RoleChoices.MASTER,
+        is_master_active=True,
+        master_quality_approved=False,
+        telegram_id=22222222,
+    )
+    User.objects.create_user(
+        username="master_trainee_2",
+        password="x",
+        role=RoleChoices.MASTER,
+        is_master_active=True,
+        master_quality_approved=True,
+        master_level=MasterLevelChoices.TRAINEE,
+        telegram_id=33333333,
+    )
+    appointment = Appointment.objects.create(
+        client=client_user,
+        brand="Xiaomi",
+        model="Redmi",
+        lock_type="PIN",
+        has_pc=True,
+        description="desc",
+    )
+
+    with patch("apps.accounts.notifications.send_telegram_message", return_value=True) as telegram_mock:
+        sent = notify_masters_about_new_appointment(appointment)
+
+    assert sent == 1
+    telegram_mock.assert_called_once()
+    assert telegram_mock.call_args[0][0] == master_allowed.telegram_id
+
+
+@pytest.mark.django_db
 def test_status_change_is_forwarded_to_client_telegram(client_user, master_user):
     client_user.telegram_id = 222333444
     client_user.save(update_fields=["telegram_id", "updated_at"])
@@ -102,8 +223,8 @@ def test_status_change_is_forwarded_to_client_telegram(client_user, master_user)
         tg_mock.assert_called()
         args, _ = tg_mock.call_args
         assert args[0] == 222333444
-        assert f"заявке #{appointment.id}".lower() in args[1].lower()
-        assert "Статус:" in args[1]
+        assert f"Р·Р°СЏРІРєРµ #{appointment.id}".lower() in args[1].lower()
+        assert "РЎС‚Р°С‚СѓСЃ:" in args[1]
 
 
 @pytest.mark.django_db
@@ -239,14 +360,14 @@ def test_master_message_is_forwarded_to_client_telegram(client_user, master_user
     with patch("apps.chat.services.send_telegram_message", return_value=True) as telegram_mock:
         response = auth_as(master_user).post(
             f"/api/appointments/{appointment.id}/messages/",
-            {"text": "Проверил, можно продолжать"},
+            {"text": "РџСЂРѕРІРµСЂРёР», РјРѕР¶РЅРѕ РїСЂРѕРґРѕР»Р¶Р°С‚СЊ"},
             format="json",
         )
         assert response.status_code == 201
         telegram_mock.assert_called_once()
         args, _ = telegram_mock.call_args
         assert args[0] == 123456789
-        assert f"заявке #{appointment.id}".lower() in args[1].lower()
+        assert f"Р·Р°СЏРІРєРµ #{appointment.id}".lower() in args[1].lower()
 
 
 @pytest.mark.django_db
@@ -268,14 +389,14 @@ def test_client_message_is_forwarded_to_master_telegram(client_user, master_user
     with patch("apps.chat.services.send_telegram_message", return_value=True) as telegram_mock:
         response = auth_as(client_user).post(
             f"/api/appointments/{appointment.id}/messages/",
-            {"text": "Здравствуйте, готов к подключению"},
+            {"text": "Р—РґСЂР°РІСЃС‚РІСѓР№С‚Рµ, РіРѕС‚РѕРІ Рє РїРѕРґРєР»СЋС‡РµРЅРёСЋ"},
             format="json",
         )
         assert response.status_code == 201
         telegram_mock.assert_called()
         args, _ = telegram_mock.call_args
         assert args[0] == 987654321
-        assert f"заявке #{appointment.id}".lower() in args[1].lower()
+        assert f"Р·Р°СЏРІРєРµ #{appointment.id}".lower() in args[1].lower()
 
 
 @pytest.mark.django_db
@@ -333,8 +454,8 @@ def test_bootstrap_admin_flow(api_client):
         {
             "username": "owner",
             "password": "supersecure123",
-            "first_name": "Иван",
-            "last_name": "Админ",
+            "first_name": "РРІР°РЅ",
+            "last_name": "РђРґРјРёРЅ",
         },
         format="json",
     )
@@ -377,9 +498,9 @@ def test_password_login_flow(api_client):
 @pytest.mark.django_db
 def test_admin_can_update_system_settings(admin_user):
     payload = {
-        "bank_requisites": "Счет 123",
+        "bank_requisites": "РЎС‡РµС‚ 123",
         "crypto_requisites": "USDT TRC20 ...",
-        "instructions": "Оплатите и приложите чек.",
+        "instructions": "РћРїР»Р°С‚РёС‚Рµ Рё РїСЂРёР»РѕР¶РёС‚Рµ С‡РµРє.",
     }
     response = auth_as(admin_user).put("/api/admin/system/settings/", payload, format="json")
     assert response.status_code == 200
@@ -484,7 +605,7 @@ def test_client_signal_creates_event_and_master_notification(client_user, master
 
     response = auth_as(client_user).post(
         f"/api/appointments/{appointment.id}/client-signal/",
-        {"signal": "need_help", "comment": "Не понимаю следующий шаг"},
+        {"signal": "need_help", "comment": "РќРµ РїРѕРЅРёРјР°СЋ СЃР»РµРґСѓСЋС‰РёР№ С€Р°Рі"},
         format="json",
     )
     assert response.status_code == 200
@@ -495,7 +616,7 @@ def test_client_signal_creates_event_and_master_notification(client_user, master
     assert any(item["event_type"] == "client_signal" for item in events_response.data)
 
     note = events_response.data[0]["note"]
-    assert "Клиент просит помощь" in note
+    assert "РљР»РёРµРЅС‚ РїСЂРѕСЃРёС‚ РїРѕРјРѕС‰СЊ" in note
 
     notification = Notification.objects.filter(user=master_user).order_by("-id").first()
     assert notification is not None
@@ -511,7 +632,7 @@ def test_client_can_repeat_appointment(client_user):
         model="A50",
         lock_type="PIN",
         has_pc=True,
-        description="Повторная диагностика",
+        description="РџРѕРІС‚РѕСЂРЅР°СЏ РґРёР°РіРЅРѕСЃС‚РёРєР°",
         status=AppointmentStatusChoices.COMPLETED,
     )
 
@@ -550,12 +671,12 @@ def test_register_flow(api_client):
 @pytest.mark.django_db
 def test_banned_client_is_blocked_from_functional_api_but_can_read_me(client_user):
     client_user.is_banned = True
-    client_user.ban_reason = "Нарушение правил платформы"
+    client_user.ban_reason = "РќР°СЂСѓС€РµРЅРёРµ РїСЂР°РІРёР» РїР»Р°С‚С„РѕСЂРјС‹"
     client_user.save(update_fields=["is_banned", "ban_reason", "updated_at"])
 
     list_response = auth_as(client_user).get("/api/appointments/my/")
     assert list_response.status_code == 403
-    assert "заблокирован" in str(list_response.data.get("detail", "")).lower()
+    assert "Р·Р°Р±Р»РѕРєРёСЂРѕРІР°РЅ" in str(list_response.data.get("detail", "")).lower()
 
     dashboard_response = auth_as(client_user).get("/api/dashboard/")
     assert dashboard_response.status_code == 403
@@ -563,7 +684,7 @@ def test_banned_client_is_blocked_from_functional_api_but_can_read_me(client_use
     me_response = auth_as(client_user).get("/api/me/")
     assert me_response.status_code == 200
     assert me_response.data["user"]["is_banned"] is True
-    assert "Нарушение правил платформы" in me_response.data["user"]["ban_reason"]
+    assert "РќР°СЂСѓС€РµРЅРёРµ РїСЂР°РІРёР» РїР»Р°С‚С„РѕСЂРјС‹" in me_response.data["user"]["ban_reason"]
 
 
 @pytest.mark.django_db
@@ -624,7 +745,7 @@ def test_master_can_list_own_reviews(client_user, master_user):
         target=master_user,
         review_type=ReviewTypeChoices.MASTER_REVIEW,
         rating=5,
-        comment="Отлично",
+        comment="РћС‚Р»РёС‡РЅРѕ",
     )
 
     response = auth_as(master_user).get("/api/reviews/my/")
@@ -652,7 +773,7 @@ def test_admin_can_list_all_reviews_with_filters(client_user, master_user, admin
         target=master_user,
         review_type=ReviewTypeChoices.MASTER_REVIEW,
         rating=5,
-        comment="Супер",
+        comment="РЎСѓРїРµСЂ",
     )
     Review.objects.create(
         appointment=appointment,
@@ -660,7 +781,7 @@ def test_admin_can_list_all_reviews_with_filters(client_user, master_user, admin
         target=client_user,
         review_type=ReviewTypeChoices.CLIENT_REVIEW,
         rating=3,
-        comment="Ок",
+        comment="РћРє",
     )
 
     response = auth_as(admin_user).get("/api/admin/reviews/")
@@ -671,4 +792,5 @@ def test_admin_can_list_all_reviews_with_filters(client_user, master_user, admin
     assert filtered.status_code == 200
     assert len(filtered.data) == 1
     assert filtered.data[0]["review_type"] == ReviewTypeChoices.MASTER_REVIEW
+
 

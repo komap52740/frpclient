@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from unittest.mock import patch
 
@@ -28,6 +28,7 @@ def master_user(db):
         password="x",
         role=RoleChoices.MASTER,
         is_master_active=True,
+        master_quality_approved=True,
     )
 
 
@@ -57,12 +58,12 @@ def test_bot_text_message_creates_chat_message_for_active_appointment(client_use
         bot._handle_message(
             {
                 "chat": {"id": client_user.telegram_id},
-                "text": "Пишу через Telegram-бота",
+                "text": "РџРёС€Сѓ С‡РµСЂРµР· Telegram-Р±РѕС‚Р°",
             }
         )
 
     message = Message.objects.get(appointment=appointment)
-    assert message.text == "Пишу через Telegram-бота"
+    assert message.text == "РџРёС€Сѓ С‡РµСЂРµР· Telegram-Р±РѕС‚Р°"
     assert not message.file
 
     notification = Notification.objects.filter(user=master_user).order_by("-id").first()
@@ -86,7 +87,7 @@ def test_bot_document_message_creates_chat_message_with_file(client_user, master
         bot._handle_message(
             {
                 "chat": {"id": client_user.telegram_id},
-                "caption": "Чек об оплате",
+                "caption": "Р§РµРє РѕР± РѕРїР»Р°С‚Рµ",
                 "document": {
                     "file_id": "doc-file-id",
                     "file_name": "payment-proof.pdf",
@@ -95,7 +96,7 @@ def test_bot_document_message_creates_chat_message_with_file(client_user, master
         )
 
     message = Message.objects.get(appointment=appointment)
-    assert message.text == "Чек об оплате"
+    assert message.text == "Р§РµРє РѕР± РѕРїР»Р°С‚Рµ"
     assert message.file.name.endswith(".pdf")
     assert send_mock.called
     master_tg_mock.assert_called_once()
@@ -114,7 +115,7 @@ def test_bot_rejects_unsupported_document_extension(client_user, master_user):
         bot._handle_message(
             {
                 "chat": {"id": client_user.telegram_id},
-                "caption": "Запусти это",
+                "caption": "Р—Р°РїСѓСЃС‚Рё СЌС‚Рѕ",
                 "document": {
                     "file_id": "doc-file-id",
                     "file_name": "payload.exe",
@@ -123,4 +124,5 @@ def test_bot_rejects_unsupported_document_extension(client_user, master_user):
         )
 
     assert not Message.objects.filter(appointment=appointment).exists()
-    assert any("Формат файла не поддерживается." in (call.args[1] if len(call.args) > 1 else "") for call in send_mock.call_args_list)
+    assert any("Р¤РѕСЂРјР°С‚ С„Р°Р№Р»Р° РЅРµ РїРѕРґРґРµСЂР¶РёРІР°РµС‚СЃСЏ." in (call.args[1] if len(call.args) > 1 else "") for call in send_mock.call_args_list)
+

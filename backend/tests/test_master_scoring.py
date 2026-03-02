@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from datetime import timedelta
 
@@ -22,7 +22,7 @@ def auth_as(user: User) -> APIClient:
 
 @pytest.mark.django_db
 def test_recalculate_master_stats_computes_score():
-    master = User.objects.create_user(username="score-master", password="x", role=RoleChoices.MASTER, is_master_active=True)
+    master = User.objects.create_user(username="score-master", password="x", role=RoleChoices.MASTER, is_master_active=True, master_quality_approved=True)
     client = User.objects.create_user(username="score-client", password="x", role=RoleChoices.CLIENT)
 
     completed = Appointment.objects.create(
@@ -59,7 +59,7 @@ def test_recalculate_master_stats_computes_score():
         target=master,
         review_type=ReviewTypeChoices.MASTER_REVIEW,
         rating=4,
-        comment="Хорошо",
+        comment="РҐРѕСЂРѕС€Рѕ",
     )
 
     stats = recalculate_master_stats(master)
@@ -71,7 +71,7 @@ def test_recalculate_master_stats_computes_score():
 
 @pytest.mark.django_db
 def test_master_dashboard_contains_master_score():
-    master = User.objects.create_user(username="dash-master", password="x", role=RoleChoices.MASTER, is_master_active=True)
+    master = User.objects.create_user(username="dash-master", password="x", role=RoleChoices.MASTER, is_master_active=True, master_quality_approved=True)
     response = auth_as(master).get("/api/dashboard/")
     assert response.status_code == 200
     assert response.data["role"] == "master"
@@ -81,8 +81,8 @@ def test_master_dashboard_contains_master_score():
 @pytest.mark.django_db
 def test_admin_masters_sort_and_filter_by_master_score():
     admin = User.objects.create_user(username="masters-admin", password="x", role=RoleChoices.ADMIN, is_staff=True)
-    master_low = User.objects.create_user(username="master-low", password="x", role=RoleChoices.MASTER, is_master_active=True)
-    master_high = User.objects.create_user(username="master-high", password="x", role=RoleChoices.MASTER, is_master_active=True)
+    master_low = User.objects.create_user(username="master-low", password="x", role=RoleChoices.MASTER, is_master_active=True, master_quality_approved=True)
+    master_high = User.objects.create_user(username="master-high", password="x", role=RoleChoices.MASTER, is_master_active=True, master_quality_approved=True)
 
     MasterStats.objects.create(user=master_low, master_score=30)
     MasterStats.objects.create(user=master_high, master_score=90)
@@ -96,3 +96,4 @@ def test_admin_masters_sort_and_filter_by_master_score():
     ids = [item["id"] for item in filtered.data]
     assert master_high.id in ids
     assert master_low.id not in ids
+

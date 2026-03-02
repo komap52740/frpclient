@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import pytest
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -29,6 +29,7 @@ def master_user(db):
         password="x",
         role=RoleChoices.MASTER,
         is_master_active=True,
+        master_quality_approved=True,
     )
 
 
@@ -36,7 +37,7 @@ def master_user(db):
 def test_master_quick_replies_crud_and_permissions(master_user, client_user):
     create_response = auth_as(master_user).post(
         "/api/chat/quick-replies/",
-        {"command": "/1", "title": "Установка", "text": "Скачайте программу и откройте ее."},
+        {"command": "/1", "title": "РЈСЃС‚Р°РЅРѕРІРєР°", "text": "РЎРєР°С‡Р°Р№С‚Рµ РїСЂРѕРіСЂР°РјРјСѓ Рё РѕС‚РєСЂРѕР№С‚Рµ РµРµ."},
         format="json",
     )
     assert create_response.status_code == 201
@@ -50,11 +51,11 @@ def test_master_quick_replies_crud_and_permissions(master_user, client_user):
 
     patch_response = auth_as(master_user).patch(
         f"/api/chat/quick-replies/{reply_id}/",
-        {"text": "Скачайте программу и следуйте инструкции."},
+        {"text": "РЎРєР°С‡Р°Р№С‚Рµ РїСЂРѕРіСЂР°РјРјСѓ Рё СЃР»РµРґСѓР№С‚Рµ РёРЅСЃС‚СЂСѓРєС†РёРё."},
         format="json",
     )
     assert patch_response.status_code == 200
-    assert "инструкции" in patch_response.data["text"]
+    assert "РёРЅСЃС‚СЂСѓРєС†РёРё" in patch_response.data["text"]
 
     forbidden_response = auth_as(client_user).get("/api/chat/quick-replies/")
     assert forbidden_response.status_code == 403
@@ -78,8 +79,8 @@ def test_master_message_expands_quick_reply_command(master_user, client_user):
     MasterQuickReply.objects.create(
         user=master_user,
         command="1",
-        title="Установка",
-        text="Скачайте программу и откройте ее.",
+        title="РЈСЃС‚Р°РЅРѕРІРєР°",
+        text="РЎРєР°С‡Р°Р№С‚Рµ РїСЂРѕРіСЂР°РјРјСѓ Рё РѕС‚РєСЂРѕР№С‚Рµ РµРµ.",
     )
 
     first_response = auth_as(master_user).post(
@@ -88,16 +89,16 @@ def test_master_message_expands_quick_reply_command(master_user, client_user):
         format="json",
     )
     assert first_response.status_code == 201
-    assert first_response.data["text"] == "Скачайте программу и откройте ее."
+    assert first_response.data["text"] == "РЎРєР°С‡Р°Р№С‚Рµ РїСЂРѕРіСЂР°РјРјСѓ Рё РѕС‚РєСЂРѕР№С‚Рµ РµРµ."
 
     second_response = auth_as(master_user).post(
         f"/api/appointments/{appointment.id}/messages/",
-        {"text": "/1 После установки напишите в чат."},
+        {"text": "/1 РџРѕСЃР»Рµ СѓСЃС‚Р°РЅРѕРІРєРё РЅР°РїРёС€РёС‚Рµ РІ С‡Р°С‚."},
         format="json",
     )
     assert second_response.status_code == 201
-    assert "Скачайте программу и откройте ее." in second_response.data["text"]
-    assert "После установки напишите в чат." in second_response.data["text"]
+    assert "РЎРєР°С‡Р°Р№С‚Рµ РїСЂРѕРіСЂР°РјРјСѓ Рё РѕС‚РєСЂРѕР№С‚Рµ РµРµ." in second_response.data["text"]
+    assert "РџРѕСЃР»Рµ СѓСЃС‚Р°РЅРѕРІРєРё РЅР°РїРёС€РёС‚Рµ РІ С‡Р°С‚." in second_response.data["text"]
 
 
 @pytest.mark.django_db
@@ -115,12 +116,12 @@ def test_client_message_with_profanity_is_rejected(client_user, master_user):
 
     response = auth_as(client_user).post(
         f"/api/appointments/{appointment.id}/messages/",
-        {"text": "ты пидор"},
+        {"text": "С‚С‹ РїРёРґРѕСЂ"},
         format="json",
     )
 
     assert response.status_code == 400
-    assert "недопустимую лексику" in response.data["detail"].lower()
+    assert "РЅРµРґРѕРїСѓСЃС‚РёРјСѓСЋ Р»РµРєСЃРёРєСѓ" in response.data["detail"].lower()
     assert Message.objects.filter(appointment=appointment).count() == 0
 
 
@@ -139,12 +140,12 @@ def test_client_spam_like_message_is_rejected(client_user, master_user):
 
     response = auth_as(client_user).post(
         f"/api/appointments/{appointment.id}/messages/",
-        {"text": "ааааааааааааааа"},
+        {"text": "Р°Р°Р°Р°Р°Р°Р°Р°Р°Р°Р°Р°Р°Р°Р°"},
         format="json",
     )
 
     assert response.status_code == 400
-    assert "спам" in response.data["detail"].lower()
+    assert "СЃРїР°Рј" in response.data["detail"].lower()
     assert Message.objects.filter(appointment=appointment).count() == 0
 
 
@@ -171,3 +172,4 @@ def test_client_file_message_without_text_is_allowed(client_user, master_user):
     assert response.status_code == 201
     assert response.data["text"] in ("", None)
     assert Message.objects.filter(appointment=appointment).count() == 1
+

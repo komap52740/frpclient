@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from datetime import timedelta
 
@@ -50,7 +50,7 @@ def test_compute_client_risk_score_range_and_levels():
 @pytest.mark.django_db
 def test_recalculate_client_stats_updates_risk_fields():
     client_user = User.objects.create_user(username="risk-client", password="x", role=RoleChoices.CLIENT)
-    master_user = User.objects.create_user(username="risk-master", password="x", role=RoleChoices.MASTER, is_master_active=True)
+    master_user = User.objects.create_user(username="risk-master", password="x", role=RoleChoices.MASTER, is_master_active=True, master_quality_approved=True)
 
     Appointment.objects.create(
         client=client_user,
@@ -76,7 +76,7 @@ def test_recalculate_client_stats_updates_risk_fields():
 
     flag, _ = BehaviorFlag.objects.get_or_create(
         code=BehaviorFlagCode.DIFFICULT_CLIENT,
-        defaults={"label": "Сложный клиент"},
+        defaults={"label": "РЎР»РѕР¶РЅС‹Р№ РєР»РёРµРЅС‚"},
     )
     review = Review.objects.create(
         appointment=completed_appt,
@@ -84,7 +84,7 @@ def test_recalculate_client_stats_updates_risk_fields():
         target=client_user,
         review_type=ReviewTypeChoices.CLIENT_REVIEW,
         rating=2,
-        comment="Трудный кейс",
+        comment="РўСЂСѓРґРЅС‹Р№ РєРµР№СЃ",
     )
     review.behavior_flags.add(flag)
 
@@ -97,7 +97,7 @@ def test_recalculate_client_stats_updates_risk_fields():
 @pytest.mark.django_db
 def test_risk_exposed_in_me_appointment_detail_and_admin_users():
     client_user = User.objects.create_user(username="risk-client-2", password="x", role=RoleChoices.CLIENT)
-    master_user = User.objects.create_user(username="risk-master-2", password="x", role=RoleChoices.MASTER, is_master_active=True)
+    master_user = User.objects.create_user(username="risk-master-2", password="x", role=RoleChoices.MASTER, is_master_active=True, master_quality_approved=True)
     admin_user = User.objects.create_user(username="risk-admin", password="x", role=RoleChoices.ADMIN, is_staff=True)
     appointment = Appointment.objects.create(
         client=client_user,
@@ -127,3 +127,4 @@ def test_risk_exposed_in_me_appointment_detail_and_admin_users():
     assert client_payload is not None
     assert "client_stats" in client_payload
     assert client_payload["client_stats"]["risk_level"] is not None
+

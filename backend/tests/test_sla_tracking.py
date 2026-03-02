@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from datetime import timedelta
 
@@ -48,6 +48,7 @@ def test_confirm_payment_sets_completion_deadline():
         password="x",
         role=RoleChoices.MASTER,
         is_master_active=True,
+        master_quality_approved=True,
     )
     appointment = Appointment.objects.create(
         client=client_user,
@@ -77,13 +78,14 @@ def test_sla_breach_emits_event_and_rule_creates_admin_notification():
         password="x",
         role=RoleChoices.MASTER,
         is_master_active=True,
+        master_quality_approved=True,
     )
     Rule.objects.create(
         name="notify_admin_on_sla_breach",
         is_active=True,
         trigger_event_type="sla.breached",
         condition_json={},
-        action_json={"type": "request_admin_attention", "title": "SLA нарушен"},
+        action_json={"type": "request_admin_attention", "title": "SLA РЅР°СЂСѓС€РµРЅ"},
     )
 
     appointment = Appointment.objects.create(
@@ -109,4 +111,5 @@ def test_sla_breach_emits_event_and_rule_creates_admin_notification():
         entity_type="Appointment",
         entity_id=str(appointment.id),
     ).exists()
-    assert Notification.objects.filter(user=admin_user, title="SLA нарушен").exists()
+    assert Notification.objects.filter(user=admin_user, title="SLA РЅР°СЂСѓС€РµРЅ").exists()
+

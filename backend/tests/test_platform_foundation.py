@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import pytest
 from rest_framework.test import APIClient
@@ -46,7 +46,7 @@ def test_emit_event_stores_platform_event():
 @pytest.mark.django_db
 def test_feature_flag_evaluation_basic():
     client_user = User.objects.create_user(username="client-flag", password="x", role=RoleChoices.CLIENT)
-    master_user = User.objects.create_user(username="master-flag", password="x", role=RoleChoices.MASTER, is_master_active=True)
+    master_user = User.objects.create_user(username="master-flag", password="x", role=RoleChoices.MASTER, is_master_active=True, master_quality_approved=True)
 
     global_flag = FeatureFlag.objects.create(
         name="global_on",
@@ -101,3 +101,4 @@ def test_notification_unread_count_and_mark_read():
     unread_response_after = client.get("/api/notifications/unread-count/")
     assert unread_response_after.status_code == 200
     assert unread_response_after.data["unread_count"] == 0
+

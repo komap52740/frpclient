@@ -10,7 +10,7 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenRefreshView
 
-from .models import RoleChoices, SiteSettings, User
+from .models import MasterLevelChoices, RoleChoices, SiteSettings, User
 from .permissions import IsAuthenticatedAndNotBanned
 from .services import recalculate_master_stats
 from apps.appointments.models import Appointment, AppointmentStatusChoices
@@ -265,10 +265,15 @@ class DashboardSummaryView(APIView):
 
         if user.role == RoleChoices.MASTER:
             master_stats = recalculate_master_stats(user)
+            can_take_new = (
+                user.is_master_active
+                and user.master_quality_approved
+                and user.master_level != MasterLevelChoices.TRAINEE
+            )
             new_available_queryset = Appointment.objects.filter(
                 status=AppointmentStatusChoices.NEW,
                 assigned_master__isnull=True,
-            )
+            ) if can_take_new else Appointment.objects.none()
             own_queryset = Appointment.objects.filter(assigned_master=user)
             own_active_queryset = own_queryset.filter(status__in=active_statuses)
             payload = {

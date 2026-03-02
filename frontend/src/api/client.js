@@ -251,14 +251,17 @@ export const adminApi = {
   updateUserRole(userId, payload) {
     return api.post(`/admin/users/${userId}/role/`, payload);
   },
-  masters() {
-    return api.get("/admin/masters/");
+  masters(params = {}) {
+    return api.get("/admin/masters/", { params });
   },
   activateMaster(userId) {
     return api.post(`/admin/masters/${userId}/activate/`);
   },
   suspendMaster(userId) {
     return api.post(`/admin/masters/${userId}/suspend/`);
+  },
+  updateMasterQuality(userId, payload) {
+    return api.post(`/admin/masters/${userId}/quality/`, payload);
   },
   systemStatus() {
     return api.get("/admin/system/status/");

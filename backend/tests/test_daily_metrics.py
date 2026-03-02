@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from datetime import timedelta
 
@@ -23,7 +23,7 @@ def auth_as(user: User) -> APIClient:
 def test_compute_daily_metrics_and_admin_api():
     admin_user = User.objects.create_user(username="metrics-admin", password="x", role=RoleChoices.ADMIN, is_staff=True)
     client_user = User.objects.create_user(username="metrics-client", password="x", role=RoleChoices.CLIENT)
-    master_user = User.objects.create_user(username="metrics-master", password="x", role=RoleChoices.MASTER, is_master_active=True)
+    master_user = User.objects.create_user(username="metrics-master", password="x", role=RoleChoices.MASTER, is_master_active=True, master_quality_approved=True)
 
     now = timezone.now()
     appointment = Appointment.objects.create(
@@ -58,3 +58,4 @@ def test_compute_daily_metrics_and_admin_api():
     assert response.status_code == 200
     assert len(response.data) >= 1
     assert response.data[0]["date"] == today.isoformat()
+

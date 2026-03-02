@@ -9,7 +9,7 @@ from django.conf import settings
 
 from apps.appointments.models import Appointment, AppointmentStatusChoices
 
-from .models import RoleChoices, User
+from .models import MasterLevelChoices, RoleChoices, User
 
 logger = logging.getLogger(__name__)
 
@@ -45,9 +45,10 @@ def notify_masters_about_new_appointment(appointment: Appointment) -> int:
     masters = User.objects.filter(
         role=RoleChoices.MASTER,
         is_master_active=True,
+        master_quality_approved=True,
         is_banned=False,
         telegram_id__isnull=False,
-    ).exclude(telegram_id=0)
+    ).exclude(telegram_id=0).exclude(master_level=MasterLevelChoices.TRAINEE)
 
     text = (
         "Новая заявка для мастеров\n"

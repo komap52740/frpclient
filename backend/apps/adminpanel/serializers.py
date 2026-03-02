@@ -2,7 +2,7 @@
 
 from rest_framework import serializers
 
-from apps.accounts.models import RoleChoices, SiteSettings, User
+from apps.accounts.models import MasterLevelChoices, RoleChoices, SiteSettings, User
 from apps.accounts.serializers import ClientStatsSerializer, MasterStatsSerializer
 
 
@@ -27,6 +27,11 @@ class AdminUserSerializer(serializers.ModelSerializer):
             "ban_reason",
             "banned_at",
             "is_master_active",
+            "master_level",
+            "master_specializations",
+            "master_quality_approved",
+            "master_quality_approved_at",
+            "master_quality_comment",
             "is_staff",
             "is_superuser",
             "client_stats",
@@ -37,6 +42,13 @@ class AdminUserSerializer(serializers.ModelSerializer):
 class AdminUserRoleSerializer(serializers.Serializer):
     role = serializers.ChoiceField(choices=RoleChoices.choices)
     is_master_active = serializers.BooleanField(required=False)
+
+
+class AdminMasterQualitySerializer(serializers.Serializer):
+    master_level = serializers.ChoiceField(choices=MasterLevelChoices.choices, required=False)
+    master_specializations = serializers.CharField(max_length=255, required=False, allow_blank=True)
+    master_quality_approved = serializers.BooleanField(required=False)
+    master_quality_comment = serializers.CharField(max_length=255, required=False, allow_blank=True)
 
 
 class AdminSystemSettingsSerializer(serializers.ModelSerializer):

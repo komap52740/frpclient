@@ -13,7 +13,7 @@ from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.accounts.models import RoleChoices, SiteSettings, User
+from apps.accounts.models import MasterLevelChoices, RoleChoices, SiteSettings, User
 from apps.accounts.permissions import IsAdminRole, IsAuthenticatedAndNotBanned
 from apps.accounts.services import recalculate_client_stats
 from apps.appointments.models import Appointment, AppointmentStatusChoices
@@ -22,6 +22,7 @@ from apps.appointments.views import ConfirmPaymentMixin
 
 from .filters import AdminAppointmentFilter
 from .serializers import (
+    AdminMasterQualitySerializer,
     AdminSystemActionSerializer,
     AdminSystemSettingsSerializer,
     AdminUserRoleSerializer,
@@ -112,13 +113,57 @@ class AdminMastersView(generics.ListAPIView):
         queryset = User.objects.filter(role=RoleChoices.MASTER).select_related("master_stats").order_by("-id")
         min_score = self.request.query_params.get("min_score")
         ordering = self.request.query_params.get("ordering")
+        quality = (self.request.query_params.get("quality") or "").strip().lower()
+        level = (self.request.query_params.get("level") or "").strip().lower()
 
         if min_score and str(min_score).isdigit():
             queryset = queryset.filter(master_stats__master_score__gte=int(min_score))
 
+        if quality == "approved":
+            queryset = queryset.filter(master_quality_approved=True)
+        elif quality == "pending":
+            queryset = queryset.filter(master_quality_approved=False)
+
+        if level in MasterLevelChoices.values:
+            queryset = queryset.filter(master_level=level)
+
         if ordering in {"master_score", "-master_score"}:
             queryset = queryset.order_by(f"{'' if ordering == 'master_score' else '-'}master_stats__master_score", "-id")
         return queryset
+
+
+class AdminMasterQualityUpdateView(APIView):
+    permission_classes = (IsAuthenticatedAndNotBanned, IsAdminRole)
+
+    def post(self, request, user_id: int):
+        user = get_object_or_404(User, id=user_id, role=RoleChoices.MASTER)
+        serializer = AdminMasterQualitySerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        data = serializer.validated_data
+        update_fields = ["updated_at"]
+
+        if "master_level" in data:
+            user.master_level = data["master_level"]
+            update_fields.append("master_level")
+        if "master_specializations" in data:
+            user.master_specializations = data["master_specializations"].strip()
+            update_fields.append("master_specializations")
+        if "master_quality_comment" in data:
+            user.master_quality_comment = data["master_quality_comment"].strip()
+            update_fields.append("master_quality_comment")
+        if "master_quality_approved" in data:
+            approved = bool(data["master_quality_approved"])
+            user.master_quality_approved = approved
+            update_fields.append("master_quality_approved")
+            if approved:
+                user.master_quality_approved_at = timezone.now()
+            else:
+                user.master_quality_approved_at = None
+            update_fields.append("master_quality_approved_at")
+
+        user.save(update_fields=sorted(set(update_fields)))
+        return Response(AdminUserSerializer(user).data)
 
 
 class AdminAllUsersView(generics.ListAPIView):

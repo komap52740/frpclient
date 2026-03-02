@@ -14,6 +14,14 @@ class RoleChoices(models.TextChoices):
     ADMIN = "admin", "Администратор"
 
 
+class MasterLevelChoices(models.TextChoices):
+    TRAINEE = "trainee", "Стажер"
+    JUNIOR = "junior", "Junior"
+    MIDDLE = "middle", "Middle"
+    SENIOR = "senior", "Senior"
+    LEAD = "lead", "Lead"
+
+
 class User(AbstractUser, TimeStampedModel):
     role = models.CharField(max_length=20, choices=RoleChoices.choices, default=RoleChoices.CLIENT)
     telegram_id = models.BigIntegerField(unique=True, null=True, blank=True)
@@ -21,6 +29,11 @@ class User(AbstractUser, TimeStampedModel):
     telegram_photo_url = models.URLField(blank=True)
 
     is_master_active = models.BooleanField(default=False)
+    master_level = models.CharField(max_length=20, choices=MasterLevelChoices.choices, default=MasterLevelChoices.JUNIOR)
+    master_specializations = models.CharField(max_length=255, blank=True)
+    master_quality_approved = models.BooleanField(default=False)
+    master_quality_approved_at = models.DateTimeField(null=True, blank=True)
+    master_quality_comment = models.CharField(max_length=255, blank=True)
 
     is_banned = models.BooleanField(default=False)
     ban_reason = models.TextField(blank=True)

@@ -622,3 +622,16 @@ No-Go, РµСЃР»Рё:
   - card action flow now emphasizes one primary action while keeping `Открыть заявку` as a lighter secondary path for clients.
 - `MyAppointmentsPage` controls:
   - added compact mobile filter mode with `Настроить/Свернуть` behavior for search + sort + unread toggle.
+### 2026-03-02 (Quality for service centers)
+- Added master quality contour in backend:
+  - `User` now stores `master_level`, `master_specializations`, `master_quality_approved`, `master_quality_approved_at`, `master_quality_comment`.
+  - safe migration backfills existing active masters with quality approval to avoid production disruption.
+- Added quality gates:
+  - master cannot take new appointment without quality approval.
+  - `trainee` level is blocked from taking service-center appointments.
+  - non-approved/trainee masters are excluded from new-appointment Telegram notifications.
+- Added admin quality management API:
+  - `POST /api/admin/masters/{id}/quality/` for level/specializations/comment/approval updates.
+  - `GET /api/admin/masters/` supports `quality` and `level` filters.
+- Updated admin UI:
+  - `AdminMastersPage` now supports quality operations (approve/revoke, level, specializations, QA comment) in one table.

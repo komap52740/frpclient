@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import pytest
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -26,6 +26,7 @@ def test_appointment_lifecycle_emits_platform_events():
         password="x",
         role=RoleChoices.MASTER,
         is_master_active=True,
+        master_quality_approved=True,
     )
 
     create_response = auth_as(client_user).post(
@@ -35,7 +36,7 @@ def test_appointment_lifecycle_emits_platform_events():
             "model": "iPhone 14",
             "lock_type": "PIN",
             "has_pc": True,
-            "description": "Тестовая заявка",
+            "description": "РўРµСЃС‚РѕРІР°СЏ Р·Р°СЏРІРєР°",
         },
         format="json",
     )
@@ -98,6 +99,7 @@ def test_chat_message_events_emitted():
         password="x",
         role=RoleChoices.MASTER,
         is_master_active=True,
+        master_quality_approved=True,
     )
     appointment = Appointment.objects.create(
         client=client_user,
@@ -112,7 +114,7 @@ def test_chat_message_events_emitted():
 
     send_response = auth_as(master_user).post(
         f"/api/appointments/{appointment.id}/messages/",
-        {"text": "Проверка platform event"},
+        {"text": "РџСЂРѕРІРµСЂРєР° platform event"},
         format="json",
     )
     assert send_response.status_code == 201
@@ -143,6 +145,7 @@ def test_review_events_emitted():
         password="x",
         role=RoleChoices.MASTER,
         is_master_active=True,
+        master_quality_approved=True,
     )
     appointment = Appointment.objects.create(
         client=client_user,
@@ -157,14 +160,14 @@ def test_review_events_emitted():
 
     master_review_response = auth_as(client_user).post(
         f"/api/appointments/{appointment.id}/review-master/",
-        {"rating": 5, "comment": "Отлично"},
+        {"rating": 5, "comment": "РћС‚Р»РёС‡РЅРѕ"},
         format="json",
     )
     assert master_review_response.status_code == 201
 
     client_review_response = auth_as(master_user).post(
         f"/api/appointments/{appointment.id}/review-client/",
-        {"rating": 4, "comment": "Хороший клиент", "behavior_flags": []},
+        {"rating": 4, "comment": "РҐРѕСЂРѕС€РёР№ РєР»РёРµРЅС‚", "behavior_flags": []},
         format="json",
     )
     assert client_review_response.status_code == 201
@@ -198,3 +201,4 @@ def test_admin_can_filter_v1_events():
     assert response.status_code == 200
     assert len(response.data) >= 1
     assert response.data[0]["event_type"] == "appointment.created"
+

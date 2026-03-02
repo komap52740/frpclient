@@ -1,4 +1,15 @@
-﻿import { Alert, Button, FormControlLabel, MenuItem, Paper, Stack, Switch, TextField, Typography } from "@mui/material";
+﻿import AddPhotoAlternateRoundedIcon from "@mui/icons-material/AddPhotoAlternateRounded";
+import HelpOutlineRoundedIcon from "@mui/icons-material/HelpOutlineRounded";
+import {
+  Alert,
+  Button,
+  FormControlLabel,
+  Paper,
+  Stack,
+  Switch,
+  TextField,
+  Typography,
+} from "@mui/material";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -9,19 +20,23 @@ export default function CreateAppointmentPage() {
   const [form, setForm] = useState({
     brand: "",
     model: "",
-    lock_type: "PIN",
+    lock_type: "OTHER",
     has_pc: true,
     description: "",
     photo_lock_screen: null,
   });
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
   const updateField = (key, value) => {
     setForm((prev) => ({ ...prev, [key]: value }));
   };
 
-  const onSubmit = async (e) => {
-    e.preventDefault();
+  const onSubmit = async (event) => {
+    event.preventDefault();
+    setSubmitting(true);
+
     const payload = new FormData();
     Object.entries(form).forEach(([key, value]) => {
       if (value === null || value === "") return;
@@ -33,48 +48,73 @@ export default function CreateAppointmentPage() {
       navigate(`/appointments/${response.data.id}`);
     } catch (err) {
       setError(err.response?.data?.detail || "Не удалось создать заявку");
+    } finally {
+      setSubmitting(false);
     }
   };
 
   return (
-    <Paper sx={{ p: 3 }}>
-      <Typography variant="h5" mb={2}>Новая заявка</Typography>
+    <Paper sx={{ p: { xs: 2, md: 3 }, borderRadius: 3 }}>
+      <Stack spacing={0.7} sx={{ mb: 2 }}>
+        <Typography variant="h5">Новая заявка</Typography>
+        <Typography variant="body2" color="text.secondary">
+          Заполните 3 поля. Остальное можно уточнить позже в чате.
+        </Typography>
+      </Stack>
 
-      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+      {error ? <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert> : null}
 
-      <Stack component="form" spacing={2} onSubmit={onSubmit}>
-        <TextField label="Бренд" value={form.brand} onChange={(e) => updateField("brand", e.target.value)} required />
-        <TextField label="Модель" value={form.model} onChange={(e) => updateField("model", e.target.value)} required />
+      <Stack component="form" spacing={1.4} onSubmit={onSubmit}>
         <TextField
-          select
-          label="Тип блокировки"
-          value={form.lock_type}
-          onChange={(e) => updateField("lock_type", e.target.value)}
-        >
-          <MenuItem value="PIN">PIN-код</MenuItem>
-          <MenuItem value="GOOGLE">Google-аккаунт</MenuItem>
-          <MenuItem value="APPLE_ID">Apple ID</MenuItem>
-          <MenuItem value="OTHER">Другое</MenuItem>
-        </TextField>
+          label="Марка"
+          value={form.brand}
+          onChange={(event) => updateField("brand", event.target.value)}
+          required
+        />
+        <TextField
+          label="Модель"
+          value={form.model}
+          onChange={(event) => updateField("model", event.target.value)}
+          required
+        />
         <FormControlLabel
-          control={<Switch checked={form.has_pc} onChange={(e) => updateField("has_pc", e.target.checked)} />}
+          control={<Switch checked={form.has_pc} onChange={(event) => updateField("has_pc", event.target.checked)} />}
           label="Есть доступ к ПК"
         />
         <TextField
-          label="Описание"
+          label="Что случилось с телефоном?"
+          placeholder="Опишите проблему простыми словами"
           multiline
-          minRows={3}
+          minRows={4}
           value={form.description}
-          onChange={(e) => updateField("description", e.target.value)}
+          onChange={(event) => updateField("description", event.target.value)}
           required
         />
 
-        <Button component="label" variant="outlined">
-          Фото экрана блокировки (опционально)
-          <input hidden type="file" accept=".jpg,.jpeg,.png" onChange={(e) => updateField("photo_lock_screen", e.target.files?.[0] || null)} />
+        <Button
+          variant={showAdvanced ? "outlined" : "text"}
+          startIcon={<HelpOutlineRoundedIcon fontSize="small" />}
+          onClick={() => setShowAdvanced((prev) => !prev)}
+          sx={{ alignSelf: "flex-start" }}
+        >
+          {showAdvanced ? "Скрыть доп. поля" : "Показать доп. поля"}
         </Button>
 
-        <Button type="submit" variant="contained">Создать</Button>
+        {showAdvanced ? (
+          <Button component="label" variant="outlined" startIcon={<AddPhotoAlternateRoundedIcon fontSize="small" />}>
+            Фото экрана блокировки (опционально)
+            <input
+              hidden
+              type="file"
+              accept=".jpg,.jpeg,.png"
+              onChange={(event) => updateField("photo_lock_screen", event.target.files?.[0] || null)}
+            />
+          </Button>
+        ) : null}
+
+        <Button type="submit" variant="contained" size="large" disabled={submitting}>
+          {submitting ? "Создаем заявку..." : "Создать заявку"}
+        </Button>
       </Stack>
     </Paper>
   );
