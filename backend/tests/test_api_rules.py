@@ -632,6 +632,7 @@ def test_client_can_repeat_appointment(client_user):
         model="A50",
         lock_type="PIN",
         has_pc=True,
+        contact_phone="+79001112233",
         description="РџРѕРІС‚РѕСЂРЅР°СЏ РґРёР°РіРЅРѕСЃС‚РёРєР°",
         rustdesk_id="123 456 789",
         rustdesk_password="pass-001",
@@ -650,6 +651,7 @@ def test_client_can_repeat_appointment(client_user):
     assert repeated.brand == source.brand
     assert repeated.model == source.model
     assert repeated.lock_type == source.lock_type
+    assert repeated.contact_phone == source.contact_phone
     assert repeated.rustdesk_id == source.rustdesk_id
     assert repeated.rustdesk_password == source.rustdesk_password
     assert repeated.status == AppointmentStatusChoices.NEW
@@ -722,6 +724,7 @@ def test_create_appointment_calls_master_telegram_notifications(client_user):
         "model": "A50",
         "lock_type": "PIN",
         "has_pc": True,
+        "contact_phone": "+79001112233",
         "description": "desc",
         "rustdesk_id": "987 654 321",
         "rustdesk_password": "test-pass",
@@ -746,6 +749,7 @@ def test_create_appointment_requires_rudesktop_credentials(client_user):
 
     response = auth_as(client_user).post("/api/appointments/", payload, format="json")
     assert response.status_code == 400
+    assert "contact_phone" in response.data
     assert "rustdesk_id" in response.data
     assert "rustdesk_password" in response.data
 

@@ -70,6 +70,7 @@ class Appointment(TimeStampedModel):
     model = models.CharField(max_length=255)
     lock_type = models.CharField(max_length=20, choices=LockTypeChoices.choices)
     has_pc = models.BooleanField(default=False)
+    contact_phone = models.CharField(max_length=32, blank=True, default="")
     description = models.TextField()
     rustdesk_id = models.CharField(max_length=64, blank=True, default="")
     rustdesk_password = models.CharField(max_length=128, blank=True, default="")

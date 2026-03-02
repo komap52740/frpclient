@@ -31,7 +31,10 @@ def test_appointment_create_sets_response_deadline():
             "model": "iPhone",
             "lock_type": "PIN",
             "has_pc": True,
+            "contact_phone": "+79001112233",
             "description": "desc",
+            "rustdesk_id": "111222333",
+            "rustdesk_password": "rd-pass",
         },
         format="json",
     )

@@ -43,7 +43,10 @@ def test_rule_creates_notification_on_event():
             "model": "iPhone 15",
             "lock_type": "PIN",
             "has_pc": True,
+            "contact_phone": "+79001112233",
             "description": "desc",
+            "rustdesk_id": "777888999",
+            "rustdesk_password": "rd-pass",
         },
         format="json",
     )

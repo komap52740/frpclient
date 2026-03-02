@@ -32,6 +32,7 @@ class AppointmentSerializer(serializers.ModelSerializer):
             "model",
             "lock_type",
             "has_pc",
+            "contact_phone",
             "description",
             "rustdesk_id",
             "rustdesk_password",
@@ -132,8 +133,11 @@ class AppointmentCreateSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         rustdesk_id = (attrs.get("rustdesk_id") or "").strip()
         rustdesk_password = (attrs.get("rustdesk_password") or "").strip()
+        contact_phone = (attrs.get("contact_phone") or "").strip()
 
         errors = {}
+        if not contact_phone:
+            errors["contact_phone"] = "Укажите контактный телефон"
         if not rustdesk_id:
             errors["rustdesk_id"] = "Укажите логин/ID RuDesktop"
         if not rustdesk_password:
@@ -141,6 +145,7 @@ class AppointmentCreateSerializer(serializers.ModelSerializer):
         if errors:
             raise serializers.ValidationError(errors)
 
+        attrs["contact_phone"] = contact_phone
         attrs["rustdesk_id"] = rustdesk_id
         attrs["rustdesk_password"] = rustdesk_password
         return attrs
@@ -152,6 +157,7 @@ class AppointmentCreateSerializer(serializers.ModelSerializer):
             "model",
             "lock_type",
             "has_pc",
+            "contact_phone",
             "description",
             "rustdesk_id",
             "rustdesk_password",

@@ -36,7 +36,10 @@ def test_appointment_lifecycle_emits_platform_events():
             "model": "iPhone 14",
             "lock_type": "PIN",
             "has_pc": True,
+            "contact_phone": "+79001112233",
             "description": "РўРµСЃС‚РѕРІР°СЏ Р·Р°СЏРІРєР°",
+            "rustdesk_id": "444555666",
+            "rustdesk_password": "rd-pass",
         },
         format="json",
     )

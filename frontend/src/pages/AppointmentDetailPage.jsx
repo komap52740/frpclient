@@ -712,6 +712,7 @@ export default function AppointmentDetailPage() {
   const lastSyncLabel = dayjs(lastSyncedAt).format("HH:mm:ss");
   const visibleTimelineEvents = isClient ? timelineEvents.slice(0, isClientCompact ? 3 : 6) : timelineEvents;
   const sidebarTimelineEvents = isClient ? visibleTimelineEvents.slice(0, isClientCompact ? 2 : 4) : visibleTimelineEvents;
+  const contactPhone = (appointment.contact_phone || "").trim();
   const rustdeskId = (appointment.rustdesk_id || "").trim();
   const rustdeskPassword = (appointment.rustdesk_password || "").trim();
   const ruDesktopConnectAllowedStatuses = ["PAID", "IN_PROGRESS"];
@@ -1270,6 +1271,7 @@ export default function AppointmentDetailPage() {
                           <Chip size="small" label={`Блокировка: ${getLockTypeLabel(appointment.lock_type)}`} />
                           <Chip size="small" color={appointment.total_price ? "warning" : "default"} label={appointment.total_price ? `К оплате: ${appointment.total_price} руб.` : "Цена уточняется"} />
                           <Chip size="small" label={`Мастер: ${normalizeRuText(appointment.master_username) || "пока не назначен"}`} />
+                          {contactPhone ? <Chip size="small" label={`Телефон: ${contactPhone}`} /> : null}
                           {rustdeskId ? <Chip size="small" icon={<ComputerRoundedIcon fontSize="small" />} label={`RuDesktop логин/ID: ${rustdeskId}`} /> : null}
                         </Stack>
                         {appointment.description ? (
@@ -1284,6 +1286,7 @@ export default function AppointmentDetailPage() {
                         <Typography variant="body2"><b>Тип блокировки:</b> {getLockTypeLabel(appointment.lock_type)}</Typography>
                         <Typography variant="body2"><b>Цена:</b> {appointment.total_price ? `${appointment.total_price} руб.` : "Не выставлена"}</Typography>
                         <Typography variant="body2"><b>Мастер:</b> {normalizeRuText(appointment.master_username) || appointment.assigned_master || "Пока не назначен"}</Typography>
+                        <Typography variant="body2"><b>Телефон клиента:</b> {contactPhone || "Не указан"}</Typography>
                         <Typography variant="body2"><b>Логин/ID RuDesktop:</b> {rustdeskId || "Не указан"}</Typography>
                         {rustdeskPassword ? <Typography variant="body2"><b>RuDesktop пароль:</b> {rustdeskPassword}</Typography> : null}
                         {appointment.description ? (

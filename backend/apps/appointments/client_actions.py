@@ -86,6 +86,7 @@ def repeat_client_appointment(*, source: Appointment, client_user) -> Appointmen
         model=source.model,
         lock_type=source.lock_type,
         has_pc=source.has_pc,
+        contact_phone=source.contact_phone,
         description=source.description,
         rustdesk_id=source.rustdesk_id,
         rustdesk_password=source.rustdesk_password,
