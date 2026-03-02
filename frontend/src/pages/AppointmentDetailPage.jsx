@@ -1,8 +1,11 @@
 ﻿import CampaignRoundedIcon from "@mui/icons-material/CampaignRounded";
 import ContentCopyRoundedIcon from "@mui/icons-material/ContentCopyRounded";
+import ComputerRoundedIcon from "@mui/icons-material/ComputerRounded";
 import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
 import ForumRoundedIcon from "@mui/icons-material/ForumRounded";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
+import LinkRoundedIcon from "@mui/icons-material/LinkRounded";
+import OpenInNewRoundedIcon from "@mui/icons-material/OpenInNewRounded";
 import PaymentsRoundedIcon from "@mui/icons-material/PaymentsRounded";
 import ReplayRoundedIcon from "@mui/icons-material/ReplayRounded";
 import ShieldRoundedIcon from "@mui/icons-material/ShieldRounded";
@@ -583,10 +586,10 @@ export default function AppointmentDetailPage() {
     }
   };
 
-  const copyToClipboard = async (value) => {
+  const copyToClipboard = async (value, emptyMessage = "Нет данных для копирования") => {
     const text = (value || "").trim();
     if (!text) {
-      setError("Реквизиты пока не заполнены администратором");
+      setError(emptyMessage);
       return;
     }
     try {
@@ -687,6 +690,38 @@ export default function AppointmentDetailPage() {
   const lastSyncLabel = dayjs(lastSyncedAt).format("HH:mm:ss");
   const visibleTimelineEvents = isClient ? timelineEvents.slice(0, isClientCompact ? 3 : 6) : timelineEvents;
   const sidebarTimelineEvents = isClient ? visibleTimelineEvents.slice(0, isClientCompact ? 2 : 4) : visibleTimelineEvents;
+  const rustdeskId = (appointment.rustdesk_id || "").trim();
+  const rustdeskPassword = (appointment.rustdesk_password || "").trim();
+  const sidebarLinks = [
+    {
+      id: "rustdesk_download",
+      label: "Скачать RustDesk",
+      href: "https://rustdesk.com/download",
+    },
+    {
+      id: "rustdesk_guide",
+      label: "Инструкция подключения",
+      href: "https://rustdesk.com/docs/en/",
+    },
+    ...(appointment.photo_lock_screen_url
+      ? [
+          {
+            id: "lock_screen",
+            label: "Фото экрана блокировки",
+            href: appointment.photo_lock_screen_url,
+          },
+        ]
+      : []),
+    ...(appointment.payment_proof_url
+      ? [
+          {
+            id: "payment_proof",
+            label: "Чек/скрин оплаты",
+            href: appointment.payment_proof_url,
+          },
+        ]
+      : []),
+  ];
   const actionEtaLabel = (() => {
     if (appointment.status === "AWAITING_PAYMENT") {
       return "После оплаты мастер продолжит обычно за 1-5 минут";
@@ -1210,6 +1245,7 @@ export default function AppointmentDetailPage() {
                           <Chip size="small" label={`Блокировка: ${getLockTypeLabel(appointment.lock_type)}`} />
                           <Chip size="small" color={appointment.total_price ? "warning" : "default"} label={appointment.total_price ? `К оплате: ${appointment.total_price} руб.` : "Цена уточняется"} />
                           <Chip size="small" label={`Мастер: ${normalizeRuText(appointment.master_username) || "пока не назначен"}`} />
+                          {rustdeskId ? <Chip size="small" icon={<ComputerRoundedIcon fontSize="small" />} label={`RustDesk: ${rustdeskId}`} /> : null}
                         </Stack>
                         {appointment.description ? (
                           <Typography variant="body2" color="text.secondary">
@@ -1223,6 +1259,8 @@ export default function AppointmentDetailPage() {
                         <Typography variant="body2"><b>Тип блокировки:</b> {getLockTypeLabel(appointment.lock_type)}</Typography>
                         <Typography variant="body2"><b>Цена:</b> {appointment.total_price ? `${appointment.total_price} руб.` : "Не выставлена"}</Typography>
                         <Typography variant="body2"><b>Мастер:</b> {normalizeRuText(appointment.master_username) || appointment.assigned_master || "Пока не назначен"}</Typography>
+                        <Typography variant="body2"><b>RustDesk ID:</b> {rustdeskId || "Не указан"}</Typography>
+                        {rustdeskPassword ? <Typography variant="body2"><b>RustDesk пароль:</b> {rustdeskPassword}</Typography> : null}
                         {appointment.description ? (
                           <Typography variant="body2"><b>Комментарий:</b> {normalizeRuText(appointment.description)}</Typography>
                         ) : null}
@@ -1721,6 +1759,80 @@ export default function AppointmentDetailPage() {
                 )}
               </Stack>
             </Paper>
+
+              <Paper sx={{ p: 2.2 }}>
+                <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}>
+                  <LinkRoundedIcon color="primary" fontSize="small" />
+                  <Typography variant="h3">Ссылки и подключение</Typography>
+                </Stack>
+                <Stack spacing={0.9}>
+                  <Typography variant="caption" color="text.secondary">
+                    Все нужные ссылки собраны справа, чтобы не искать их в переписке.
+                  </Typography>
+
+                  {rustdeskId ? (
+                    <Stack spacing={0.8}>
+                      <Chip
+                        size="small"
+                        icon={<ComputerRoundedIcon fontSize="small" />}
+                        label={`RustDesk ID: ${rustdeskId}`}
+                        sx={{ alignSelf: "flex-start" }}
+                      />
+                      <Stack direction="row" spacing={0.7} flexWrap="wrap" useFlexGap>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          startIcon={<ContentCopyRoundedIcon fontSize="small" />}
+                          onClick={() => copyToClipboard(rustdeskId, "RustDesk ID не указан")}
+                        >
+                          Копировать ID
+                        </Button>
+                        {rustdeskPassword ? (
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            startIcon={<ContentCopyRoundedIcon fontSize="small" />}
+                            onClick={() => copyToClipboard(rustdeskPassword, "Пароль RustDesk не указан")}
+                          >
+                            Копировать пароль
+                          </Button>
+                        ) : null}
+                      </Stack>
+                    </Stack>
+                  ) : (
+                    <Alert
+                      severity={isClient ? "info" : "warning"}
+                      action={(
+                        <Button size="small" color="inherit" onClick={() => handlePrimaryAction("open_chat")}>
+                          В чат
+                        </Button>
+                      )}
+                    >
+                      {isClient
+                        ? "RustDesk ID пока не указан. Отправьте его в чат, чтобы мастер подключился быстрее."
+                        : "Клиент еще не указал RustDesk ID. Запросите его в чате."}
+                    </Alert>
+                  )}
+
+                  <Stack spacing={0.6}>
+                    {sidebarLinks.map((item) => (
+                      <Button
+                        key={item.id}
+                        size="small"
+                        variant="outlined"
+                        component="a"
+                        href={item.href}
+                        target="_blank"
+                        rel="noreferrer"
+                        startIcon={<OpenInNewRoundedIcon fontSize="small" />}
+                        sx={{ justifyContent: "flex-start" }}
+                      >
+                        {item.label}
+                      </Button>
+                    ))}
+                  </Stack>
+                </Stack>
+              </Paper>
 
               <Paper ref={timelineRef} sx={{ p: 2.2 }}>
                 <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}>

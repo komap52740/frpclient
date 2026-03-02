@@ -33,6 +33,8 @@ class AppointmentSerializer(serializers.ModelSerializer):
             "lock_type",
             "has_pc",
             "description",
+            "rustdesk_id",
+            "rustdesk_password",
             "photo_lock_screen",
             "photo_lock_screen_url",
             "status",
@@ -135,6 +137,8 @@ class AppointmentCreateSerializer(serializers.ModelSerializer):
             "lock_type",
             "has_pc",
             "description",
+            "rustdesk_id",
+            "rustdesk_password",
             "photo_lock_screen",
         )
 

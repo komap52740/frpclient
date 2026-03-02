@@ -71,6 +71,8 @@ class Appointment(TimeStampedModel):
     lock_type = models.CharField(max_length=20, choices=LockTypeChoices.choices)
     has_pc = models.BooleanField(default=False)
     description = models.TextField()
+    rustdesk_id = models.CharField(max_length=64, blank=True, default="")
+    rustdesk_password = models.CharField(max_length=128, blank=True, default="")
     photo_lock_screen = models.FileField(
         upload_to="lock_screen/",
         null=True,

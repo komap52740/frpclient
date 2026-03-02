@@ -87,6 +87,8 @@ def repeat_client_appointment(*, source: Appointment, client_user) -> Appointmen
         lock_type=source.lock_type,
         has_pc=source.has_pc,
         description=source.description,
+        rustdesk_id=source.rustdesk_id,
+        rustdesk_password=source.rustdesk_password,
     )
     initialize_response_deadline(repeated)
     emit_event(
@@ -101,4 +103,3 @@ def repeat_client_appointment(*, source: Appointment, client_user) -> Appointmen
     )
     notify_masters_about_new_appointment(repeated)
     return repeated
-

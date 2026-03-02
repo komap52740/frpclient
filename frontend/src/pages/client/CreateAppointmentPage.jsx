@@ -1,9 +1,10 @@
-﻿import AddPhotoAlternateRoundedIcon from "@mui/icons-material/AddPhotoAlternateRounded";
+import AddPhotoAlternateRoundedIcon from "@mui/icons-material/AddPhotoAlternateRounded";
 import HelpOutlineRoundedIcon from "@mui/icons-material/HelpOutlineRounded";
 import {
   Alert,
   Button,
   FormControlLabel,
+  MenuItem,
   Paper,
   Stack,
   Switch,
@@ -14,15 +15,34 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { appointmentsApi } from "../../api/client";
+import { getLockTypeLabel } from "../../constants/labels";
+
+function splitDevice(rawDevice) {
+  const normalized = (rawDevice || "").trim().replace(/\s+/g, " ");
+  if (!normalized) {
+    return { brand: "", model: "" };
+  }
+
+  const parts = normalized.split(" ");
+  if (parts.length === 1) {
+    return { brand: normalized, model: normalized };
+  }
+
+  return {
+    brand: parts[0],
+    model: parts.slice(1).join(" "),
+  };
+}
 
 export default function CreateAppointmentPage() {
   const navigate = useNavigate();
   const [form, setForm] = useState({
-    brand: "",
-    model: "",
+    device: "",
     lock_type: "OTHER",
     has_pc: true,
     description: "",
+    rustdesk_id: "",
+    rustdesk_password: "",
     photo_lock_screen: null,
   });
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -36,12 +56,37 @@ export default function CreateAppointmentPage() {
   const onSubmit = async (event) => {
     event.preventDefault();
     setSubmitting(true);
+    setError("");
+
+    const { brand, model } = splitDevice(form.device);
+    const description = form.description.trim();
+    if (!brand || !model) {
+      setError("Укажите устройство (марка и модель)");
+      setSubmitting(false);
+      return;
+    }
+    if (!description) {
+      setError("Коротко опишите проблему");
+      setSubmitting(false);
+      return;
+    }
 
     const payload = new FormData();
-    Object.entries(form).forEach(([key, value]) => {
-      if (value === null || value === "") return;
-      payload.append(key, value);
-    });
+    payload.append("brand", brand);
+    payload.append("model", model);
+    payload.append("lock_type", form.lock_type);
+    payload.append("has_pc", String(form.has_pc));
+    payload.append("description", description);
+
+    if (form.rustdesk_id.trim()) {
+      payload.append("rustdesk_id", form.rustdesk_id.trim());
+    }
+    if (form.rustdesk_password.trim()) {
+      payload.append("rustdesk_password", form.rustdesk_password.trim());
+    }
+    if (form.photo_lock_screen) {
+      payload.append("photo_lock_screen", form.photo_lock_screen);
+    }
 
     try {
       const response = await appointmentsApi.create(payload);
@@ -58,7 +103,7 @@ export default function CreateAppointmentPage() {
       <Stack spacing={0.7} sx={{ mb: 2 }}>
         <Typography variant="h5">Новая заявка</Typography>
         <Typography variant="body2" color="text.secondary">
-          Заполните 3 поля. Остальное можно уточнить позже в чате.
+          Минимум шагов: устройство, что случилось, RustDesk. Остальное можно уточнить в чате.
         </Typography>
       </Stack>
 
@@ -66,26 +111,26 @@ export default function CreateAppointmentPage() {
 
       <Stack component="form" spacing={1.4} onSubmit={onSubmit}>
         <TextField
-          label="Марка"
-          value={form.brand}
-          onChange={(event) => updateField("brand", event.target.value)}
+          label="Устройство (марка + модель)"
+          placeholder="Например: Samsung A54"
+          value={form.device}
+          onChange={(event) => updateField("device", event.target.value)}
           required
         />
+
         <TextField
-          label="Модель"
-          value={form.model}
-          onChange={(event) => updateField("model", event.target.value)}
-          required
+          label="Ваш RustDesk ID"
+          placeholder="Например: 123 456 789"
+          value={form.rustdesk_id}
+          onChange={(event) => updateField("rustdesk_id", event.target.value)}
+          helperText="Лучше указать сразу: мастер сможет быстрее подключиться."
         />
-        <FormControlLabel
-          control={<Switch checked={form.has_pc} onChange={(event) => updateField("has_pc", event.target.checked)} />}
-          label="Есть доступ к ПК"
-        />
+
         <TextField
-          label="Что случилось с телефоном?"
-          placeholder="Опишите проблему простыми словами"
+          label="Что случилось?"
+          placeholder="Коротко опишите проблему"
           multiline
-          minRows={4}
+          minRows={3}
           value={form.description}
           onChange={(event) => updateField("description", event.target.value)}
           required
@@ -97,19 +142,50 @@ export default function CreateAppointmentPage() {
           onClick={() => setShowAdvanced((prev) => !prev)}
           sx={{ alignSelf: "flex-start" }}
         >
-          {showAdvanced ? "Скрыть доп. поля" : "Показать доп. поля"}
+          {showAdvanced ? "Скрыть доп. поля" : "Доп. поля (опционально)"}
         </Button>
 
         {showAdvanced ? (
-          <Button component="label" variant="outlined" startIcon={<AddPhotoAlternateRoundedIcon fontSize="small" />}>
-            Фото экрана блокировки (опционально)
-            <input
-              hidden
-              type="file"
-              accept=".jpg,.jpeg,.png"
-              onChange={(event) => updateField("photo_lock_screen", event.target.files?.[0] || null)}
+          <Stack spacing={1.2}>
+            <TextField
+              label="Пароль RustDesk (если есть)"
+              value={form.rustdesk_password}
+              onChange={(event) => updateField("rustdesk_password", event.target.value)}
             />
-          </Button>
+
+            <TextField
+              select
+              label="Тип блокировки"
+              value={form.lock_type}
+              onChange={(event) => updateField("lock_type", event.target.value)}
+            >
+              {["PIN", "GOOGLE", "APPLE_ID", "OTHER"].map((type) => (
+                <MenuItem key={type} value={type}>
+                  {getLockTypeLabel(type)}
+                </MenuItem>
+              ))}
+            </TextField>
+
+            <FormControlLabel
+              control={(
+                <Switch
+                  checked={form.has_pc}
+                  onChange={(event) => updateField("has_pc", event.target.checked)}
+                />
+              )}
+              label="Есть доступ к ПК"
+            />
+
+            <Button component="label" variant="outlined" startIcon={<AddPhotoAlternateRoundedIcon fontSize="small" />}>
+              Фото экрана блокировки (опционально)
+              <input
+                hidden
+                type="file"
+                accept=".jpg,.jpeg,.png"
+                onChange={(event) => updateField("photo_lock_screen", event.target.files?.[0] || null)}
+              />
+            </Button>
+          </Stack>
         ) : null}
 
         <Button type="submit" variant="contained" size="large" disabled={submitting}>
