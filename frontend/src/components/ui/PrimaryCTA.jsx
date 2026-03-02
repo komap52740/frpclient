@@ -103,12 +103,17 @@ export default function PrimaryCTA({
         disabled={disabled || action.disabled}
         startIcon={<Icon />}
         onClick={() => onAction?.(action.key, action)}
-        sx={sx}
+        sx={{
+          minHeight: 44,
+          fontWeight: 780,
+          borderRadius: 2.2,
+          ...sx,
+        }}
       >
         {action.label}
       </Button>
       {action.helper ? (
-        <Typography variant="caption" color="text.secondary">
+        <Typography variant="caption" color="text.secondary" sx={{ px: 0.2 }}>
           {action.helper}
         </Typography>
       ) : null}

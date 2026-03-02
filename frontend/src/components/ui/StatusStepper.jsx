@@ -38,9 +38,9 @@ export default function StatusStepper({ status, role, compact = false, slaBreach
   const isTerminalError = status === "DECLINED_BY_MASTER" || status === "CANCELLED";
 
   return (
-    <Stack spacing={compact ? 0.75 : 1.25}>
+    <Stack spacing={compact ? 0.75 : 1.2}>
       <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between">
-        <Typography variant={compact ? "caption" : "body2"} sx={{ fontWeight: 700, color: ui.color }}>
+        <Typography variant={compact ? "caption" : "body2"} sx={{ fontWeight: 760, color: ui.color }}>
           {ui.stepLabel}
         </Typography>
         {isTerminalError || slaBreached ? <ErrorOutlineRoundedIcon fontSize="small" sx={{ color: ui.color }} /> : null}
@@ -52,7 +52,7 @@ export default function StatusStepper({ status, role, compact = false, slaBreach
             variant="determinate"
             value={getProgressValue(status)}
             sx={{
-              height: 7.5,
+              height: 8,
               borderRadius: 999,
               bgcolor: ui.bg,
               "& .MuiLinearProgress-bar": {
@@ -70,7 +70,7 @@ export default function StatusStepper({ status, role, compact = false, slaBreach
           sx={{
             "& .MuiStepLabel-label": {
               fontSize: 12,
-              fontWeight: 600,
+              fontWeight: 650,
               color: "text.secondary",
               mt: 0.45,
             },
@@ -80,15 +80,12 @@ export default function StatusStepper({ status, role, compact = false, slaBreach
             },
             "& .MuiStepLabel-label.Mui-completed": {
               color: "text.primary",
-              fontWeight: 700,
+              fontWeight: 750,
             },
             "& .MuiStepIcon-root": {
-              color: alpha(ui.color, 0.26),
+              color: alpha(ui.color, 0.24),
             },
-            "& .MuiStepIcon-root.Mui-active": {
-              color: ui.color,
-            },
-            "& .MuiStepIcon-root.Mui-completed": {
+            "& .MuiStepIcon-root.Mui-active, & .MuiStepIcon-root.Mui-completed": {
               color: ui.color,
             },
           }}
@@ -103,7 +100,7 @@ export default function StatusStepper({ status, role, compact = false, slaBreach
 
       {!compact ? (
         <Typography variant="caption" color="text.secondary">
-          {ui.hint || (role === "master" ? "Если не получается — напишите в чат клиента." : "Если не получается — напишите в чат мастеру.")}
+          {ui.hint || (role === "master" ? "Если зависли на шаге, уточните детали у клиента в чате." : "Если что-то не получается, напишите мастеру в чат.")}
         </Typography>
       ) : null}
     </Stack>

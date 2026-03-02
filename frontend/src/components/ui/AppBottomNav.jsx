@@ -8,6 +8,7 @@ import PersonRoundedIcon from "@mui/icons-material/PersonRounded";
 import ReviewsRoundedIcon from "@mui/icons-material/ReviewsRounded";
 import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
 import { BottomNavigation, BottomNavigationAction, Paper } from "@mui/material";
+import { alpha } from "@mui/material/styles";
 import { useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
@@ -19,6 +20,7 @@ function getActions(role) {
       { label: "Профиль", to: "/client/profile", icon: <PersonRoundedIcon /> },
     ];
   }
+
   if (role === "master") {
     return [
       { label: "Новые", to: "/master/new", icon: <NewReleasesRoundedIcon /> },
@@ -26,6 +28,7 @@ function getActions(role) {
       { label: "Отзывы", to: "/master/reviews", icon: <ReviewsRoundedIcon /> },
     ];
   }
+
   if (role === "admin") {
     return [
       { label: "Система", to: "/admin/system", icon: <SettingsRoundedIcon /> },
@@ -35,6 +38,7 @@ function getActions(role) {
       { label: "Польз.", to: "/admin/users", icon: <ManageAccountsRoundedIcon /> },
     ];
   }
+
   return [];
 }
 
@@ -55,19 +59,23 @@ export default function AppBottomNav({ role }) {
       sx={{
         display: { xs: "block", md: "none" },
         position: "fixed",
-        left: 8,
-        right: 8,
-        bottom: "calc(env(safe-area-inset-bottom, 0px) + 8px)",
+        left: 10,
+        right: 10,
+        bottom: "calc(env(safe-area-inset-bottom, 0px) + 10px)",
         zIndex: 1300,
         borderRadius: 4,
         border: "1px solid",
         borderColor: "divider",
         backgroundColor: (theme) =>
-          theme.palette.mode === "dark" ? "rgba(15,23,42,0.92)" : "rgba(255,255,255,0.86)",
-        backdropFilter: "blur(16px) saturate(130%)",
+          theme.palette.mode === "dark"
+            ? "rgba(10, 16, 28, 0.9)"
+            : "rgba(255,255,255,0.86)",
+        backdropFilter: "blur(18px) saturate(150%)",
         overflow: "hidden",
         boxShadow: (theme) =>
-          theme.palette.mode === "dark" ? "0 10px 28px rgba(2,6,23,0.5)" : "0 10px 28px rgba(15,23,42,0.12)",
+          theme.palette.mode === "dark"
+            ? "0 14px 36px rgba(2,6,23,0.58)"
+            : "0 12px 30px rgba(15,23,42,0.14)",
       }}
     >
       <BottomNavigation
@@ -75,23 +83,25 @@ export default function AppBottomNav({ role }) {
         onChange={(_, value) => navigate(value)}
         showLabels
         sx={{
-          minHeight: 62,
+          minHeight: 64,
           bgcolor: "transparent",
           "& .MuiBottomNavigationAction-root": {
             minWidth: 56,
             color: "text.secondary",
             py: 0.5,
             borderRadius: 2.5,
-            mx: 0.25,
+            mx: 0.3,
             "& .MuiBottomNavigationAction-label": {
               fontSize: 11.5,
+              fontWeight: 700,
             },
           },
           "& .Mui-selected": {
             color: "primary.main",
-            fontWeight: 700,
             bgcolor: (theme) =>
-              theme.palette.mode === "dark" ? "rgba(90,169,255,0.16)" : "rgba(0,122,255,0.10)",
+              theme.palette.mode === "dark"
+                ? alpha(theme.palette.primary.main, 0.2)
+                : alpha(theme.palette.primary.main, 0.12),
           },
         }}
       >

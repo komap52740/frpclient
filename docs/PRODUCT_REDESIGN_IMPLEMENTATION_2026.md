@@ -635,3 +635,22 @@ No-Go, РµСЃР»Рё:
   - `GET /api/admin/masters/` supports `quality` and `level` filters.
 - Updated admin UI:
   - `AdminMastersPage` now supports quality operations (approve/revoke, level, specializations, QA comment) in one table.
+### 2026-03-02 (Premium UI pass, navigation + client list)
+- Reworked design system for a more premium SaaS look:
+  - stronger color hierarchy, deeper shadows, cleaner rounded geometry, and refined button/input behavior.
+  - improved global glass effect and app-level visual depth for both light and dark modes.
+- Rebuilt `MainLayout` shell:
+  - cleaner topbar with route-aware title/subtitle.
+  - fast role-aware quick action in header on desktop.
+  - polished drawer navigation with clearer selected states.
+  - improved Russian UX copy (removed mojibake labels in core navigation).
+- Rebuilt mobile shell controls:
+  - redesigned `AppBottomNav` and `AppFab` with clearer selected states and premium visual treatment.
+- Reworked status language + semantics in `theme/status.js`:
+  - cleaner Russian labels and hints focused on next action.
+- Refreshed reusable UI blocks:
+  - `StatusStepper` now has clearer visual progress and stronger readability.
+  - `AppointmentCard` redesigned with stronger hierarchy: status rail, cleaner meta, and one clear action focus.
+- Refactored client page `MyAppointmentsPage`:
+  - less clutter, stronger “priority action” block, and simplified filter/sort UX.
+  - improved mobile behavior for advanced filters.

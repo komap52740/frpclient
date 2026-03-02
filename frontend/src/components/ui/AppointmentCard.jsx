@@ -17,15 +17,15 @@ import StatusStepper from "./StatusStepper";
 
 dayjs.locale("ru");
 
-function formatLastActivity(item) {
+function formatLastActivity(item, compact) {
   const source = item.updated_at || item.created_at;
   if (!source) return "—";
-  return dayjs(source).format("DD.MM.YYYY HH:mm");
+  return compact ? dayjs(source).format("HH:mm") : dayjs(source).format("DD.MM.YYYY HH:mm");
 }
 
 function riskTone(level) {
   if (level === "critical" || level === "high") {
-    return { color: "#b42318", bg: "#fee4e2", label: `Риск: ${level === "critical" ? "критический" : "высокий"}` };
+    return { color: "#b42318", bg: "#fee4e2", label: level === "critical" ? "Риск: критический" : "Риск: высокий" };
   }
   if (level === "medium") {
     return { color: "#b54708", bg: "#fffaeb", label: "Риск: средний" };
@@ -47,7 +47,6 @@ export default function AppointmentCard({
   const statusUi = resolveStatusUI(item.status, item.sla_breached);
   const unreadCount = item.unread_count || 0;
   const riskUi = riskTone(item.client_risk_level);
-  const showCompactMeta = isClient && isMobile;
   const detailButtonVariant = showWorkflowAction ? (isClient ? "text" : "outlined") : "contained";
 
   return (
@@ -55,36 +54,38 @@ export default function AppointmentCard({
       sx={{
         position: "relative",
         overflow: "hidden",
-        transition: "transform 220ms ease, box-shadow 220ms ease, border-color 220ms ease",
         border: "1px solid",
         borderColor: "divider",
         background: isDark
-          ? "linear-gradient(156deg, rgba(15,23,42,0.88) 0%, rgba(20,29,46,0.85) 100%)"
-          : "linear-gradient(156deg, rgba(255,255,255,0.96) 0%, rgba(247,251,255,0.92) 100%)",
+          ? "linear-gradient(158deg, rgba(12,20,34,0.92) 0%, rgba(19,30,48,0.88) 100%)"
+          : "linear-gradient(158deg, rgba(255,255,255,0.98) 0%, rgba(244,250,255,0.93) 100%)",
+        transition: "transform 220ms ease, box-shadow 220ms ease, border-color 220ms ease",
         "&::before": {
           content: "\"\"",
           position: "absolute",
-          inset: "0 auto 0 0",
-          width: 3,
+          top: 0,
+          left: 0,
+          bottom: 0,
+          width: 4,
           background: statusUi.color,
-          opacity: 0.8,
+          opacity: 0.85,
         },
         "&:hover": {
           transform: "translateY(-2px)",
-          boxShadow: isDark ? "0 14px 30px rgba(2,6,23,0.55)" : 6,
-          borderColor: "rgba(2,132,199,0.28)",
+          boxShadow: isDark ? "0 14px 30px rgba(2,6,23,0.56)" : "0 14px 30px rgba(15,23,42,0.12)",
+          borderColor: "rgba(14,116,255,0.3)",
         },
       }}
     >
-      <CardContent sx={{ p: isMobile ? 1.35 : 2, "&:last-child": { pb: isMobile ? 1.35 : 2 } }}>
-        <Stack spacing={isClient ? 1 : 1.25}>
+      <CardContent sx={{ p: isMobile ? 1.35 : 1.9, "&:last-child": { pb: isMobile ? 1.35 : 1.9 } }}>
+        <Stack spacing={1.1}>
           <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={1}>
             <Box>
-              <Typography variant="h4" sx={{ fontSize: isMobile ? "0.97rem" : "1.02rem" }}>
+              <Typography variant="h4" sx={{ fontSize: isMobile ? "0.98rem" : "1.05rem" }}>
                 Заявка #{item.id}
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                {normalizeRuText(item.brand)} {normalizeRuText(item.model)} • {getLockTypeLabel(item.lock_type)}
+                {normalizeRuText(item.brand)} {normalizeRuText(item.model)} · {getLockTypeLabel(item.lock_type)}
               </Typography>
             </Box>
             <Chip
@@ -94,56 +95,28 @@ export default function AppointmentCard({
                 bgcolor: statusUi.bg,
                 color: statusUi.color,
                 border: `1px solid ${statusUi.color}33`,
+                fontWeight: 760,
               }}
             />
           </Stack>
 
-          {item.description && !isClient ? (
-            <Typography
-              variant="body2"
-              color="text.secondary"
-              sx={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}
-            >
-              {normalizeRuText(item.description)}
-            </Typography>
-          ) : null}
-
           <StatusStepper status={item.status} role={role} compact slaBreached={item.sla_breached} />
 
-          {!isClient ? <PaperHint hint={statusUi.hint} /> : null}
-
           <Stack direction="row" spacing={0.8} flexWrap="wrap" useFlexGap alignItems="center">
-            {showCompactMeta ? (
-              unreadCount ? (
-                <Badge color="primary" badgeContent={unreadCount} max={99}>
-                  <Chip size="small" icon={<ChatBubbleOutlineRoundedIcon />} label="Новые сообщения" variant="outlined" />
-                </Badge>
-              ) : (
-                <Chip
-                  size="small"
-                  icon={<ScheduleRoundedIcon />}
-                  label={`Обновлено ${dayjs(item.updated_at || item.created_at).format("HH:mm")}`}
-                  variant="outlined"
-                />
-              )
-            ) : (
-              <>
-                <Chip
-                  size="small"
-                  icon={<ScheduleRoundedIcon />}
-                  label={isMobile ? dayjs(item.updated_at || item.created_at).format("HH:mm") : `Обновлено: ${formatLastActivity(item)}`}
-                  variant="outlined"
-                />
-                <Badge color="primary" badgeContent={unreadCount} max={99}>
-                  <Chip
-                    size="small"
-                    icon={<ChatBubbleOutlineRoundedIcon />}
-                    label={unreadCount ? (isMobile ? "Новые" : "Есть новые") : "Сообщения"}
-                    variant="outlined"
-                  />
-                </Badge>
-              </>
-            )}
+            <Chip
+              size="small"
+              icon={<ScheduleRoundedIcon />}
+              label={isMobile ? formatLastActivity(item, true) : `Обновлено: ${formatLastActivity(item, false)}`}
+              variant="outlined"
+            />
+            <Badge color="primary" badgeContent={unreadCount} max={99}>
+              <Chip
+                size="small"
+                icon={<ChatBubbleOutlineRoundedIcon />}
+                label={unreadCount ? "Есть новые" : "Сообщения"}
+                variant="outlined"
+              />
+            </Badge>
             {role === "master" && item.client_risk_level ? (
               <Chip
                 size="small"
@@ -154,54 +127,28 @@ export default function AppointmentCard({
             ) : null}
           </Stack>
 
-          <Stack direction={{ xs: "column", sm: "row" }} spacing={0.9}>
-            {showWorkflowAction ? (
-              <PrimaryCTA
-                status={item.status}
-                role={role}
-                onAction={(actionKey) => onPrimaryAction?.(actionKey, item)}
-                fullWidth
-              />
-            ) : null}
-            <Button
-              component={RouterLink}
-              to={linkTo}
-              variant={detailButtonVariant}
-              size={isClient ? "small" : "medium"}
+          {showWorkflowAction ? (
+            <PrimaryCTA
+              status={item.status}
+              role={role}
+              onAction={(actionKey) => onPrimaryAction?.(actionKey, item)}
               fullWidth
-              endIcon={showWorkflowAction ? <ChevronRightRoundedIcon fontSize="small" /> : null}
-              sx={{
-                opacity: showWorkflowAction && isClient ? 0.86 : 1,
-                minHeight: isMobile ? 38 : undefined,
-              }}
-            >
-              Открыть заявку
-            </Button>
-          </Stack>
+            />
+          ) : null}
+
+          <Button
+            component={RouterLink}
+            to={linkTo}
+            variant={detailButtonVariant}
+            size={isClient ? "small" : "medium"}
+            fullWidth
+            endIcon={showWorkflowAction ? <ChevronRightRoundedIcon fontSize="small" /> : null}
+            sx={{ minHeight: isMobile ? 40 : 42 }}
+          >
+            Открыть заявку
+          </Button>
         </Stack>
       </CardContent>
     </Card>
-  );
-}
-
-function PaperHint({ hint }) {
-  if (!hint) {
-    return null;
-  }
-
-  return (
-    <Box
-      sx={{
-        p: 1,
-        borderRadius: 2,
-        bgcolor: (theme) => (theme.palette.mode === "dark" ? "rgba(30,41,59,0.62)" : "#f3f8fd"),
-        border: "1px solid",
-        borderColor: "divider",
-      }}
-    >
-      <Typography variant="caption" color="text.secondary">
-        Что делать дальше: {hint}
-      </Typography>
-    </Box>
   );
 }

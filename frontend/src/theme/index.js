@@ -95,14 +95,18 @@ export function createAppTheme(mode = "light") {
     components: {
       MuiCssBaseline: {
         styleOverrides: {
+          ":root": {
+            colorScheme: mode,
+          },
           "*": {
             WebkitFontSmoothing: "antialiased",
             MozOsxFontSmoothing: "grayscale",
+            boxSizing: "border-box",
           },
           body: {
             background: isDark
-              ? "radial-gradient(1200px 620px at -10% -30%, #10233f 0%, #0a111f 45%, #060a12 100%)"
-              : "radial-gradient(1200px 560px at -10% -20%, #e9f3ff 0%, #f5f7fb 40%, #f2f2f7 100%)",
+              ? "radial-gradient(1200px 620px at -10% -30%, #13325f 0%, #091425 44%, #050b14 100%)"
+              : "radial-gradient(1300px 680px at -10% -20%, #deebff 0%, #f3f7ff 40%, #edf2fa 100%)",
             color: colors.textMain,
             textRendering: "geometricPrecision",
           },
@@ -138,9 +142,10 @@ export function createAppTheme(mode = "light") {
         styleOverrides: {
           root: {
             borderRadius: appTokens.radius.sm,
-            minHeight: 42,
-            paddingInline: 18,
-            transition: "all 220ms ease",
+            minHeight: 44,
+            paddingInline: 20,
+            transition: "all 220ms cubic-bezier(0.22, 1, 0.36, 1)",
+            fontWeight: 750,
           },
           containedPrimary: {
             boxShadow: appTokens.shadows.soft,
@@ -159,7 +164,7 @@ export function createAppTheme(mode = "light") {
             boxShadow: appTokens.shadows.card,
             backgroundColor: colors.bgElevated,
             backgroundImage: "none",
-            backdropFilter: "blur(18px) saturate(130%)",
+            backdropFilter: "blur(18px) saturate(145%)",
           },
         },
       },
@@ -170,7 +175,7 @@ export function createAppTheme(mode = "light") {
             border: `1px solid ${colors.borderSoft}`,
             boxShadow: appTokens.shadows.card,
             backgroundColor: isDark ? alpha("#0f172a", 0.8) : "rgba(255,255,255,0.88)",
-            backdropFilter: "blur(14px) saturate(125%)",
+            backdropFilter: "blur(16px) saturate(138%)",
           },
         },
       },
@@ -181,7 +186,7 @@ export function createAppTheme(mode = "light") {
             color: colors.textMain,
             borderBottom: `1px solid ${colors.borderSoft}`,
             boxShadow: isDark ? "0 6px 30px rgba(2, 6, 23, 0.45)" : "0 4px 24px rgba(15, 23, 42, 0.07)",
-            backdropFilter: "blur(18px) saturate(140%)",
+            backdropFilter: "blur(22px) saturate(150%)",
           },
         },
       },
@@ -208,6 +213,15 @@ export function createAppTheme(mode = "light") {
               borderColor: colors.brand,
               boxShadow: appTokens.shadows.focus,
             },
+          },
+        },
+      },
+      MuiTabs: {
+        styleOverrides: {
+          indicator: {
+            height: 3,
+            borderRadius: 999,
+            background: `linear-gradient(90deg, ${colors.brand} 0%, ${alpha(colors.brand, 0.7)} 100%)`,
           },
         },
       },

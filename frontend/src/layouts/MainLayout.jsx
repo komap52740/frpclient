@@ -1,13 +1,15 @@
 import DarkModeRoundedIcon from "@mui/icons-material/DarkModeRounded";
-import LogoutRoundedIcon from "@mui/icons-material/LogoutRounded";
 import LightModeRoundedIcon from "@mui/icons-material/LightModeRounded";
-import MenuIcon from "@mui/icons-material/Menu";
+import LogoutRoundedIcon from "@mui/icons-material/LogoutRounded";
+import MenuRoundedIcon from "@mui/icons-material/MenuRounded";
+import RocketLaunchRoundedIcon from "@mui/icons-material/RocketLaunchRounded";
 import {
   AppBar,
   Box,
   Button,
   Chip,
   Container,
+  Divider,
   Drawer,
   IconButton,
   List,
@@ -16,9 +18,9 @@ import {
   Stack,
   Toolbar,
   Typography,
-  useMediaQuery,
 } from "@mui/material";
-import { useTheme } from "@mui/material/styles";
+import { alpha, useTheme } from "@mui/material/styles";
+import useMediaQuery from "@mui/material/useMediaQuery";
 import { useMemo, useState } from "react";
 import { Link as RouterLink, useLocation, useNavigate } from "react-router-dom";
 
@@ -33,18 +35,20 @@ function buildMenu(role) {
   if (role === "client") {
     return [
       { label: "Главная", to: "/client/home" },
-      { label: "Создать заявку", to: "/client/create" },
+      { label: "Новая заявка", to: "/client/create" },
       { label: "Мои заявки", to: "/client/my" },
       { label: "Профиль", to: "/client/profile" },
     ];
   }
+
   if (role === "master") {
     return [
       { label: "Новые заявки", to: "/master/new" },
       { label: "Активные", to: "/master/active" },
-      { label: "Мои отзывы", to: "/master/reviews" },
+      { label: "Отзывы", to: "/master/reviews" },
     ];
   }
+
   if (role === "admin") {
     return [
       { label: "Система", to: "/admin/system" },
@@ -56,60 +60,82 @@ function buildMenu(role) {
       { label: "Мастера", to: "/admin/masters" },
     ];
   }
+
   return [];
 }
 
 function getRoleLabel(role) {
   if (role === "client") return "Клиент";
   if (role === "master") return "Мастер";
-  if (role === "admin") return "Администратор";
+  if (role === "admin") return "Админ";
   return "Пользователь";
 }
 
 function resolveRouteContext(role, pathname) {
   if (pathname.startsWith("/appointments/")) {
-    return { title: "Заявка", subtitle: "Контроль статуса, оплаты и чата" };
+    return {
+      title: "Карточка заявки",
+      subtitle: "Статус, чат, оплата и события в одном окне",
+    };
   }
 
   if (role === "client") {
-    if (pathname.startsWith("/client/home")) return { title: "Главная", subtitle: "Ваш центр действий" };
-    if (pathname.startsWith("/client/my")) return { title: "Мои заявки", subtitle: "Все заказы в одном списке" };
-    if (pathname.startsWith("/client/create")) return { title: "Новая заявка", subtitle: "Создание займет 1-2 минуты" };
-    if (pathname.startsWith("/client/profile")) return { title: "Профиль", subtitle: "Настройки и безопасность" };
+    if (pathname.startsWith("/client/home")) return { title: "Главная", subtitle: "Быстрые действия и актуальные статусы" };
+    if (pathname.startsWith("/client/create")) return { title: "Новая заявка", subtitle: "Минимум полей, максимум скорости" };
+    if (pathname.startsWith("/client/my")) return { title: "Мои заявки", subtitle: "Контроль заказов без лишнего шума" };
+    if (pathname.startsWith("/client/profile")) return { title: "Профиль", subtitle: "Настройки аккаунта и безопасность" };
   }
 
   if (role === "master") {
     if (pathname.startsWith("/master/new")) return { title: "Новые заявки", subtitle: "Выберите следующую задачу" };
-    if (pathname.startsWith("/master/active")) return { title: "Активные", subtitle: "Текущие заявки в работе" };
-    if (pathname.startsWith("/master/reviews")) return { title: "Отзывы", subtitle: "Обратная связь клиентов" };
+    if (pathname.startsWith("/master/active")) return { title: "Активные заявки", subtitle: "Фокус на текущих работах" };
+    if (pathname.startsWith("/master/reviews")) return { title: "Отзывы", subtitle: "Оценка качества вашей работы" };
   }
 
   if (role === "admin") {
-    if (pathname.startsWith("/admin/system")) return { title: "Система", subtitle: "Контроль платформы" };
-    if (pathname.startsWith("/admin/appointments")) return { title: "Заявки", subtitle: "Операционная лента" };
-    if (pathname.startsWith("/admin/users")) return { title: "Пользователи", subtitle: "Управление аккаунтами" };
-    if (pathname.startsWith("/admin/rules")) return { title: "Правила", subtitle: "Автоматизация событий" };
-    if (pathname.startsWith("/admin/reviews")) return { title: "Отзывы", subtitle: "Мониторинг качества" };
+    if (pathname.startsWith("/admin/system")) return { title: "Система", subtitle: "Состояние платформы и ключевые метрики" };
+    if (pathname.startsWith("/admin/appointments")) return { title: "Заявки", subtitle: "Операционный контроль заказов" };
+    if (pathname.startsWith("/admin/users")) return { title: "Пользователи", subtitle: "Управление доступами и ролями" };
+    if (pathname.startsWith("/admin/rules")) return { title: "Правила", subtitle: "Автоматизация триггеров и уведомлений" };
+    if (pathname.startsWith("/admin/reviews")) return { title: "Отзывы", subtitle: "Контроль качества сервиса" };
+    if (pathname.startsWith("/admin/masters")) return { title: "Мастера", subtitle: "Квалификация и доступ к заявкам" };
   }
 
-  return { title: "FRP Клиент", subtitle: "Рабочее пространство" };
+  return { title: "FRP Client", subtitle: "Рабочее пространство" };
+}
+
+function resolveQuickAction(role, pathname) {
+  if (role === "client" && !pathname.startsWith("/client/create")) {
+    return { label: "Новая заявка", to: "/client/create" };
+  }
+  if (role === "master" && !pathname.startsWith("/master/new")) {
+    return { label: "Новые заявки", to: "/master/new" };
+  }
+  if (role === "admin" && !pathname.startsWith("/admin/system")) {
+    return { label: "Система", to: "/admin/system" };
+  }
+  return null;
 }
 
 export default function MainLayout({ children }) {
   const { user, logout } = useAuth();
-  const [open, setOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
   const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const { mode, toggleMode } = useThemeMode();
-  const menuItems = buildMenu(user?.role);
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
+  const isMobile = useMediaQuery(theme.breakpoints.down("md"));
   const roleLabel = useMemo(() => getRoleLabel(user?.role), [user?.role]);
-  const routeContext = useMemo(
+  const route = useMemo(
     () => resolveRouteContext(user?.role, location.pathname),
     [user?.role, location.pathname]
   );
+  const quickAction = useMemo(
+    () => resolveQuickAction(user?.role, location.pathname),
+    [user?.role, location.pathname]
+  );
+  const menuItems = useMemo(() => buildMenu(user?.role), [user?.role]);
 
   const onLogout = async () => {
     await logout();
@@ -123,104 +149,175 @@ export default function MainLayout({ children }) {
         color="transparent"
         elevation={0}
         sx={{
-          backdropFilter: "blur(18px) saturate(140%)",
-          px: { xs: 0.4, sm: 0.8 },
+          px: { xs: 0.6, md: 1.2 },
+          backdropFilter: "blur(24px) saturate(160%)",
+          backgroundColor: (themeValue) =>
+            themeValue.palette.mode === "dark"
+              ? "rgba(8, 14, 24, 0.72)"
+              : "rgba(245, 249, 255, 0.72)",
         }}
       >
-        <Toolbar sx={{ minHeight: { xs: 60, sm: 68 }, px: { xs: 0.6, sm: 1 } }}>
+        <Toolbar sx={{ minHeight: { xs: 62, md: 70 }, px: 0.5, gap: 1 }}>
           <IconButton
             color="inherit"
-            edge="start"
-            onClick={() => setOpen(true)}
-            sx={{ mr: 0.7 }}
-          >
-            <MenuIcon />
-          </IconButton>
-          <Stack direction="row" spacing={0.8} alignItems="center" sx={{ flexGrow: 1, minWidth: 0 }}>
-            <Box sx={{ minWidth: 0 }}>
-              <Typography sx={{ fontWeight: 800, letterSpacing: "-0.01em", whiteSpace: "nowrap" }}>
-                {isMobile ? routeContext.title : "FRP Клиент"}
-              </Typography>
-              <Typography
-                variant="caption"
-                color="text.secondary"
-                sx={{ display: { xs: "none", md: "block" }, whiteSpace: "nowrap", textOverflow: "ellipsis", overflow: "hidden" }}
-              >
-                {routeContext.subtitle}
-              </Typography>
-            </Box>
-            <Chip
-              size="small"
-              label={roleLabel}
-              sx={{
-                display: { xs: "none", sm: "inline-flex" },
-                bgcolor: "rgba(0,122,255,0.12)",
-                color: "primary.main",
-              }}
-            />
-          </Stack>
-          <IconButton
-            color="inherit"
-            onClick={toggleMode}
+            onClick={() => setDrawerOpen(true)}
             sx={{
-              mr: 0.5,
               border: "1px solid",
               borderColor: "divider",
               bgcolor: "background.paper",
             }}
           >
-            {mode === "dark" ? <LightModeRoundedIcon fontSize="small" /> : <DarkModeRoundedIcon fontSize="small" />}
+            <MenuRoundedIcon />
           </IconButton>
-          <NotificationBell />
-          <Typography sx={{ mr: 1.4, display: { xs: "none", md: "block" }, color: "text.secondary" }}>
-            {user?.username}
-          </Typography>
-          <Button color="inherit" onClick={onLogout} sx={{ color: "text.primary", display: { xs: "none", sm: "inline-flex" } }}>
-            Выйти
-          </Button>
-          {isMobile ? (
-            <IconButton
-              color="inherit"
-              onClick={onLogout}
-              sx={{ border: "1px solid", borderColor: "divider", bgcolor: "background.paper" }}
+
+          <Stack sx={{ flexGrow: 1, minWidth: 0 }} spacing={0.2}>
+            <Stack direction="row" spacing={0.8} alignItems="center">
+              <Chip
+                size="small"
+                icon={<RocketLaunchRoundedIcon sx={{ fontSize: 14 }} />}
+                label="FRP"
+                sx={{
+                  height: 24,
+                  bgcolor: (themeValue) =>
+                    themeValue.palette.mode === "dark"
+                      ? alpha(themeValue.palette.primary.main, 0.18)
+                      : alpha(themeValue.palette.primary.main, 0.12),
+                  color: "primary.main",
+                  border: "1px solid",
+                  borderColor: (themeValue) => alpha(themeValue.palette.primary.main, 0.35),
+                }}
+              />
+              <Typography
+                sx={{
+                  fontWeight: 800,
+                  letterSpacing: "-0.02em",
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                }}
+              >
+                {route.title}
+              </Typography>
+            </Stack>
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{
+                display: { xs: "none", md: "block" },
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+              }}
             >
-              <LogoutRoundedIcon fontSize="small" />
-            </IconButton>
+              {route.subtitle}
+            </Typography>
+          </Stack>
+
+          {quickAction && !isMobile ? (
+            <Button
+              component={RouterLink}
+              to={quickAction.to}
+              variant="contained"
+              size="small"
+              sx={{ mr: 0.5 }}
+            >
+              {quickAction.label}
+            </Button>
           ) : null}
+
+          <Chip
+            size="small"
+            label={roleLabel}
+            sx={{
+              display: { xs: "none", sm: "inline-flex" },
+              bgcolor: "background.paper",
+              border: "1px solid",
+              borderColor: "divider",
+            }}
+          />
+
+          <IconButton
+            color="inherit"
+            onClick={toggleMode}
+            sx={{
+              border: "1px solid",
+              borderColor: "divider",
+              bgcolor: "background.paper",
+            }}
+          >
+            {mode === "dark" ? (
+              <LightModeRoundedIcon fontSize="small" />
+            ) : (
+              <DarkModeRoundedIcon fontSize="small" />
+            )}
+          </IconButton>
+
+          <NotificationBell />
+
+          <IconButton
+            color="inherit"
+            onClick={onLogout}
+            sx={{
+              border: "1px solid",
+              borderColor: "divider",
+              bgcolor: "background.paper",
+            }}
+          >
+            <LogoutRoundedIcon fontSize="small" />
+          </IconButton>
         </Toolbar>
       </AppBar>
 
       <Drawer
-        open={open}
-        onClose={() => setOpen(false)}
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
         PaperProps={{
           sx: {
-            backdropFilter: "blur(18px) saturate(130%)",
-            backgroundColor: (theme) => (theme.palette.mode === "dark" ? "rgba(15,23,42,0.94)" : "rgba(255,255,255,0.88)"),
-            borderRight: (theme) => `1px solid ${theme.palette.divider}`,
+            width: 300,
+            borderRight: "1px solid",
+            borderColor: "divider",
+            backgroundColor: (themeValue) =>
+              themeValue.palette.mode === "dark"
+                ? "rgba(9, 15, 27, 0.95)"
+                : "rgba(255,255,255,0.92)",
+            backdropFilter: "blur(20px) saturate(150%)",
           },
         }}
       >
-        <Box sx={{ width: 280 }} role="presentation" onClick={() => setOpen(false)}>
-          <Box sx={{ p: 2, borderBottom: "1px solid", borderColor: "divider" }}>
-            <Typography variant="subtitle2" color="text.secondary">Навигация</Typography>
-            <Typography variant="h6" sx={{ mt: 0.5 }}>Рабочее место</Typography>
-            <Typography variant="caption" color="text.secondary">{user?.username}</Typography>
-          </Box>
-          <List>
-            {menuItems.map((item) => (
-              <ListItemButton component={RouterLink} to={item.to} key={item.to}>
-                <ListItemText primary={item.label} />
-              </ListItemButton>
-            ))}
-            <ListItemButton onClick={onLogout}>
-              <ListItemText primary="Выйти" />
+        <Stack sx={{ p: 2 }} spacing={0.7}>
+          <Typography variant="h3">Навигация</Typography>
+          <Typography variant="caption" color="text.secondary">
+            {user?.username || "Пользователь"} · {roleLabel}
+          </Typography>
+        </Stack>
+        <Divider />
+        <List sx={{ p: 1 }}>
+          {menuItems.map((item) => (
+            <ListItemButton
+              key={item.to}
+              component={RouterLink}
+              to={item.to}
+              selected={location.pathname.startsWith(item.to)}
+              onClick={() => setDrawerOpen(false)}
+              sx={{
+                borderRadius: 2,
+                mb: 0.4,
+                "&.Mui-selected": {
+                  bgcolor: (themeValue) => alpha(themeValue.palette.primary.main, 0.14),
+                  color: "primary.main",
+                },
+              }}
+            >
+              <ListItemText primary={item.label} />
             </ListItemButton>
-          </List>
-        </Box>
+          ))}
+          <ListItemButton onClick={onLogout} sx={{ borderRadius: 2 }}>
+            <ListItemText primary="Выйти" />
+          </ListItemButton>
+        </List>
       </Drawer>
 
-      <Container maxWidth="lg" sx={{ py: { xs: 1.5, md: 3 }, pb: { xs: 12, md: 3 } }}>
+      <Container maxWidth="lg" sx={{ py: { xs: 1.4, md: 2.8 }, pb: { xs: 12, md: 3 } }}>
         <PageMotion>{children}</PageMotion>
       </Container>
 
