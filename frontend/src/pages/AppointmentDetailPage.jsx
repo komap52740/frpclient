@@ -303,6 +303,8 @@ export default function AppointmentDetailPage() {
   const [paymentFocusOpen, setPaymentFocusOpen] = useState(false);
   const [paymentDragOver, setPaymentDragOver] = useState(false);
   const [clientTab, setClientTab] = useState("chat");
+  const [chatPanelView, setChatPanelView] = useState("messages");
+  const [clientDataExpanded, setClientDataExpanded] = useState(false);
   const [toast, setToast] = useState({ open: false, severity: "success", message: "", actionKey: "" });
   const [clientCompactView, setClientCompactView] = useState(() => {
     if (typeof window === "undefined") {
@@ -419,6 +421,10 @@ export default function AppointmentDetailPage() {
       } else if (focus === "timeline" || focus === "review") {
         setClientTab(clientCompactView ? "chat" : "details");
       } else if (focus === "chat") {
+        setChatPanelView("messages");
+        setClientTab("chat");
+      } else if (focus === "links") {
+        setChatPanelView("links");
         setClientTab("chat");
       }
     }
@@ -426,6 +432,7 @@ export default function AppointmentDetailPage() {
     const byFocus = {
       payment: paymentRef,
       chat: chatRef,
+      links: chatRef,
       timeline: timelineRef,
       review: reviewRef,
     };
@@ -505,6 +512,14 @@ export default function AppointmentDetailPage() {
       return prev;
     });
   }, [appointment?.id, appointment?.status, clientCompactView, user?.role]);
+
+  useEffect(() => {
+    if (user?.role !== "client") {
+      return;
+    }
+    setChatPanelView("messages");
+    setClientDataExpanded(false);
+  }, [appointment?.id, user?.role]);
 
   useEffect(() => {
     if (user?.role !== "client") {
@@ -611,13 +626,14 @@ export default function AppointmentDetailPage() {
       return;
     }
 
-    const payload = preparedPassword
-      ? `Логин/ID RuDesktop: ${preparedId}\nПароль: ${preparedPassword}`
-      : `Логин/ID RuDesktop: ${preparedId}`;
-
     try {
-      await navigator.clipboard.writeText(payload);
-      setSuccess("Запускаем RuDesktop. Данные подключения уже скопированы в буфер.");
+      if (preparedPassword) {
+        await navigator.clipboard.writeText(preparedPassword);
+        setSuccess("Запускаем RuDesktop. В буфер скопирован только пароль.");
+      } else {
+        await navigator.clipboard.writeText(preparedId);
+        setSuccess("Запускаем RuDesktop. Пароль не задан, в буфер скопирован логин/ID.");
+      }
     } catch {
       setSuccess("Запускаем RuDesktop. Если не откроется — скопируйте данные вручную из карточки.");
     }
@@ -667,7 +683,7 @@ export default function AppointmentDetailPage() {
   const showClientRepeat =
     user.role === "client" &&
     ["COMPLETED", "CANCELLED", "DECLINED_BY_MASTER"].includes(appointment.status);
-  const showClientTabs = user.role === "client";
+  const showClientTabs = user.role === "client" && (!clientCompactView || showClientPaymentActions);
 
   const showMasterTake = user.role === "master" && appointment.status === "NEW";
   const showMasterReviewAndPrice = isMasterAssigned && appointment.status === "IN_REVIEW";
@@ -681,7 +697,7 @@ export default function AppointmentDetailPage() {
   const showClientPaymentHighlight = isClient && ["AWAITING_PAYMENT", "PAYMENT_PROOF_UPLOADED"].includes(appointment.status);
   const isClientCompact = isClient && clientCompactView;
   const clientDetailsTabEnabled = !isClientCompact;
-  const showClientDesktopSidebar = isClient && !isMobile;
+  const showClientDesktopSidebar = isClient && !isMobile && !isClientCompact;
   const showClientPaymentDock =
     showClientDesktopSidebar &&
     ["AWAITING_PAYMENT", "PAYMENT_PROOF_UPLOADED"].includes(appointment.status);
@@ -692,8 +708,7 @@ export default function AppointmentDetailPage() {
   const showClientPaymentCard = showClientPaymentActions && (!showClientTabs || clientTab === "payment");
   const showClientChatPanel = !showClientTabs || clientTab === "chat";
   const showClientDetailsCard = showClientTabs && clientTab === "details" && clientDetailsTabEnabled;
-  const showClientSecondaryCards =
-    !showClientTabs || clientTab === "details" || (isClientCompact && clientTab === "chat");
+  const showClientSecondaryCards = !isClientCompact && (!showClientTabs || clientTab === "details");
   const paymentFlowStatusesDone = ["PAYMENT_PROOF_UPLOADED", "PAID", "IN_PROGRESS", "COMPLETED"];
   const paymentConfirmedStatuses = ["PAID", "IN_PROGRESS", "COMPLETED"];
   const latestPaymentProofEvent = timelineEvents.find((event) => event.event_type === "payment_proof_uploaded");
@@ -813,6 +828,13 @@ export default function AppointmentDetailPage() {
           icon: <ForumRoundedIcon fontSize="small" />,
         },
         {
+          id: "links",
+          key: "open_links",
+          label: "Ссылки",
+          tab: "chat",
+          icon: <LinkRoundedIcon fontSize="small" />,
+        },
+        {
           id: "status",
           key: "open_timeline",
           label: "Статус",
@@ -913,6 +935,15 @@ export default function AppointmentDetailPage() {
       return;
     }
     if (actionKey === "open_chat") {
+      setChatPanelView("messages");
+      if (isClient) {
+        setClientTab("chat");
+      }
+      chatRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
+    if (actionKey === "open_links") {
+      setChatPanelView("links");
       if (isClient) {
         setClientTab("chat");
       }
@@ -921,14 +952,24 @@ export default function AppointmentDetailPage() {
     }
     if (actionKey === "open_timeline") {
       if (isClient) {
-        setClientTab(clientDetailsTabEnabled ? "details" : "chat");
+        if (clientDetailsTabEnabled) {
+          setClientTab("details");
+        } else {
+          setClientCompactView(false);
+          setClientTab("details");
+        }
       }
       timelineRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
       return;
     }
     if (actionKey === "leave_review") {
       if (isClient) {
-        setClientTab(clientDetailsTabEnabled ? "details" : "chat");
+        if (clientDetailsTabEnabled) {
+          setClientTab("details");
+        } else {
+          setClientCompactView(false);
+          setClientTab("details");
+        }
       }
       reviewRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
       return;
@@ -1160,7 +1201,12 @@ export default function AppointmentDetailPage() {
             >
               <Tabs
                 value={clientTab}
-                onChange={(_, nextValue) => setClientTab(nextValue)}
+                onChange={(_, nextValue) => {
+                  setClientTab(nextValue);
+                  if (nextValue === "chat") {
+                    setChatPanelView("messages");
+                  }
+                }}
                 variant="fullWidth"
                 sx={{
                   minHeight: 42,
@@ -1194,7 +1240,13 @@ export default function AppointmentDetailPage() {
             >
               <Stack direction="row" spacing={0.6} sx={{ overflowX: "auto", pb: 0.2 }}>
                 {clientRailActions.map((action) => {
-                  const active = showClientTabs ? clientTab === action.tab : false;
+                  const active = showClientTabs
+                    ? action.id === "links"
+                      ? clientTab === "chat" && chatPanelView === "links"
+                      : action.id === "messages"
+                        ? clientTab === "chat" && chatPanelView !== "links"
+                        : clientTab === action.tab
+                    : false;
                   return (
                     <Button
                       key={action.id}
@@ -1294,20 +1346,32 @@ export default function AppointmentDetailPage() {
                     {isClient ? (
                       <Stack spacing={1.1}>
                         <Typography variant="body2" color="text.secondary">
-                          Главное по заявке без лишнего шума
+                          Только ключевое. Остальное открывайте по необходимости.
                         </Typography>
                         <Stack direction="row" spacing={0.8} flexWrap="wrap" useFlexGap>
                           <Chip size="small" label={`Устройство: ${normalizeRuText(appointment.brand)} ${normalizeRuText(appointment.model)}`} />
-                          <Chip size="small" label={`Блокировка: ${getLockTypeLabel(appointment.lock_type)}`} />
                           <Chip size="small" color={appointment.total_price ? "warning" : "default"} label={appointment.total_price ? `К оплате: ${appointment.total_price} руб.` : "Цена уточняется"} />
                           <Chip size="small" label={`Мастер: ${normalizeRuText(appointment.master_username) || "пока не назначен"}`} />
-                          {contactPhone ? <Chip size="small" label={`Телефон: ${contactPhone}`} /> : null}
-                          {rustdeskId ? <Chip size="small" icon={<ComputerRoundedIcon fontSize="small" />} label={`RuDesktop логин/ID: ${rustdeskId}`} /> : null}
                         </Stack>
-                        {appointment.description ? (
-                          <Typography variant="body2" color="text.secondary">
-                            {normalizeRuText(appointment.description)}
-                          </Typography>
+                        <Button
+                          variant={clientDataExpanded ? "outlined" : "text"}
+                          size="small"
+                          onClick={() => setClientDataExpanded((prev) => !prev)}
+                          sx={{ alignSelf: "flex-start", px: 1.2, borderRadius: 2 }}
+                        >
+                          {clientDataExpanded ? "Скрыть детали" : "Показать детали"}
+                        </Button>
+                        {clientDataExpanded ? (
+                          <Stack spacing={0.55}>
+                            <Typography variant="body2"><b>Тип блокировки:</b> {getLockTypeLabel(appointment.lock_type)}</Typography>
+                            {contactPhone ? <Typography variant="body2"><b>Телефон:</b> {contactPhone}</Typography> : null}
+                            {rustdeskId ? <Typography variant="body2"><b>RuDesktop ID:</b> {rustdeskId}</Typography> : null}
+                            {appointment.description ? (
+                              <Typography variant="body2" color="text.secondary">
+                                {normalizeRuText(appointment.description)}
+                              </Typography>
+                            ) : null}
+                          </Stack>
                         ) : null}
                       </Stack>
                     ) : (
@@ -1702,7 +1766,13 @@ export default function AppointmentDetailPage() {
 
             <Fade in={showClientChatPanel} timeout={220} mountOnEnter unmountOnExit>
               <Box ref={chatRef}>
-                <ChatPanel appointmentId={id} currentUser={user} systemEvents={mappedSystemEvents} />
+                <ChatPanel
+                  appointmentId={id}
+                  currentUser={user}
+                  systemEvents={mappedSystemEvents}
+                  initialView={chatPanelView}
+                  minimalClient={isClientCompact}
+                />
               </Box>
             </Fade>
 
@@ -1842,11 +1912,26 @@ export default function AppointmentDetailPage() {
                           variant="contained"
                           startIcon={<ComputerRoundedIcon fontSize="small" />}
                           onClick={() => openRuDesktopSession(rustdeskId, rustdeskPassword)}
-                          sx={{ alignSelf: "flex-start" }}
+                          sx={{
+                            alignSelf: "flex-start",
+                            borderRadius: 2,
+                            px: 1.8,
+                            boxShadow: 0,
+                            background: "linear-gradient(120deg, #1d4ed8 0%, #0ea5e9 100%)",
+                            "&:hover": {
+                              boxShadow: "0 10px 24px rgba(14,165,233,0.28)",
+                            },
+                          }}
                           disabled={!canLaunchRuDesktop}
                         >
                           Подключиться по кнопке
                         </Button>
+                      ) : null}
+                      {canLaunchRuDesktop ? (
+                        <Stack direction="row" spacing={0.6} flexWrap="wrap" useFlexGap>
+                          <Chip size="small" variant="outlined" label="1) Запуск RuDesktop" />
+                          <Chip size="small" variant="outlined" label="2) Вставьте пароль" />
+                        </Stack>
                       ) : null}
                       <Stack direction="row" spacing={0.7} flexWrap="wrap" useFlexGap>
                         <Button
@@ -1860,9 +1945,14 @@ export default function AppointmentDetailPage() {
                         {rustdeskPassword ? (
                           <Button
                             size="small"
-                            variant="outlined"
+                            variant="contained"
                             startIcon={<ContentCopyRoundedIcon fontSize="small" />}
                             onClick={() => copyToClipboard(rustdeskPassword, "Пароль RuDesktop не указан")}
+                            sx={{
+                              borderRadius: 2,
+                              boxShadow: 0,
+                              background: "linear-gradient(120deg, #16a34a 0%, #22c55e 100%)",
+                            }}
                           >
                             Копировать пароль
                           </Button>
@@ -1871,7 +1961,7 @@ export default function AppointmentDetailPage() {
                       {hasRuDesktopCredentials ? (
                         <Typography variant="caption" color="text.secondary">
                           {canLaunchRuDesktop
-                            ? "Кнопка запускает RuDesktop и сразу передает логин/ID (пароль тоже копируется в буфер)."
+                            ? "Кнопка запускает RuDesktop, а в буфер копируется только пароль."
                             : "Подключение станет доступно после подтверждения оплаты и перехода заявки в работу."}
                         </Typography>
                       ) : null}
@@ -1890,6 +1980,16 @@ export default function AppointmentDetailPage() {
                         : "Клиент еще не указал логин/ID RuDesktop. Запросите его в чате."}
                     </Alert>
                   )}
+
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    startIcon={<LinkRoundedIcon fontSize="small" />}
+                    onClick={() => handlePrimaryAction("open_links")}
+                    sx={{ alignSelf: "flex-start" }}
+                  >
+                    Открыть чат-ссылки
+                  </Button>
 
                   <Stack spacing={0.6}>
                     {sidebarLinks.map((item) => (

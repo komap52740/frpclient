@@ -157,7 +157,13 @@ const EMPTY_REPLY_FORM = {
   text: "",
 };
 
-export default function ChatPanel({ appointmentId, currentUser, systemEvents = [] }) {
+export default function ChatPanel({
+  appointmentId,
+  currentUser,
+  systemEvents = [],
+  initialView = "messages",
+  minimalClient = false,
+}) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const isDark = theme.palette.mode === "dark";
@@ -169,7 +175,7 @@ export default function ChatPanel({ appointmentId, currentUser, systemEvents = [
   const [fileError, setFileError] = useState("");
   const [isSending, setIsSending] = useState(false);
 
-  const [chatView, setChatView] = useState("messages");
+  const [chatView, setChatView] = useState(initialView === "links" ? "links" : "messages");
   const [newIncomingCount, setNewIncomingCount] = useState(0);
   const [quickPhrasesOpen, setQuickPhrasesOpen] = useState(!isMobile);
 
@@ -182,6 +188,8 @@ export default function ChatPanel({ appointmentId, currentUser, systemEvents = [
   const threadRef = useRef(null);
 
   const isMaster = currentUser.role === "master";
+  const isMinimalClientMode = minimalClient && currentUser.role === "client";
+  const isSplitClientLayout = isMinimalClientMode && !isMobile;
   const quickTemplates = QUICK_TEMPLATES[currentUser.role] || QUICK_TEMPLATES.client;
 
   const quickReplyMap = useMemo(() => {
@@ -262,17 +270,21 @@ export default function ChatPanel({ appointmentId, currentUser, systemEvents = [
   useEffect(() => {
     setMessages([]);
     setNewIncomingCount(0);
-    setChatView("messages");
+    setChatView(initialView === "links" ? "links" : "messages");
     loadMessages(0);
-  }, [appointmentId, loadMessages]);
+  }, [appointmentId, initialView, loadMessages]);
+
+  useEffect(() => {
+    setChatView(initialView === "links" ? "links" : "messages");
+  }, [initialView]);
 
   useEffect(() => {
     loadQuickReplies();
   }, [loadQuickReplies]);
 
   useEffect(() => {
-    setQuickPhrasesOpen(!isMobile);
-  }, [appointmentId, isMobile]);
+    setQuickPhrasesOpen(isMinimalClientMode ? false : !isMobile);
+  }, [appointmentId, isMobile, isMinimalClientMode]);
 
   useAutoRefresh(() => loadMessages(lastMessageId), { intervalMs: 2500 });
 
@@ -448,6 +460,82 @@ export default function ChatPanel({ appointmentId, currentUser, systemEvents = [
     }
   };
 
+  const linksPanel = (
+    <Paper
+      variant="outlined"
+      sx={{
+        p: 1.1,
+        borderRadius: 2.5,
+        maxHeight: isMobile ? 400 : 460,
+        overflowY: "auto",
+        bgcolor: isDark ? alpha("#0f172a", 0.7) : alpha("#f8fbff", 0.95),
+      }}
+    >
+      {linkItems.length ? (
+        <Stack spacing={0.9}>
+          {linkItems.map((item) => (
+            <Paper
+              key={item.id}
+              elevation={0}
+              sx={{
+                p: 1,
+                borderRadius: 2.2,
+                border: "1px solid",
+                borderColor: "divider",
+                bgcolor: isDark ? alpha("#111b2f", 0.8) : "#ffffff",
+              }}
+            >
+              <Stack spacing={0.45}>
+                <Typography variant="caption" color="text.secondary">
+                  {item.sender_username} • {dayjs(item.created_at).format("DD.MM.YYYY HH:mm")}
+                </Typography>
+                <Typography
+                  component="a"
+                  href={item.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  variant="body2"
+                  sx={{
+                    color: "primary.main",
+                    fontWeight: 700,
+                    textDecoration: "none",
+                    wordBreak: "break-all",
+                  }}
+                >
+                  {item.url}
+                </Typography>
+                <Stack direction="row" spacing={0.8}>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    component="a"
+                    href={item.url}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Открыть
+                  </Button>
+                  <Button
+                    size="small"
+                    variant="text"
+                    startIcon={<ContentCopyRoundedIcon fontSize="small" />}
+                    onClick={() => copyLink(item.url)}
+                  >
+                    Копировать
+                  </Button>
+                </Stack>
+              </Stack>
+            </Paper>
+          ))}
+        </Stack>
+      ) : (
+        <Typography variant="body2" color="text.secondary">
+          Ссылок пока нет. Отправьте сообщение с `https://...`, и ссылка появится здесь автоматически.
+        </Typography>
+      )}
+    </Paper>
+  );
+
   return (
     <Paper
       sx={{
@@ -464,78 +552,82 @@ export default function ChatPanel({ appointmentId, currentUser, systemEvents = [
           <Chip
             size="small"
             icon={<LinkRoundedIcon />}
-            label={`Ссылки: ${linkItems.length}`}
+            label={isSplitClientLayout ? `Ссылок: ${linkItems.length}` : `Ссылки: ${linkItems.length}`}
             variant="outlined"
           />
         </Stack>
 
-        <Tabs
-          value={chatView}
-          onChange={(_, value) => setChatView(value)}
-          variant="fullWidth"
-          sx={{
-            borderRadius: 2.4,
-            bgcolor: (themeValue) =>
-              themeValue.palette.mode === "dark" ? alpha("#0f172a", 0.66) : alpha("#e5eefb", 0.62),
-            minHeight: 40,
-            "& .MuiTab-root": {
+        {!isSplitClientLayout ? (
+          <Tabs
+            value={chatView}
+            onChange={(_, value) => setChatView(value)}
+            variant="fullWidth"
+            sx={{
+              borderRadius: 2.4,
+              bgcolor: (themeValue) =>
+                themeValue.palette.mode === "dark" ? alpha("#0f172a", 0.66) : alpha("#e5eefb", 0.62),
               minHeight: 40,
-              textTransform: "none",
-              fontWeight: 700,
-            },
-          }}
-        >
-          <Tab value="messages" label="Сообщения" />
-          <Tab value="links" label={`Ссылки (${linkItems.length})`} />
-        </Tabs>
+              "& .MuiTab-root": {
+                minHeight: 40,
+                textTransform: "none",
+                fontWeight: 700,
+              },
+            }}
+          >
+            <Tab value="messages" label="Сообщения" />
+            <Tab value="links" label={`Ссылки (${linkItems.length})`} />
+          </Tabs>
+        ) : null}
 
-        <Stack spacing={0.65}>
-          <Stack direction="row" justifyContent="space-between" alignItems="center">
-            <Typography variant="caption" color="text.secondary">
-              {isMaster ? "Быстрые фразы и команды" : "Быстрые фразы"}
-            </Typography>
-            <Button
-              size="small"
-              variant="text"
-              endIcon={quickPhrasesOpen ? <ExpandLessRoundedIcon fontSize="small" /> : <ExpandMoreRoundedIcon fontSize="small" />}
-              onClick={() => setQuickPhrasesOpen((prev) => !prev)}
-              sx={{ minHeight: 28, px: 1 }}
-            >
-              {quickPhrasesOpen ? "Скрыть" : "Показать"}
-            </Button>
-          </Stack>
-          {quickPhrasesOpen ? (
-            <Stack
-              direction="row"
-              spacing={0.7}
-              flexWrap={isMobile ? "nowrap" : "wrap"}
-              useFlexGap={!isMobile}
-              sx={{ overflowX: isMobile ? "auto" : "visible", pb: isMobile ? 0.4 : 0 }}
-            >
-              {quickTemplates.map((template) => (
-                <Chip
-                  key={template}
-                  label={template}
-                  variant="outlined"
-                  onClick={() => applyTemplate(template)}
-                  sx={{ cursor: "pointer" }}
-                />
-              ))}
-              {isMaster
-                ? quickReplies.map((item) => (
-                    <Chip
-                      key={item.id}
-                      label={item.title ? `/${item.command} — ${item.title}` : `/${item.command}`}
-                      color="primary"
-                      variant="outlined"
-                      onClick={() => applyQuickReplyCommand(item.command)}
-                      sx={{ cursor: "pointer" }}
-                    />
-                  ))
-                : null}
+        {!isMinimalClientMode ? (
+          <Stack spacing={0.65}>
+            <Stack direction="row" justifyContent="space-between" alignItems="center">
+              <Typography variant="caption" color="text.secondary">
+                {isMaster ? "Быстрые фразы и команды" : "Быстрые фразы"}
+              </Typography>
+              <Button
+                size="small"
+                variant="text"
+                endIcon={quickPhrasesOpen ? <ExpandLessRoundedIcon fontSize="small" /> : <ExpandMoreRoundedIcon fontSize="small" />}
+                onClick={() => setQuickPhrasesOpen((prev) => !prev)}
+                sx={{ minHeight: 28, px: 1 }}
+              >
+                {quickPhrasesOpen ? "Скрыть" : "Показать"}
+              </Button>
             </Stack>
-          ) : null}
-        </Stack>
+            {quickPhrasesOpen ? (
+              <Stack
+                direction="row"
+                spacing={0.7}
+                flexWrap={isMobile ? "nowrap" : "wrap"}
+                useFlexGap={!isMobile}
+                sx={{ overflowX: isMobile ? "auto" : "visible", pb: isMobile ? 0.4 : 0 }}
+              >
+                {quickTemplates.map((template) => (
+                  <Chip
+                    key={template}
+                    label={template}
+                    variant="outlined"
+                    onClick={() => applyTemplate(template)}
+                    sx={{ cursor: "pointer" }}
+                  />
+                ))}
+                {isMaster
+                  ? quickReplies.map((item) => (
+                      <Chip
+                        key={item.id}
+                        label={item.title ? `/${item.command} — ${item.title}` : `/${item.command}`}
+                        color="primary"
+                        variant="outlined"
+                        onClick={() => applyQuickReplyCommand(item.command)}
+                        sx={{ cursor: "pointer" }}
+                      />
+                    ))
+                  : null}
+              </Stack>
+            ) : null}
+          </Stack>
+        ) : null}
 
         {isMaster ? (
           <Stack direction="row" justifyContent="space-between" alignItems="center">
@@ -556,7 +648,54 @@ export default function ChatPanel({ appointmentId, currentUser, systemEvents = [
         {fileError ? <Alert severity="warning">{fileError}</Alert> : null}
         {file && !fileError ? <Alert severity="success">Файл готов к отправке: {file.name}</Alert> : null}
 
-        {chatView === "messages" ? (
+        {isSplitClientLayout ? (
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: "minmax(0, 1.45fr) minmax(260px, 0.85fr)",
+              gap: 1,
+              alignItems: "start",
+            }}
+          >
+            <Paper
+              variant="outlined"
+              sx={{
+                p: 0.8,
+                borderRadius: 2.5,
+                bgcolor: isDark ? alpha("#0f172a", 0.56) : alpha("#f8fbff", 0.72),
+              }}
+            >
+              {newIncomingCount > 0 ? (
+                <Button
+                  size="small"
+                  variant="contained"
+                  sx={{ alignSelf: "flex-start", boxShadow: 2, mb: 0.8 }}
+                  onClick={() => {
+                    setNewIncomingCount(0);
+                    scrollToBottom();
+                  }}
+                >
+                  Новые сообщения: {newIncomingCount}
+                </Button>
+              ) : null}
+
+              <ChatThread
+                items={threadItems}
+                currentUserId={currentUser.id}
+                currentUserRole={currentUser.role}
+                onDeleteMessage={onDelete}
+                containerRef={threadRef}
+                onScroll={onThreadScroll}
+              />
+            </Paper>
+            <Stack spacing={0.6}>
+              <Typography variant="caption" color="text.secondary" sx={{ px: 0.2 }}>
+                Ссылки из переписки
+              </Typography>
+              {linksPanel}
+            </Stack>
+          </Box>
+        ) : chatView === "messages" ? (
           <>
             {newIncomingCount > 0 ? (
               <Button
@@ -582,79 +721,7 @@ export default function ChatPanel({ appointmentId, currentUser, systemEvents = [
             />
           </>
         ) : (
-          <Paper
-            variant="outlined"
-            sx={{
-              p: 1.1,
-              borderRadius: 2.5,
-              maxHeight: isMobile ? 400 : 440,
-              overflowY: "auto",
-              bgcolor: isDark ? alpha("#0f172a", 0.7) : alpha("#f8fbff", 0.95),
-            }}
-          >
-            {linkItems.length ? (
-              <Stack spacing={0.9}>
-                {linkItems.map((item) => (
-                  <Paper
-                    key={item.id}
-                    elevation={0}
-                    sx={{
-                      p: 1,
-                      borderRadius: 2.2,
-                      border: "1px solid",
-                      borderColor: "divider",
-                      bgcolor: isDark ? alpha("#111b2f", 0.8) : "#ffffff",
-                    }}
-                  >
-                    <Stack spacing={0.45}>
-                      <Typography variant="caption" color="text.secondary">
-                        {item.sender_username} · {dayjs(item.created_at).format("DD.MM.YYYY HH:mm")}
-                      </Typography>
-                      <Typography
-                        component="a"
-                        href={item.url}
-                        target="_blank"
-                        rel="noreferrer"
-                        variant="body2"
-                        sx={{
-                          color: "primary.main",
-                          fontWeight: 700,
-                          textDecoration: "none",
-                          wordBreak: "break-all",
-                        }}
-                      >
-                        {item.url}
-                      </Typography>
-                      <Stack direction="row" spacing={0.8}>
-                        <Button
-                          size="small"
-                          variant="outlined"
-                          component="a"
-                          href={item.url}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          Открыть
-                        </Button>
-                        <Button
-                          size="small"
-                          variant="text"
-                          startIcon={<ContentCopyRoundedIcon fontSize="small" />}
-                          onClick={() => copyLink(item.url)}
-                        >
-                          Копировать
-                        </Button>
-                      </Stack>
-                    </Stack>
-                  </Paper>
-                ))}
-              </Stack>
-            ) : (
-              <Typography variant="body2" color="text.secondary">
-                Ссылок пока нет. Отправьте сообщение с `https://...`, и ссылка появится здесь автоматически.
-              </Typography>
-            )}
-          </Paper>
+          linksPanel
         )}
 
         <Paper
@@ -674,8 +741,8 @@ export default function ChatPanel({ appointmentId, currentUser, systemEvents = [
         >
           <Stack spacing={1}>
             <TextField
-              label={chatView === "links" ? "Ссылка или сообщение" : "Сообщение"}
-              placeholder={chatView === "links" ? "Вставьте ссылку вида https://..." : ""}
+              label={chatView === "links" && !isSplitClientLayout ? "Ссылка или сообщение" : "Сообщение"}
+              placeholder={chatView === "links" && !isSplitClientLayout ? "Вставьте ссылку вида https://..." : ""}
               multiline
               minRows={isMobile ? 2.3 : 2}
               value={text}
@@ -687,7 +754,9 @@ export default function ChatPanel({ appointmentId, currentUser, systemEvents = [
                 }
               }}
               helperText={
-                chatView === "links"
+                isMinimalClientMode
+                  ? "Пишите коротко и по делу. Ссылки автоматически появляются справа."
+                  : chatView === "links"
                   ? "Режим «Ссылки»: вставьте URL, чтобы он появился во вкладке ссылок. Ctrl+Enter для отправки."
                   : text.trim().length
                     ? "Сообщение готово к отправке. Ctrl+Enter для быстрой отправки"
