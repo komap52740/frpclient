@@ -80,7 +80,6 @@ export default function ClientProfilePage() {
   const isDark = theme.palette.mode === "dark";
 
   const stats = user?.client_stats || {};
-  const wholesaleDiscount = Number(user?.wholesale_discount_percent || 0);
   const [serviceForm, setServiceForm] = useState({
     wholesale_company_name: user?.wholesale_company_name || "",
     wholesale_comment: user?.wholesale_comment || "",
@@ -215,7 +214,7 @@ export default function ClientProfilePage() {
             <Chip
               size="small"
               icon={<StorefrontRoundedIcon />}
-              label={`Опт: ${wholesaleLabel}${wholesaleDiscount > 0 ? ` (${wholesaleDiscount}%)` : ""}`}
+              label={`Опт: ${wholesaleLabel}`}
               variant={user?.wholesale_status === "approved" ? "filled" : "outlined"}
               color={user?.wholesale_status === "approved" ? "success" : "default"}
             />
@@ -262,7 +261,7 @@ export default function ClientProfilePage() {
               variant={isWholesaleApproved ? "filled" : "outlined"}
             />
             <Chip
-              label={`Статус: ${wholesaleLabel}${wholesaleDiscount > 0 ? ` (${wholesaleDiscount}%)` : ""}`}
+              label={`Статус: ${wholesaleLabel}`}
               variant="outlined"
             />
           </Stack>

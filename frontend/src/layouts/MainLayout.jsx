@@ -77,11 +77,9 @@ function buildWholesaleBadge(user) {
   }
 
   const status = user.wholesale_status || "none";
-  const discountPercent = Number(user.wholesale_discount_percent || 0);
-
   if (status === "approved") {
     return {
-      label: discountPercent > 0 ? `Оптовый сервис ${discountPercent}%` : "Оптовый сервис",
+      label: "Оптовый сервис",
       color: "success",
       variant: "filled",
     };
