@@ -576,12 +576,7 @@ export default function AppointmentDetailPage() {
     if (user.role !== "client") {
       return normalized;
     }
-    const allowedTypes = new Set([
-      "price_set",
-      "payment_proof_uploaded",
-      "payment_confirmed",
-    ]);
-    return normalized.filter((event) => allowedTypes.has(event.event_type)).slice(-6);
+    return [];
   }, [timelineEvents, user.role]);
 
   const runAction = async (action) => {
@@ -717,15 +712,12 @@ export default function AppointmentDetailPage() {
 
   const showAdminControls = user.role === "admin";
   const showAdminPaymentConfirm = showAdminControls && appointment.status === "PAYMENT_PROOF_UPLOADED";
-  const showClientPaymentHighlight =
-    isClient && !isClientMinimal && ["AWAITING_PAYMENT", "PAYMENT_PROOF_UPLOADED"].includes(appointment.status);
+  const showClientPaymentHighlight = false;
   const isClientCompact = isClient && clientCompactView;
   const clientDetailsTabEnabled = !isClientCompact;
-  const showClientDesktopSidebar = isClient && !isMobile;
-  const showClientPaymentDock =
-    showClientDesktopSidebar &&
-    ["AWAITING_PAYMENT", "PAYMENT_PROOF_UPLOADED"].includes(appointment.status);
-  const showClientFloatingActionBar = isClient && isMobile && !paymentFocusOpen;
+  const showClientDesktopSidebar = false;
+  const showClientPaymentDock = false;
+  const showClientFloatingActionBar = false;
   const showClientQuickRail = false;
   const clientPaymentTabDisabled = !showClientPaymentActions;
   const showClientDataCard = isClient
@@ -905,7 +897,7 @@ export default function AppointmentDetailPage() {
     if (appointment.status === "AWAITING_PAYMENT") {
       return {
         title: "Оплатите и прикрепите чек",
-        description: "После загрузки чека мастер сразу увидит оплату и продолжит работу.",
+        description: "После загрузки мастер сразу увидит оплату.",
         actionKey: "open_payment",
         cta: "К оплате",
       };
@@ -913,7 +905,7 @@ export default function AppointmentDetailPage() {
     if (appointment.status === "PAYMENT_PROOF_UPLOADED") {
       return {
         title: "Чек на проверке",
-        description: "Обычно подтверждение занимает 1-5 минут. Если дольше — напишите в чат.",
+        description: "Обычно подтверждение занимает 1-5 минут.",
         actionKey: "open_chat",
         cta: "Открыть чат",
       };
@@ -921,7 +913,7 @@ export default function AppointmentDetailPage() {
     if (["NEW", "IN_REVIEW"].includes(appointment.status)) {
       return {
         title: "Ожидаем мастера",
-        description: "Как только мастер возьмет заявку, вы получите обновление автоматически.",
+        description: "Как только мастер возьмет заявку, напишем в чат.",
         actionKey: "open_chat",
         cta: "Открыть чат",
       };
@@ -929,7 +921,7 @@ export default function AppointmentDetailPage() {
     if (["PAID", "IN_PROGRESS"].includes(appointment.status)) {
       return {
         title: "Работа выполняется",
-        description: "Держите чат открытым: мастер может запросить уточнение в любой момент.",
+        description: "Держите чат открытым.",
         actionKey: "open_chat",
         cta: "Перейти в чат",
       };
@@ -938,8 +930,8 @@ export default function AppointmentDetailPage() {
       return {
         title: "Заявка завершена",
         description: "Работа завершена. Если появятся вопросы — напишите в чат.",
-        actionKey: isClientMinimal ? "open_chat" : "leave_review",
-        cta: isClientMinimal ? "Открыть чат" : "Оставить отзыв",
+        actionKey: "open_chat",
+        cta: "Открыть чат",
       };
     }
     return {
@@ -1114,7 +1106,7 @@ export default function AppointmentDetailPage() {
   };
 
   return (
-    <Stack spacing={2}>
+    <Stack spacing={isClient ? 1.35 : 2}>
       <input
         ref={paymentFileInputRef}
         hidden
@@ -1204,7 +1196,7 @@ export default function AppointmentDetailPage() {
                 <Box>
                   <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>{clientFocus?.title}</Typography>
                   <Typography variant="caption" color="text.secondary">{clientFocus?.description}</Typography>
-                  {actionEtaLabel ? (
+                  {!isClient && actionEtaLabel ? (
                     <Stack direction="row" alignItems="center" spacing={0.5} sx={{ mt: 0.55 }}>
                       <InfoOutlinedIcon sx={{ fontSize: 14, color: "text.secondary" }} />
                       <Typography variant="caption" color="text.secondary">
@@ -1809,7 +1801,7 @@ export default function AppointmentDetailPage() {
                   systemEvents={mappedSystemEvents}
                   initialView={chatPanelView}
                   minimalClient={isClientMinimal}
-                  downloadLinks={isClient ? sidebarLinks : []}
+                  downloadLinks={isClient ? [] : sidebarLinks}
                 />
               </Box>
             </Fade>

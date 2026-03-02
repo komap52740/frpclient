@@ -1,5 +1,4 @@
 import AddPhotoAlternateRoundedIcon from "@mui/icons-material/AddPhotoAlternateRounded";
-import HelpOutlineRoundedIcon from "@mui/icons-material/HelpOutlineRounded";
 import LockOpenRoundedIcon from "@mui/icons-material/LockOpenRounded";
 import VisibilityOffRoundedIcon from "@mui/icons-material/VisibilityOffRounded";
 import VisibilityRoundedIcon from "@mui/icons-material/VisibilityRounded";
@@ -23,17 +22,6 @@ import { appointmentsApi } from "../../api/client";
 import { getLockTypeLabel } from "../../constants/labels";
 
 const CREATE_DEFAULTS_KEY = "frp_create_defaults_v1";
-const ISSUE_TEMPLATES = [
-  "Забыл PIN-код",
-  "Телефон просит Google-аккаунт после сброса",
-  "Нужно срочно разблокировать сегодня",
-];
-const DEVICE_TEMPLATES = [
-  "Samsung A54",
-  "Redmi Note 12",
-  "Honor 90",
-  "iPhone 11",
-];
 
 function splitDevice(rawDevice) {
   const normalized = (rawDevice || "").trim().replace(/\s+/g, " ");
@@ -87,13 +75,6 @@ export default function CreateAppointmentPage() {
 
   const updateField = (key, value) => {
     setForm((prev) => ({ ...prev, [key]: value }));
-  };
-
-  const appendIssueTemplate = (template) => {
-    updateField(
-      "description",
-      form.description.trim() ? `${form.description.trim()}\n${template}` : template
-    );
   };
 
   const onSubmit = async (event) => {
@@ -169,7 +150,24 @@ export default function CreateAppointmentPage() {
       ) : null}
       {error ? <Alert severity="error" sx={{ mb: 1.4 }}>{error}</Alert> : null}
 
-      <Stack component="form" spacing={1.3} onSubmit={onSubmit}>
+      <Stack component="form" spacing={1.3} onSubmit={onSubmit} autoComplete="off" noValidate>
+        {/* Trap browser credential autofill so it does not pollute RuDesktop fields. */}
+        <input
+          type="text"
+          name="username"
+          autoComplete="username"
+          tabIndex={-1}
+          aria-hidden="true"
+          style={{ position: "absolute", opacity: 0, pointerEvents: "none", height: 0 }}
+        />
+        <input
+          type="password"
+          name="password"
+          autoComplete="current-password"
+          tabIndex={-1}
+          aria-hidden="true"
+          style={{ position: "absolute", opacity: 0, pointerEvents: "none", height: 0 }}
+        />
         <TextField
           label="Устройство"
           placeholder="Например: Samsung A54"
@@ -177,20 +175,6 @@ export default function CreateAppointmentPage() {
           onChange={(event) => updateField("device", event.target.value)}
           required
         />
-
-        <Stack direction="row" spacing={0.7} flexWrap="wrap" useFlexGap>
-          {DEVICE_TEMPLATES.map((template) => (
-            <Button
-              key={template}
-              size="small"
-              variant="text"
-              onClick={() => updateField("device", template)}
-              sx={{ borderRadius: 999, px: 1.2 }}
-            >
-              {template}
-            </Button>
-          ))}
-        </Stack>
 
         <TextField
           label="Комментарий (опционально)"
@@ -202,36 +186,36 @@ export default function CreateAppointmentPage() {
           helperText="Можно не заполнять: мастер уточнит детали в чате."
         />
 
-        <Stack direction="row" spacing={0.7} flexWrap="wrap" useFlexGap>
-          {ISSUE_TEMPLATES.map((template) => (
-            <Button
-              key={template}
-              size="small"
-              variant="text"
-              onClick={() => appendIssueTemplate(template)}
-              sx={{ borderRadius: 999, px: 1.2 }}
-            >
-              {template}
-            </Button>
-          ))}
-        </Stack>
-
         <TextField
-          label="Логин/ID RuDesktop"
-          placeholder="Например: 123 456 789"
+          label="ID RuDesktop"
+          placeholder="Например: 123456789"
           value={form.rustdesk_id}
           onChange={(event) => updateField("rustdesk_id", event.target.value)}
-          helperText="Без этого мастер не сможет подключиться."
+          helperText="ID устройства для подключения мастера."
           required
+          autoComplete="off"
+          inputProps={{
+            autoComplete: "off",
+            name: "rustdesk_remote_id",
+            "data-lpignore": "true",
+            "data-1p-ignore": "true",
+          }}
         />
 
         <TextField
-          label="Пароль RuDesktop"
+          label="Код доступа RuDesktop"
           type={showPassword ? "text" : "password"}
           value={form.rustdesk_password}
           onChange={(event) => updateField("rustdesk_password", event.target.value)}
-          helperText="Пароль нужен для подключения мастера."
+          helperText="Код доступа из RuDesktop для подключения мастера."
           required
+          autoComplete="new-password"
+          inputProps={{
+            autoComplete: "new-password",
+            name: "rustdesk_access_code",
+            "data-lpignore": "true",
+            "data-1p-ignore": "true",
+          }}
           InputProps={{
             endAdornment: (
               <InputAdornment position="end">
@@ -245,7 +229,6 @@ export default function CreateAppointmentPage() {
 
         <Button
           variant={showAdvanced ? "outlined" : "text"}
-          startIcon={<HelpOutlineRoundedIcon fontSize="small" />}
           onClick={() => setShowAdvanced((prev) => !prev)}
           sx={{ alignSelf: "flex-start" }}
         >
