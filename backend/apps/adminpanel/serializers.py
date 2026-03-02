@@ -32,6 +32,14 @@ class AdminUserSerializer(serializers.ModelSerializer):
             "master_quality_approved",
             "master_quality_approved_at",
             "master_quality_comment",
+            "is_service_center",
+            "wholesale_status",
+            "wholesale_discount_percent",
+            "wholesale_company_name",
+            "wholesale_comment",
+            "wholesale_requested_at",
+            "wholesale_reviewed_at",
+            "wholesale_review_comment",
             "is_staff",
             "is_superuser",
             "client_stats",
@@ -49,6 +57,17 @@ class AdminMasterQualitySerializer(serializers.Serializer):
     master_specializations = serializers.CharField(max_length=255, required=False, allow_blank=True)
     master_quality_approved = serializers.BooleanField(required=False)
     master_quality_comment = serializers.CharField(max_length=255, required=False, allow_blank=True)
+
+
+class AdminWholesaleReviewSerializer(serializers.Serializer):
+    decision = serializers.ChoiceField(choices=(("approve", "approve"), ("reject", "reject")))
+    discount_percent = serializers.IntegerField(min_value=0, max_value=100, required=False)
+    review_comment = serializers.CharField(max_length=255, required=False, allow_blank=True)
+
+    def validate(self, attrs):
+        if attrs["decision"] == "approve" and attrs.get("discount_percent") is None:
+            raise serializers.ValidationError({"discount_percent": "Укажите размер скидки при одобрении"})
+        return attrs
 
 
 class AdminSystemSettingsSerializer(serializers.ModelSerializer):

@@ -13,12 +13,13 @@ from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.accounts.models import MasterLevelChoices, RoleChoices, SiteSettings, User
+from apps.accounts.models import MasterLevelChoices, RoleChoices, SiteSettings, User, WholesaleStatusChoices
 from apps.accounts.permissions import IsAdminRole, IsAuthenticatedAndNotBanned
 from apps.accounts.services import recalculate_client_stats
 from apps.appointments.models import Appointment, AppointmentStatusChoices
 from apps.appointments.serializers import AppointmentSerializer
 from apps.appointments.views import ConfirmPaymentMixin
+from apps.platform.services import create_notification, emit_event
 
 from .filters import AdminAppointmentFilter
 from .serializers import (
@@ -27,6 +28,7 @@ from .serializers import (
     AdminSystemSettingsSerializer,
     AdminUserRoleSerializer,
     AdminUserSerializer,
+    AdminWholesaleReviewSerializer,
     BanUserSerializer,
 )
 
@@ -103,6 +105,80 @@ class AdminClientsView(generics.ListAPIView):
 
     def get_queryset(self):
         return User.objects.filter(role=RoleChoices.CLIENT).order_by("-id")
+
+
+class AdminWholesaleRequestsView(generics.ListAPIView):
+    permission_classes = (IsAuthenticatedAndNotBanned, IsAdminRole)
+    serializer_class = AdminUserSerializer
+
+    def get_queryset(self):
+        queryset = (
+            User.objects.filter(role=RoleChoices.CLIENT, is_service_center=True)
+            .exclude(wholesale_status=WholesaleStatusChoices.NONE)
+            .order_by("-wholesale_requested_at", "-id")
+        )
+        status_filter = (self.request.query_params.get("status") or "").strip().lower()
+        if status_filter in WholesaleStatusChoices.values:
+            queryset = queryset.filter(wholesale_status=status_filter)
+        return queryset
+
+
+class AdminWholesaleReviewView(APIView):
+    permission_classes = (IsAuthenticatedAndNotBanned, IsAdminRole)
+
+    def post(self, request, user_id: int):
+        user = get_object_or_404(User, id=user_id, role=RoleChoices.CLIENT)
+        serializer = AdminWholesaleReviewSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        decision = serializer.validated_data["decision"]
+        review_comment = (serializer.validated_data.get("review_comment") or "").strip()
+        requested_at = user.wholesale_requested_at or timezone.now()
+        reviewed_at = timezone.now()
+
+        update_fields = [
+            "wholesale_requested_at",
+            "wholesale_reviewed_at",
+            "wholesale_review_comment",
+            "is_service_center",
+            "updated_at",
+        ]
+        user.is_service_center = True
+        user.wholesale_requested_at = requested_at
+        user.wholesale_reviewed_at = reviewed_at
+        user.wholesale_review_comment = review_comment
+
+        if decision == "approve":
+            discount_percent = min(max(int(serializer.validated_data.get("discount_percent", 0)), 0), 90)
+            user.wholesale_status = WholesaleStatusChoices.APPROVED
+            user.wholesale_discount_percent = discount_percent
+        else:
+            discount_percent = 0
+            user.wholesale_status = WholesaleStatusChoices.REJECTED
+            user.wholesale_discount_percent = 0
+
+        update_fields.extend(["wholesale_status", "wholesale_discount_percent"])
+        user.save(update_fields=sorted(set(update_fields)))
+
+        create_notification(
+            user=user,
+            type="system",
+            title="Решение по оптовой скидке",
+            message=(
+                f"Оптовая скидка одобрена: {discount_percent}%."
+                if decision == "approve"
+                else "Оптовая скидка отклонена. Уточните детали в чате с поддержкой."
+            ),
+            payload={"decision": decision, "discount_percent": discount_percent},
+        )
+        emit_event(
+            "wholesale.reviewed",
+            user,
+            actor=request.user,
+            payload={"decision": decision, "discount_percent": discount_percent},
+        )
+
+        return Response(AdminUserSerializer(user).data, status=status.HTTP_200_OK)
 
 
 class AdminMastersView(generics.ListAPIView):

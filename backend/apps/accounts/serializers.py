@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from collections.abc import Mapping
 
@@ -6,7 +6,7 @@ from django.conf import settings
 from django.utils import timezone
 from rest_framework import serializers
 
-from .models import ClientStats, MasterStats, SiteSettings, User
+from .models import ClientStats, MasterStats, SiteSettings, User, WholesaleStatusChoices
 from .telegram import verify_telegram_login
 
 
@@ -58,6 +58,14 @@ class MeSerializer(serializers.ModelSerializer):
             "master_quality_approved",
             "master_quality_approved_at",
             "master_quality_comment",
+            "is_service_center",
+            "wholesale_status",
+            "wholesale_discount_percent",
+            "wholesale_company_name",
+            "wholesale_comment",
+            "wholesale_requested_at",
+            "wholesale_reviewed_at",
+            "wholesale_review_comment",
             "is_banned",
             "ban_reason",
             "client_stats",
@@ -160,3 +168,25 @@ class BootstrapAdminSerializer(serializers.Serializer):
         if len(value) < 8:
             raise serializers.ValidationError("Пароль должен содержать минимум 8 символов.")
         return value
+
+
+class WholesaleRequestSerializer(serializers.Serializer):
+    is_service_center = serializers.BooleanField(default=True)
+    wholesale_company_name = serializers.CharField(max_length=255, required=False, allow_blank=True)
+    wholesale_comment = serializers.CharField(max_length=500, required=False, allow_blank=True)
+
+    def validate(self, attrs):
+        if attrs.get("is_service_center") and not (attrs.get("wholesale_company_name") or "").strip():
+            raise serializers.ValidationError({"wholesale_company_name": "Укажите название сервисного центра"})
+        return attrs
+
+
+class WholesaleStatusSerializer(serializers.Serializer):
+    is_service_center = serializers.BooleanField()
+    wholesale_status = serializers.ChoiceField(choices=WholesaleStatusChoices.choices)
+    wholesale_discount_percent = serializers.IntegerField(min_value=0, max_value=100)
+    wholesale_company_name = serializers.CharField(allow_blank=True)
+    wholesale_comment = serializers.CharField(allow_blank=True)
+    wholesale_requested_at = serializers.DateTimeField(allow_null=True)
+    wholesale_reviewed_at = serializers.DateTimeField(allow_null=True)
+    wholesale_review_comment = serializers.CharField(allow_blank=True)

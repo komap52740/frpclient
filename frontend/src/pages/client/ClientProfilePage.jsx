@@ -1,17 +1,10 @@
-import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
+﻿import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
 import ChatRoundedIcon from "@mui/icons-material/ChatRounded";
 import LockRoundedIcon from "@mui/icons-material/LockRounded";
 import RocketLaunchRoundedIcon from "@mui/icons-material/RocketLaunchRounded";
+import StorefrontRoundedIcon from "@mui/icons-material/StorefrontRounded";
 import TrendingUpRoundedIcon from "@mui/icons-material/TrendingUpRounded";
-import {
-  Box,
-  Button,
-  Chip,
-  Divider,
-  Paper,
-  Stack,
-  Typography,
-} from "@mui/material";
+import { Box, Button, Chip, Divider, Paper, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import dayjs from "dayjs";
 import "dayjs/locale/ru";
@@ -34,6 +27,13 @@ function resolveLevelLabel(level) {
   if (level === "advanced") return "Продвинутый";
   if (level === "newbie") return "Новичок";
   return "Базовый";
+}
+
+function resolveWholesaleLabel(status) {
+  if (status === "approved") return "Одобрено";
+  if (status === "pending") return "На рассмотрении";
+  if (status === "rejected") return "Отклонено";
+  return "Не запрошено";
 }
 
 function formatPercent(value) {
@@ -78,6 +78,7 @@ export default function ClientProfilePage() {
   const isDark = theme.palette.mode === "dark";
 
   const stats = user?.client_stats || {};
+  const wholesaleDiscount = Number(user?.wholesale_discount_percent || 0);
 
   const avatarText = useMemo(() => {
     const username = (user?.username || "Клиент").trim();
@@ -86,6 +87,7 @@ export default function ClientProfilePage() {
 
   const riskLabel = resolveRiskLabel(stats.risk_level);
   const levelLabel = resolveLevelLabel(stats.level);
+  const wholesaleLabel = resolveWholesaleLabel(user?.wholesale_status);
 
   return (
     <Stack spacing={1.5}>
@@ -139,13 +141,20 @@ export default function ClientProfilePage() {
               }}
             />
             <Chip size="small" label={`Риск: ${riskLabel}`} variant="outlined" />
+            <Chip
+              size="small"
+              icon={<StorefrontRoundedIcon />}
+              label={`Опт: ${wholesaleLabel}${wholesaleDiscount > 0 ? ` (${wholesaleDiscount}%)` : ""}`}
+              variant={user?.wholesale_status === "approved" ? "filled" : "outlined"}
+              color={user?.wholesale_status === "approved" ? "success" : "default"}
+            />
             {user?.telegram_username ? (
               <Chip size="small" label={`Telegram: @${user.telegram_username}`} variant="outlined" />
             ) : null}
           </Stack>
 
           <Typography variant="body2" color="text.secondary">
-            Профиль показывает только главное: прогресс, надежность и быстрые действия.
+            В профиле только главное: прогресс, надежность и быстрые действия.
           </Typography>
         </Stack>
       </Paper>
@@ -170,6 +179,22 @@ export default function ClientProfilePage() {
           icon={<LockRoundedIcon fontSize="small" color="warning" />}
         />
       </Stack>
+
+      <Paper sx={{ p: 1.4, borderRadius: 3 }}>
+        <Stack spacing={1}>
+          <Typography variant="h3">Оптовая скидка для сервиса</Typography>
+          <Typography variant="caption" color="text.secondary">
+            {user?.wholesale_status === "approved"
+              ? `Скидка ${wholesaleDiscount}% уже активна и применяется в оптовых заявках.`
+              : user?.wholesale_status === "pending"
+                ? "Оптовая заявка отправлена. Ожидайте решение администратора."
+                : "Если вы сервисный центр, включите оптовую заявку при создании нового заказа."}
+          </Typography>
+          <Button variant="outlined" onClick={() => navigate("/client/create")} sx={{ alignSelf: "flex-start" }}>
+            Создать оптовую заявку
+          </Button>
+        </Stack>
+      </Paper>
 
       <Paper sx={{ p: 1.4, borderRadius: 3 }}>
         <Stack spacing={1}>

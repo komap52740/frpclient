@@ -88,6 +88,9 @@ class Appointment(TimeStampedModel):
         db_index=True,
     )
     total_price = models.PositiveIntegerField(null=True, blank=True)
+    wholesale_base_price = models.PositiveIntegerField(null=True, blank=True)
+    wholesale_discount_percent_applied = models.PositiveSmallIntegerField(default=0)
+    is_wholesale_request = models.BooleanField(default=False, db_index=True)
     currency = models.CharField(max_length=3, default="RUB")
 
     payment_method = models.CharField(

@@ -10,6 +10,8 @@ from .views import (
     PasswordLoginView,
     RegisterView,
     TelegramAuthView,
+    WholesaleRequestView,
+    WholesaleStatusView,
 )
 
 urlpatterns = [
@@ -21,5 +23,7 @@ urlpatterns = [
     path("auth/logout/", AuthLogoutView.as_view(), name="auth-logout"),
     path("auth/refresh/", CookieTokenRefreshView.as_view(), name="auth-refresh"),
     path("me/", MeView.as_view(), name="me"),
+    path("wholesale/status/", WholesaleStatusView.as_view(), name="wholesale-status"),
+    path("wholesale/request/", WholesaleRequestView.as_view(), name="wholesale-request"),
     path("dashboard/", DashboardSummaryView.as_view(), name="dashboard-summary"),
 ]

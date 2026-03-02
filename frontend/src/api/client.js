@@ -126,6 +126,14 @@ export const authApi = {
     const response = await api.get("/me/");
     return response.data;
   },
+  async wholesaleStatus() {
+    const response = await api.get("/wholesale/status/");
+    return response.data;
+  },
+  async requestWholesale(payload) {
+    const response = await api.post("/wholesale/request/", payload);
+    return response.data;
+  },
   async dashboardSummary() {
     const response = await api.get("/dashboard/");
     return response.data;
@@ -238,6 +246,12 @@ export const adminApi = {
   },
   clients() {
     return api.get("/admin/users/");
+  },
+  wholesaleRequests(params = {}) {
+    return api.get("/admin/wholesale-requests/", { params });
+  },
+  reviewWholesale(userId, payload) {
+    return api.post(`/admin/wholesale-requests/${userId}/review/`, payload);
   },
   users(params = {}) {
     return api.get("/admin/users/all/", { params });

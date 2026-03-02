@@ -1,4 +1,4 @@
-import AddPhotoAlternateRoundedIcon from "@mui/icons-material/AddPhotoAlternateRounded";
+﻿import AddPhotoAlternateRoundedIcon from "@mui/icons-material/AddPhotoAlternateRounded";
 import LockOpenRoundedIcon from "@mui/icons-material/LockOpenRounded";
 import VisibilityOffRoundedIcon from "@mui/icons-material/VisibilityOffRounded";
 import VisibilityRoundedIcon from "@mui/icons-material/VisibilityRounded";
@@ -19,9 +19,12 @@ import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { appointmentsApi } from "../../api/client";
+import { useAuth } from "../../auth/AuthContext";
 import { getLockTypeLabel } from "../../constants/labels";
 
 const CREATE_DEFAULTS_KEY = "frp_create_defaults_v1";
+const RUSTDESK_ID_MIN_LEN = 8;
+const RUSTDESK_ID_MAX_LEN = 12;
 
 function splitDevice(rawDevice) {
   const normalized = (rawDevice || "").trim().replace(/\s+/g, " ");
@@ -53,8 +56,48 @@ function readStoredDefaults() {
   }
 }
 
+function normalizeRustdeskId(raw) {
+  return String(raw || "").replace(/[\s-]+/g, "").trim();
+}
+
+function validateRustdeskId(raw) {
+  const value = normalizeRustdeskId(raw);
+  if (!value) {
+    return "Укажите ID RuDesktop";
+  }
+  if (!/^\d+$/.test(value)) {
+    return "ID RuDesktop должен содержать только цифры";
+  }
+  if (value.length < RUSTDESK_ID_MIN_LEN || value.length > RUSTDESK_ID_MAX_LEN) {
+    return `ID должен быть от ${RUSTDESK_ID_MIN_LEN} до ${RUSTDESK_ID_MAX_LEN} цифр`;
+  }
+  return "";
+}
+
+function validateRustdeskPassword(raw) {
+  const value = String(raw || "").trim();
+  if (!value) {
+    return "Укажите код доступа RuDesktop";
+  }
+  if (value.length < 4) {
+    return "Код доступа слишком короткий (минимум 4 символа)";
+  }
+  return "";
+}
+
+function buildAutoTemplate({ device, lockType, hasPc }) {
+  const normalizedDevice = (device || "").trim() || "не указано";
+  return [
+    "Нужна удаленная разблокировка.",
+    `Устройство: ${normalizedDevice}.`,
+    `Тип блокировки: ${getLockTypeLabel(lockType)}.`,
+    `Доступ к ПК: ${hasPc ? "есть" : "нет"}.`,
+  ].join(" ");
+}
+
 export default function CreateAppointmentPage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const storedDefaults = useMemo(() => readStoredDefaults(), []);
 
   const [form, setForm] = useState({
@@ -65,41 +108,89 @@ export default function CreateAppointmentPage() {
     rustdesk_id: storedDefaults.rustdesk_id || "",
     rustdesk_password: storedDefaults.rustdesk_password || "",
     photo_lock_screen: null,
+    is_wholesale_request: false,
+    is_service_center: false,
+    wholesale_company_name: "",
+    wholesale_comment: "",
   });
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [touched, setTouched] = useState({
+    device: false,
+    rustdesk_id: false,
+    rustdesk_password: false,
+  });
 
   const hasStoredAccess = Boolean(storedDefaults.rustdesk_id || storedDefaults.rustdesk_password);
+  const wholesaleStatus = user?.wholesale_status || "none";
+  const wholesaleDiscount = Number(user?.wholesale_discount_percent || 0);
+
+  const autoTemplate = useMemo(
+    () =>
+      buildAutoTemplate({
+        device: form.device,
+        lockType: form.lock_type,
+        hasPc: form.has_pc,
+      }),
+    [form.device, form.has_pc, form.lock_type]
+  );
+
+  const deviceError = useMemo(() => {
+    const { brand, model } = splitDevice(form.device);
+    return !brand || !model ? "Укажите устройство (марка и модель)" : "";
+  }, [form.device]);
+
+  const rustdeskIdError = useMemo(() => validateRustdeskId(form.rustdesk_id), [form.rustdesk_id]);
+  const rustdeskPasswordError = useMemo(
+    () => validateRustdeskPassword(form.rustdesk_password),
+    [form.rustdesk_password]
+  );
+  const wholesaleCompanyError = useMemo(() => {
+    if (!form.is_wholesale_request) {
+      return "";
+    }
+    return form.wholesale_company_name.trim() ? "" : "Укажите название сервисного центра";
+  }, [form.is_wholesale_request, form.wholesale_company_name]);
+
+  const showDeviceError = touched.device && Boolean(deviceError);
+  const showRustdeskIdError = touched.rustdesk_id && Boolean(rustdeskIdError);
+  const showRustdeskPasswordError = touched.rustdesk_password && Boolean(rustdeskPasswordError);
+
+  const canSubmit =
+    !submitting && !deviceError && !rustdeskIdError && !rustdeskPasswordError && !wholesaleCompanyError;
 
   const updateField = (key, value) => {
     setForm((prev) => ({ ...prev, [key]: value }));
+    if (error) {
+      setError("");
+    }
+  };
+
+  const markTouched = (key) => {
+    setTouched((prev) => ({ ...prev, [key]: true }));
   };
 
   const onSubmit = async (event) => {
     event.preventDefault();
     setSubmitting(true);
     setError("");
+    setTouched({
+      device: true,
+      rustdesk_id: true,
+      rustdesk_password: true,
+    });
+
+    if (deviceError || rustdeskIdError || rustdeskPasswordError || wholesaleCompanyError) {
+      setError(deviceError || rustdeskIdError || rustdeskPasswordError || wholesaleCompanyError);
+      setSubmitting(false);
+      return;
+    }
 
     const { brand, model } = splitDevice(form.device);
-    const description =
-      form.description.trim() || "Нужна удаленная разблокировка. Детали уточню в чате.";
-    if (!brand || !model) {
-      setError("Укажите устройство (марка и модель)");
-      setSubmitting(false);
-      return;
-    }
-    if (!form.rustdesk_id.trim()) {
-      setError("Укажите логин/ID RuDesktop");
-      setSubmitting(false);
-      return;
-    }
-    if (!form.rustdesk_password.trim()) {
-      setError("Укажите пароль RuDesktop");
-      setSubmitting(false);
-      return;
-    }
+    const note = form.description.trim();
+    const description = note ? `${autoTemplate}\n\nКомментарий клиента: ${note}` : autoTemplate;
 
     const payload = new FormData();
     payload.append("brand", brand);
@@ -107,8 +198,16 @@ export default function CreateAppointmentPage() {
     payload.append("lock_type", form.lock_type);
     payload.append("has_pc", String(form.has_pc));
     payload.append("description", description);
-    payload.append("rustdesk_id", form.rustdesk_id.trim());
+    payload.append("rustdesk_id", normalizeRustdeskId(form.rustdesk_id));
     payload.append("rustdesk_password", form.rustdesk_password.trim());
+    payload.append("is_wholesale_request", String(Boolean(form.is_wholesale_request)));
+    payload.append("is_service_center", String(Boolean(form.is_service_center)));
+    if (form.wholesale_company_name.trim()) {
+      payload.append("wholesale_company_name", form.wholesale_company_name.trim());
+    }
+    if (form.wholesale_comment.trim()) {
+      payload.append("wholesale_comment", form.wholesale_comment.trim());
+    }
     if (form.photo_lock_screen) {
       payload.append("photo_lock_screen", form.photo_lock_screen);
     }
@@ -119,7 +218,7 @@ export default function CreateAppointmentPage() {
         window.localStorage.setItem(
           CREATE_DEFAULTS_KEY,
           JSON.stringify({
-            rustdesk_id: form.rustdesk_id.trim(),
+            rustdesk_id: normalizeRustdeskId(form.rustdesk_id),
             rustdesk_password: form.rustdesk_password.trim(),
             lock_type: form.lock_type,
             has_pc: form.has_pc,
@@ -128,7 +227,8 @@ export default function CreateAppointmentPage() {
       }
       navigate(`/appointments/${response.data.id}`);
     } catch (err) {
-      setError(err.response?.data?.detail || "Не удалось создать заявку");
+      const detail = err?.response?.data?.detail;
+      setError(detail || "Не удалось создать заявку");
     } finally {
       setSubmitting(false);
     }
@@ -139,16 +239,30 @@ export default function CreateAppointmentPage() {
       <Stack spacing={0.7} sx={{ mb: 2 }}>
         <Typography variant="h5">Новая заявка</Typography>
         <Typography variant="body2" color="text.secondary">
-          3 обязательных шага: устройство, RuDesktop ID и пароль. Остальное можно уточнить в чате.
+          Быстрый режим: заполните 3 поля и отправьте. Остальное добавится автоматически.
         </Typography>
       </Stack>
 
       {hasStoredAccess ? (
         <Alert severity="info" sx={{ mb: 1.4 }}>
-          Данные RuDesktop подставлены из последней заявки. Проверьте перед отправкой.
+          Данные RuDesktop подставлены из последней заявки. Проверьте их перед отправкой.
         </Alert>
       ) : null}
-      {error ? <Alert severity="error" sx={{ mb: 1.4 }}>{error}</Alert> : null}
+      {wholesaleStatus === "pending" ? (
+        <Alert severity="warning" sx={{ mb: 1.4 }}>
+          Ваша оптовая заявка уже на рассмотрении. До одобрения цена выставляется без скидки.
+        </Alert>
+      ) : null}
+      {wholesaleStatus === "approved" ? (
+        <Alert severity="success" sx={{ mb: 1.4 }}>
+          Оптовая скидка одобрена: {wholesaleDiscount}%. При оптовой заявке скидка применяется автоматически.
+        </Alert>
+      ) : null}
+      {error ? (
+        <Alert severity="error" sx={{ mb: 1.4 }}>
+          {error}
+        </Alert>
+      ) : null}
 
       <Stack component="form" spacing={1.3} onSubmit={onSubmit} autoComplete="off" noValidate>
         {/* Trap browser credential autofill so it does not pollute RuDesktop fields. */}
@@ -168,22 +282,16 @@ export default function CreateAppointmentPage() {
           aria-hidden="true"
           style={{ position: "absolute", opacity: 0, pointerEvents: "none", height: 0 }}
         />
+
         <TextField
           label="Устройство"
           placeholder="Например: Samsung A54"
           value={form.device}
           onChange={(event) => updateField("device", event.target.value)}
+          onBlur={() => markTouched("device")}
+          error={showDeviceError}
+          helperText={showDeviceError ? deviceError : "Марка и модель устройства"}
           required
-        />
-
-        <TextField
-          label="Комментарий (опционально)"
-          placeholder="Например: после сброса просит Google-аккаунт"
-          multiline
-          minRows={3}
-          value={form.description}
-          onChange={(event) => updateField("description", event.target.value)}
-          helperText="Можно не заполнять: мастер уточнит детали в чате."
         />
 
         <TextField
@@ -191,12 +299,22 @@ export default function CreateAppointmentPage() {
           placeholder="Например: 123456789"
           value={form.rustdesk_id}
           onChange={(event) => updateField("rustdesk_id", event.target.value)}
-          helperText="ID устройства для подключения мастера."
+          onBlur={() => markTouched("rustdesk_id")}
+          error={showRustdeskIdError}
+          color={form.rustdesk_id && !rustdeskIdError ? "success" : "primary"}
+          helperText={
+            showRustdeskIdError
+              ? rustdeskIdError
+              : form.rustdesk_id && !rustdeskIdError
+                ? "ID выглядит корректно"
+                : "ID устройства для подключения мастера"
+          }
           required
           autoComplete="off"
           inputProps={{
             autoComplete: "off",
             name: "rustdesk_remote_id",
+            inputMode: "numeric",
             "data-lpignore": "true",
             "data-1p-ignore": "true",
           }}
@@ -207,7 +325,16 @@ export default function CreateAppointmentPage() {
           type={showPassword ? "text" : "password"}
           value={form.rustdesk_password}
           onChange={(event) => updateField("rustdesk_password", event.target.value)}
-          helperText="Код доступа из RuDesktop для подключения мастера."
+          onBlur={() => markTouched("rustdesk_password")}
+          error={showRustdeskPasswordError}
+          color={form.rustdesk_password && !rustdeskPasswordError ? "success" : "primary"}
+          helperText={
+            showRustdeskPasswordError
+              ? rustdeskPasswordError
+              : form.rustdesk_password && !rustdeskPasswordError
+                ? "Код доступа выглядит корректно"
+                : "Код доступа из RuDesktop для подключения мастера"
+          }
           required
           autoComplete="new-password"
           inputProps={{
@@ -226,6 +353,52 @@ export default function CreateAppointmentPage() {
             ),
           }}
         />
+
+        <Alert severity="info">Автошаблон заявки: {autoTemplate}</Alert>
+
+        <Paper variant="outlined" sx={{ p: 1.2, borderRadius: 2.1 }}>
+          <Stack spacing={1}>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={form.is_wholesale_request}
+                  onChange={(event) => {
+                    const checked = event.target.checked;
+                    updateField("is_wholesale_request", checked);
+                    updateField("is_service_center", checked);
+                  }}
+                />
+              }
+              label="Оптовая заявка для сервисного центра"
+            />
+            {form.is_wholesale_request ? (
+              <Stack spacing={1}>
+                <TextField
+                  label="Название сервиса"
+                  placeholder="Например: ServiceHub Москва"
+                  value={form.wholesale_company_name}
+                  onChange={(event) => updateField("wholesale_company_name", event.target.value)}
+                  error={Boolean(wholesaleCompanyError)}
+                  helperText={
+                    wholesaleCompanyError || "По этой заявке будет отправлен запрос на оптовую скидку"
+                  }
+                  required
+                />
+                <TextField
+                  label="Комментарий для одобрения (опционально)"
+                  placeholder="Сколько заявок в месяц, город, условия"
+                  value={form.wholesale_comment}
+                  onChange={(event) => updateField("wholesale_comment", event.target.value)}
+                  multiline
+                  minRows={2}
+                />
+                <Alert severity="warning" sx={{ py: 0.5 }}>
+                  Оптовая скидка начнет применяться после одобрения администратором.
+                </Alert>
+              </Stack>
+            ) : null}
+          </Stack>
+        </Paper>
 
         <Button
           variant={showAdvanced ? "outlined" : "text"}
@@ -251,13 +424,17 @@ export default function CreateAppointmentPage() {
             </TextField>
 
             <FormControlLabel
-              control={(
-                <Switch
-                  checked={form.has_pc}
-                  onChange={(event) => updateField("has_pc", event.target.checked)}
-                />
-              )}
+              control={<Switch checked={form.has_pc} onChange={(event) => updateField("has_pc", event.target.checked)} />}
               label="Есть доступ к ПК"
+            />
+
+            <TextField
+              label="Комментарий (опционально)"
+              placeholder="Любые уточнения для мастера"
+              multiline
+              minRows={2}
+              value={form.description}
+              onChange={(event) => updateField("description", event.target.value)}
             />
 
             <Button component="label" variant="outlined" startIcon={<AddPhotoAlternateRoundedIcon fontSize="small" />}>
@@ -276,7 +453,7 @@ export default function CreateAppointmentPage() {
           type="submit"
           variant="contained"
           size="large"
-          disabled={submitting}
+          disabled={!canSubmit}
           startIcon={<LockOpenRoundedIcon />}
           sx={{ minHeight: 50, borderRadius: 2.4, fontWeight: 800 }}
         >

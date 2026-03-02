@@ -1,18 +1,16 @@
 ﻿from __future__ import annotations
 
-from django.db.models import Count, Q
 from rest_framework import serializers
 
 from apps.chat.models import ReadState
 
+from .client_actions import CLIENT_SIGNAL_META
 from .models import (
     Appointment,
     AppointmentEvent,
     AppointmentStatusChoices,
-    LockTypeChoices,
     PaymentMethodChoices,
 )
-from .client_actions import CLIENT_SIGNAL_META
 
 
 class AppointmentSerializer(serializers.ModelSerializer):
@@ -40,6 +38,9 @@ class AppointmentSerializer(serializers.ModelSerializer):
             "photo_lock_screen_url",
             "status",
             "total_price",
+            "wholesale_base_price",
+            "wholesale_discount_percent_applied",
+            "is_wholesale_request",
             "currency",
             "payment_method",
             "payment_proof",
@@ -130,6 +131,10 @@ class AppointmentSerializer(serializers.ModelSerializer):
 
 
 class AppointmentCreateSerializer(serializers.ModelSerializer):
+    is_service_center = serializers.BooleanField(write_only=True, required=False, default=False)
+    wholesale_company_name = serializers.CharField(write_only=True, required=False, allow_blank=True, max_length=255)
+    wholesale_comment = serializers.CharField(write_only=True, required=False, allow_blank=True, max_length=500)
+
     def validate(self, attrs):
         rustdesk_id = (attrs.get("rustdesk_id") or "").strip()
         rustdesk_password = (attrs.get("rustdesk_password") or "").strip()
@@ -140,6 +145,11 @@ class AppointmentCreateSerializer(serializers.ModelSerializer):
             errors["rustdesk_id"] = "Укажите логин/ID RuDesktop"
         if not rustdesk_password:
             errors["rustdesk_password"] = "Укажите пароль RuDesktop"
+        if attrs.get("is_wholesale_request") and not attrs.get("is_service_center"):
+            errors["is_service_center"] = "Для оптовой заявки подтвердите, что вы сервисный центр"
+        if attrs.get("is_wholesale_request") and not (attrs.get("wholesale_company_name") or "").strip():
+            errors["wholesale_company_name"] = "Укажите название сервисного центра"
+
         if errors:
             raise serializers.ValidationError(errors)
 
@@ -147,6 +157,12 @@ class AppointmentCreateSerializer(serializers.ModelSerializer):
         attrs["rustdesk_id"] = rustdesk_id
         attrs["rustdesk_password"] = rustdesk_password
         return attrs
+
+    def create(self, validated_data):
+        validated_data.pop("is_service_center", None)
+        validated_data.pop("wholesale_company_name", None)
+        validated_data.pop("wholesale_comment", None)
+        return super().create(validated_data)
 
     class Meta:
         model = Appointment
@@ -160,6 +176,10 @@ class AppointmentCreateSerializer(serializers.ModelSerializer):
             "rustdesk_id",
             "rustdesk_password",
             "photo_lock_screen",
+            "is_wholesale_request",
+            "is_service_center",
+            "wholesale_company_name",
+            "wholesale_comment",
         )
 
 

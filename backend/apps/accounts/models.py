@@ -22,6 +22,13 @@ class MasterLevelChoices(models.TextChoices):
     LEAD = "lead", "Lead"
 
 
+class WholesaleStatusChoices(models.TextChoices):
+    NONE = "none", "Не запрошено"
+    PENDING = "pending", "На рассмотрении"
+    APPROVED = "approved", "Одобрено"
+    REJECTED = "rejected", "Отклонено"
+
+
 class User(AbstractUser, TimeStampedModel):
     role = models.CharField(max_length=20, choices=RoleChoices.choices, default=RoleChoices.CLIENT)
     telegram_id = models.BigIntegerField(unique=True, null=True, blank=True)
@@ -34,6 +41,20 @@ class User(AbstractUser, TimeStampedModel):
     master_quality_approved = models.BooleanField(default=False)
     master_quality_approved_at = models.DateTimeField(null=True, blank=True)
     master_quality_comment = models.CharField(max_length=255, blank=True)
+
+    is_service_center = models.BooleanField(default=False)
+    wholesale_status = models.CharField(
+        max_length=20,
+        choices=WholesaleStatusChoices.choices,
+        default=WholesaleStatusChoices.NONE,
+        db_index=True,
+    )
+    wholesale_discount_percent = models.PositiveSmallIntegerField(default=0)
+    wholesale_company_name = models.CharField(max_length=255, blank=True)
+    wholesale_comment = models.CharField(max_length=500, blank=True)
+    wholesale_requested_at = models.DateTimeField(null=True, blank=True)
+    wholesale_reviewed_at = models.DateTimeField(null=True, blank=True)
+    wholesale_review_comment = models.CharField(max_length=255, blank=True)
 
     is_banned = models.BooleanField(default=False)
     ban_reason = models.TextField(blank=True)

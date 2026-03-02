@@ -1,17 +1,18 @@
 ﻿from __future__ import annotations
 
+from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.accounts.models import MasterLevelChoices, RoleChoices
+from apps.accounts.models import MasterLevelChoices, RoleChoices, User, WholesaleStatusChoices
 from apps.accounts.notifications import notify_masters_about_new_appointment
 from apps.accounts.permissions import IsAdminRole, IsAuthenticatedAndNotBanned
 from apps.accounts.services import recalculate_client_stats
 from apps.appointments.access import get_appointment_for_user
-from apps.platform.services import emit_event
+from apps.platform.services import create_notification, emit_event
 
 from .client_actions import can_client_signal, create_client_signal, repeat_client_appointment
 from .models import Appointment, AppointmentEventType, AppointmentStatusChoices
@@ -45,7 +46,59 @@ class AppointmentCreateView(APIView):
 
         serializer = AppointmentCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        is_service_center = bool(serializer.validated_data.get("is_service_center"))
+        wholesale_company_name = (serializer.validated_data.get("wholesale_company_name") or "").strip()
+        wholesale_comment = (serializer.validated_data.get("wholesale_comment") or "").strip()
+
         appointment = serializer.save(client=request.user)
+
+        if appointment.is_wholesale_request and is_service_center:
+            client_user = request.user
+            previous_status = client_user.wholesale_status
+            update_fields = [
+                "is_service_center",
+                "wholesale_company_name",
+                "wholesale_comment",
+                "updated_at",
+            ]
+
+            client_user.is_service_center = True
+            client_user.wholesale_company_name = wholesale_company_name
+            client_user.wholesale_comment = wholesale_comment
+
+            if client_user.wholesale_status != WholesaleStatusChoices.APPROVED:
+                client_user.wholesale_status = WholesaleStatusChoices.PENDING
+                client_user.wholesale_requested_at = timezone.now()
+                client_user.wholesale_reviewed_at = None
+                client_user.wholesale_review_comment = ""
+                update_fields.extend(
+                    [
+                        "wholesale_status",
+                        "wholesale_requested_at",
+                        "wholesale_reviewed_at",
+                        "wholesale_review_comment",
+                    ]
+                )
+
+            client_user.save(update_fields=sorted(set(update_fields)))
+
+            if previous_status != WholesaleStatusChoices.PENDING and client_user.wholesale_status == WholesaleStatusChoices.PENDING:
+                emit_event(
+                    "wholesale.requested",
+                    client_user,
+                    actor=client_user,
+                    payload={"company": wholesale_company_name, "comment": wholesale_comment, "appointment_id": appointment.id},
+                )
+                admins = User.objects.filter(Q(role=RoleChoices.ADMIN) | Q(is_superuser=True)).distinct()
+                for admin in admins:
+                    create_notification(
+                        user=admin,
+                        type="system",
+                        title="Новая оптовая заявка",
+                        message=f"Клиент @{client_user.username} запросил оптовую скидку",
+                        payload={"client_id": client_user.id, "appointment_id": appointment.id},
+                    )
+
         initialize_response_deadline(appointment)
         emit_event(
             "appointment.created",
@@ -277,19 +330,47 @@ class MasterSetPriceView(APIView):
 
         serializer = SetPriceSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        appointment.total_price = serializer.validated_data["total_price"]
-        appointment.save(update_fields=["total_price", "updated_at"])
+        base_price = int(serializer.validated_data["total_price"])
+        discount_percent = 0
+        client_user = appointment.client
+        if (
+            appointment.is_wholesale_request
+            and client_user.is_service_center
+            and client_user.wholesale_status == WholesaleStatusChoices.APPROVED
+        ):
+            discount_percent = min(max(int(client_user.wholesale_discount_percent or 0), 0), 90)
+
+        discounted_price = max(1, round(base_price * (100 - discount_percent) / 100))
+        appointment.wholesale_base_price = base_price if discount_percent > 0 else None
+        appointment.wholesale_discount_percent_applied = discount_percent
+        appointment.total_price = discounted_price
+        appointment.save(
+            update_fields=[
+                "wholesale_base_price",
+                "wholesale_discount_percent_applied",
+                "total_price",
+                "updated_at",
+            ]
+        )
         add_event(
             appointment,
             request.user,
             AppointmentEventType.PRICE_SET,
-            metadata={"total_price": appointment.total_price},
+            metadata={
+                "base_price": base_price,
+                "discount_percent": discount_percent,
+                "total_price": appointment.total_price,
+            },
         )
         emit_event(
             "appointment.price_set",
             appointment,
             actor=request.user,
-            payload={"total_price": appointment.total_price},
+            payload={
+                "base_price": base_price,
+                "discount_percent": discount_percent,
+                "total_price": appointment.total_price,
+            },
         )
         transition_status(appointment, request.user, AppointmentStatusChoices.AWAITING_PAYMENT)
         return Response(AppointmentSerializer(appointment, context={"request": request}).data)

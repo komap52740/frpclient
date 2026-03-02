@@ -7,7 +7,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from rest_framework.test import APIClient
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from apps.accounts.models import MasterLevelChoices, RoleChoices, User
+from apps.accounts.models import MasterLevelChoices, RoleChoices, User, WholesaleStatusChoices
 from apps.accounts.notifications import notify_masters_about_new_appointment
 from apps.appointments.models import Appointment, AppointmentStatusChoices
 from apps.chat.models import Message
@@ -818,5 +818,82 @@ def test_admin_can_list_all_reviews_with_filters(client_user, master_user, admin
     assert filtered.status_code == 200
     assert len(filtered.data) == 1
     assert filtered.data[0]["review_type"] == ReviewTypeChoices.MASTER_REVIEW
+
+
+@pytest.mark.django_db
+def test_client_can_submit_wholesale_request(client_user):
+    response = auth_as(client_user).post(
+        "/api/wholesale/request/",
+        {
+            "is_service_center": True,
+            "wholesale_company_name": "FixLab",
+            "wholesale_comment": "15 заявок в месяц",
+        },
+        format="json",
+    )
+    assert response.status_code == 200
+    assert response.data["wholesale_status"] == WholesaleStatusChoices.PENDING
+
+    client_user.refresh_from_db()
+    assert client_user.is_service_center is True
+    assert client_user.wholesale_status == WholesaleStatusChoices.PENDING
+    assert client_user.wholesale_company_name == "FixLab"
+
+
+@pytest.mark.django_db
+def test_admin_can_review_wholesale_request(admin_user, client_user):
+    client_user.is_service_center = True
+    client_user.wholesale_status = WholesaleStatusChoices.PENDING
+    client_user.wholesale_company_name = "FixLab"
+    client_user.save(
+        update_fields=["is_service_center", "wholesale_status", "wholesale_company_name", "updated_at"]
+    )
+
+    response = auth_as(admin_user).post(
+        f"/api/admin/wholesale-requests/{client_user.id}/review/",
+        {"decision": "approve", "discount_percent": 20, "review_comment": "Подтвержден сервисный центр"},
+        format="json",
+    )
+    assert response.status_code == 200
+    assert response.data["wholesale_status"] == WholesaleStatusChoices.APPROVED
+    assert response.data["wholesale_discount_percent"] == 20
+
+    client_user.refresh_from_db()
+    assert client_user.wholesale_status == WholesaleStatusChoices.APPROVED
+    assert client_user.wholesale_discount_percent == 20
+
+
+@pytest.mark.django_db
+def test_set_price_applies_wholesale_discount_for_approved_service(client_user, master_user):
+    client_user.is_service_center = True
+    client_user.wholesale_status = WholesaleStatusChoices.APPROVED
+    client_user.wholesale_discount_percent = 25
+    client_user.save(
+        update_fields=["is_service_center", "wholesale_status", "wholesale_discount_percent", "updated_at"]
+    )
+
+    appointment = Appointment.objects.create(
+        client=client_user,
+        assigned_master=master_user,
+        brand="Samsung",
+        model="A50",
+        lock_type="PIN",
+        has_pc=True,
+        description="desc",
+        status=AppointmentStatusChoices.IN_REVIEW,
+        is_wholesale_request=True,
+    )
+
+    response = auth_as(master_user).post(
+        f"/api/appointments/{appointment.id}/set-price/",
+        {"total_price": 10000},
+    )
+    assert response.status_code == 200
+
+    appointment.refresh_from_db()
+    assert appointment.wholesale_base_price == 10000
+    assert appointment.wholesale_discount_percent_applied == 25
+    assert appointment.total_price == 7500
+    assert appointment.status == AppointmentStatusChoices.AWAITING_PAYMENT
 
 

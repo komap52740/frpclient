@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from django.conf import settings
 from django.contrib.auth import authenticate
+from django.db.models import Q
 from django.utils import timezone
 from django.utils.crypto import get_random_string
 from rest_framework import permissions, status
@@ -10,9 +11,10 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenRefreshView
 
-from .models import MasterLevelChoices, RoleChoices, SiteSettings, User
+from .models import MasterLevelChoices, RoleChoices, SiteSettings, User, WholesaleStatusChoices
 from .permissions import IsAuthenticatedAndNotBanned
 from .services import recalculate_master_stats
+from apps.platform.services import create_notification, emit_event
 from apps.appointments.models import Appointment, AppointmentStatusChoices
 from apps.chat.models import ReadState
 from .serializers import (
@@ -21,6 +23,8 @@ from .serializers import (
     PasswordLoginSerializer,
     RegisterSerializer,
     TelegramAuthSerializer,
+    WholesaleRequestSerializer,
+    WholesaleStatusSerializer,
 )
 
 
@@ -217,6 +221,105 @@ class MeView(APIView):
             },
         }
         return Response(payload, status=status.HTTP_200_OK)
+
+
+def serialize_wholesale_status(user: User) -> dict:
+    return WholesaleStatusSerializer(
+        {
+            "is_service_center": user.is_service_center,
+            "wholesale_status": user.wholesale_status,
+            "wholesale_discount_percent": user.wholesale_discount_percent,
+            "wholesale_company_name": user.wholesale_company_name,
+            "wholesale_comment": user.wholesale_comment,
+            "wholesale_requested_at": user.wholesale_requested_at,
+            "wholesale_reviewed_at": user.wholesale_reviewed_at,
+            "wholesale_review_comment": user.wholesale_review_comment,
+        }
+    ).data
+
+
+class WholesaleStatusView(APIView):
+    permission_classes = (permissions.IsAuthenticated,)
+
+    def get(self, request):
+        if request.user.role != RoleChoices.CLIENT:
+            return Response({"detail": "Только для клиентов"}, status=status.HTTP_403_FORBIDDEN)
+        return Response(serialize_wholesale_status(request.user), status=status.HTTP_200_OK)
+
+
+class WholesaleRequestView(APIView):
+    permission_classes = (IsAuthenticatedAndNotBanned,)
+
+    def post(self, request):
+        if request.user.role != RoleChoices.CLIENT:
+            return Response({"detail": "Только клиент может отправить оптовую заявку"}, status=status.HTTP_403_FORBIDDEN)
+
+        serializer = WholesaleRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        payload = serializer.validated_data
+
+        user = request.user
+        previous_status = user.wholesale_status
+        is_service_center = bool(payload.get("is_service_center", True))
+        service_name = (payload.get("wholesale_company_name") or "").strip()
+        comment = (payload.get("wholesale_comment") or "").strip()
+
+        update_fields = ["updated_at"]
+        user.is_service_center = is_service_center
+        user.wholesale_company_name = service_name
+        user.wholesale_comment = comment
+        update_fields.extend(["is_service_center", "wholesale_company_name", "wholesale_comment"])
+
+        if not is_service_center:
+            user.wholesale_status = WholesaleStatusChoices.NONE
+            user.wholesale_discount_percent = 0
+            user.wholesale_requested_at = None
+            user.wholesale_reviewed_at = None
+            user.wholesale_review_comment = ""
+            update_fields.extend(
+                [
+                    "wholesale_status",
+                    "wholesale_discount_percent",
+                    "wholesale_requested_at",
+                    "wholesale_reviewed_at",
+                    "wholesale_review_comment",
+                ]
+            )
+        else:
+            if user.wholesale_status != WholesaleStatusChoices.APPROVED:
+                user.wholesale_status = WholesaleStatusChoices.PENDING
+                user.wholesale_requested_at = timezone.now()
+                user.wholesale_reviewed_at = None
+                user.wholesale_review_comment = ""
+                update_fields.extend(
+                    [
+                        "wholesale_status",
+                        "wholesale_requested_at",
+                        "wholesale_reviewed_at",
+                        "wholesale_review_comment",
+                    ]
+                )
+
+        user.save(update_fields=sorted(set(update_fields)))
+
+        if is_service_center and user.wholesale_status == WholesaleStatusChoices.PENDING and previous_status != WholesaleStatusChoices.PENDING:
+            emit_event(
+                "wholesale.requested",
+                user,
+                actor=user,
+                payload={"company": service_name, "comment": comment},
+            )
+            admins = User.objects.filter(Q(role=RoleChoices.ADMIN) | Q(is_superuser=True)).distinct()
+            for admin in admins:
+                create_notification(
+                    user=admin,
+                    type="system",
+                    title="Новая оптовая заявка",
+                    message=f"Клиент @{user.username} запросил оптовую скидку",
+                    payload={"client_id": user.id},
+                )
+
+        return Response(serialize_wholesale_status(user), status=status.HTTP_200_OK)
 
 
 def calculate_unread_total(appointments_queryset, user: User) -> int:

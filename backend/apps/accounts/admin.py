@@ -15,10 +15,21 @@ class UserAdmin(DjangoUserAdmin):
         "is_master_active",
         "master_level",
         "master_quality_approved",
+        "wholesale_status",
+        "wholesale_discount_percent",
         "is_banned",
         "is_staff",
     )
-    list_filter = ("role", "is_master_active", "master_level", "master_quality_approved", "is_banned", "is_staff")
+    list_filter = (
+        "role",
+        "is_master_active",
+        "master_level",
+        "master_quality_approved",
+        "is_service_center",
+        "wholesale_status",
+        "is_banned",
+        "is_staff",
+    )
     fieldsets = DjangoUserAdmin.fieldsets + (
         (
             "Telegram / Roles",
@@ -34,6 +45,14 @@ class UserAdmin(DjangoUserAdmin):
                     "master_quality_approved",
                     "master_quality_approved_at",
                     "master_quality_comment",
+                    "is_service_center",
+                    "wholesale_status",
+                    "wholesale_discount_percent",
+                    "wholesale_company_name",
+                    "wholesale_comment",
+                    "wholesale_requested_at",
+                    "wholesale_reviewed_at",
+                    "wholesale_review_comment",
                     "is_banned",
                     "ban_reason",
                     "banned_at",
