@@ -139,7 +139,7 @@ export default function LoginPage() {
   }, [loginWithAccessToken, navigate, requiresSetup]);
 
   useEffect(() => {
-    if (requiresSetup || !BOT_USERNAME) {
+    if (setupLoading || requiresSetup || !BOT_USERNAME) {
       return undefined;
     }
 
@@ -264,7 +264,7 @@ export default function LoginPage() {
         container.removeChild(script);
       }
     };
-  }, [requiresSetup, telegramWidgetReloadKey]);
+  }, [setupLoading, requiresSetup, telegramWidgetReloadKey]);
 
   const startOAuthLogin = async (provider) => {
     setLoading(true);
