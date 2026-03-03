@@ -19,8 +19,9 @@ import { useAuth } from "../../auth/AuthContext";
 
 const BOT_USERNAME_RAW = import.meta.env.VITE_TELEGRAM_BOT_USERNAME || "";
 const BOT_USERNAME = BOT_USERNAME_RAW.trim().replace(/^@/, "");
-const TELEGRAM_WIDGET_RETRY_LIMIT = 8;
-const TELEGRAM_WIDGET_WATCHDOG_MS = 7000;
+const TELEGRAM_WIDGET_RETRY_LIMIT = 5;
+const TELEGRAM_WIDGET_BOOT_TIMEOUT_MS = 20000;
+const TELEGRAM_WIDGET_POLL_MS = 450;
 
 function getApiErrorMessage(error, fallback) {
   const data = error?.response?.data;
@@ -59,6 +60,8 @@ export default function LoginPage() {
   const [telegramWidgetError, setTelegramWidgetError] = useState("");
   const [telegramWidgetReloadKey, setTelegramWidgetReloadKey] = useState(0);
   const telegramWidgetRetryRef = useRef(0);
+  const loginWithTelegramRef = useRef(loginWithTelegram);
+  const navigateRef = useRef(navigate);
 
   const [setupForm, setSetupForm] = useState({
     username: "",
@@ -74,13 +77,21 @@ export default function LoginPage() {
   });
 
   useEffect(() => {
+    loginWithTelegramRef.current = loginWithTelegram;
+  }, [loginWithTelegram]);
+
+  useEffect(() => {
+    navigateRef.current = navigate;
+  }, [navigate]);
+
+  useEffect(() => {
     const loadBootstrapStatus = async () => {
       setSetupLoading(true);
       try {
         const response = await authApi.bootstrapStatus();
         setRequiresSetup(Boolean(response.requires_setup));
       } catch {
-        setError("РќРµ СѓРґР°Р»РѕСЃСЊ РїРѕР»СѓС‡РёС‚СЊ СЃС‚Р°С‚СѓСЃ РїРµСЂРІРёС‡РЅРѕР№ РЅР°СЃС‚СЂРѕР№РєРё.");
+        setError("Не удалось получить статус первичной настройки.");
       } finally {
         setSetupLoading(false);
       }
@@ -120,7 +131,7 @@ export default function LoginPage() {
         navigate("/", { replace: true });
       })
       .catch((err) => {
-        setError(getApiErrorMessage(err, "РќРµ СѓРґР°Р»РѕСЃСЊ Р·Р°РІРµСЂС€РёС‚СЊ OAuth-РІС…РѕРґ"));
+        setError(getApiErrorMessage(err, "Не удалось завершить OAuth-вход"));
       })
       .finally(() => {
         setLoading(false);
@@ -137,10 +148,10 @@ export default function LoginPage() {
       setLoading(true);
       setError("");
       try {
-        await loginWithTelegram(user);
-        navigate("/", { replace: true });
+        await loginWithTelegramRef.current(user);
+        navigateRef.current("/", { replace: true });
       } catch (err) {
-        setError(getApiErrorMessage(err, "РћС€РёР±РєР° Р°РІС‚РѕСЂРёР·Р°С†РёРё Telegram"));
+        setError(getApiErrorMessage(err, "Ошибка авторизации Telegram"));
       } finally {
         setLoading(false);
       }
@@ -149,29 +160,33 @@ export default function LoginPage() {
     let isDisposed = false;
     let failureHandled = false;
     let retryTimer = null;
-    let watchdogTimer = null;
-    let probeTimer = null;
+    let bootTimer = null;
+    let pollTimer = null;
     let observer = null;
 
     const container = document.getElementById("telegram-login-container");
     if (!container) {
-      setTelegramWidgetError("РљРѕРЅС‚РµР№РЅРµСЂ Telegram-РІС…РѕРґР° РЅРµ РЅР°Р№РґРµРЅ.");
+      setTelegramWidgetError("Контейнер Telegram-входа не найден.");
       return () => {
         window.onTelegramAuth = null;
       };
     }
 
-    const hasIframe = () => Boolean(container.querySelector("iframe"));
+    const hasWidgetUi = () =>
+      Boolean(
+        container.querySelector("iframe") ||
+          Array.from(container.children).some((node) => node.tagName && node.tagName.toLowerCase() !== "script")
+      );
 
     const markWidgetReady = () => {
       telegramWidgetRetryRef.current = 0;
       setTelegramWidgetError("");
       window.clearTimeout(retryTimer);
-      window.clearTimeout(watchdogTimer);
-      window.clearTimeout(probeTimer);
+      window.clearTimeout(bootTimer);
+      window.clearInterval(pollTimer);
       retryTimer = null;
-      watchdogTimer = null;
-      probeTimer = null;
+      bootTimer = null;
+      pollTimer = null;
     };
 
     const scheduleRetry = () => {
@@ -187,11 +202,13 @@ export default function LoginPage() {
           if (!isDisposed) {
             setTelegramWidgetReloadKey((prev) => prev + 1);
           }
-        }, 700 + nextAttempt * 450);
+        }, 1000 + nextAttempt * 550);
         return;
       }
 
-      setTelegramWidgetError("Р’РёРґР¶РµС‚ Telegram РЅРµ Р·Р°РіСЂСѓР·РёР»СЃСЏ Р°РІС‚РѕРјР°С‚РёС‡РµСЃРєРё. РџСЂРѕРІРµСЂСЊС‚Рµ Р±Р»РѕРєРёСЂРѕРІРєСѓ СЃРєСЂРёРїС‚РѕРІ РІ Р±СЂР°СѓР·РµСЂРµ Рё РёРјСЏ Р±РѕС‚Р°.");
+      setTelegramWidgetError(
+        `Виджет Telegram не загрузился автоматически. Проверьте блокировку скриптов и бота @${BOT_USERNAME}.`
+      );
     };
 
     const script = document.createElement("script");
@@ -205,18 +222,18 @@ export default function LoginPage() {
     script.setAttribute("data-onauth", "onTelegramAuth(user)");
 
     script.onload = () => {
-      probeTimer = window.setTimeout(() => {
+      pollTimer = window.setInterval(() => {
         if (isDisposed) return;
-        if (hasIframe()) {
+        if (hasWidgetUi()) {
           markWidgetReady();
         }
-      }, 220);
+      }, TELEGRAM_WIDGET_POLL_MS);
     };
     script.onerror = scheduleRetry;
 
     observer = new MutationObserver(() => {
       if (isDisposed) return;
-      if (hasIframe()) {
+      if (hasWidgetUi()) {
         markWidgetReady();
       }
     });
@@ -225,20 +242,20 @@ export default function LoginPage() {
     container.innerHTML = "";
     container.appendChild(script);
 
-    watchdogTimer = window.setTimeout(() => {
+    bootTimer = window.setTimeout(() => {
       if (isDisposed) return;
-      if (hasIframe()) {
+      if (hasWidgetUi()) {
         markWidgetReady();
       } else {
         scheduleRetry();
       }
-    }, TELEGRAM_WIDGET_WATCHDOG_MS);
+    }, TELEGRAM_WIDGET_BOOT_TIMEOUT_MS);
 
     return () => {
       isDisposed = true;
       window.clearTimeout(retryTimer);
-      window.clearTimeout(watchdogTimer);
-      window.clearTimeout(probeTimer);
+      window.clearTimeout(bootTimer);
+      window.clearInterval(pollTimer);
       if (observer) {
         observer.disconnect();
       }
@@ -247,7 +264,7 @@ export default function LoginPage() {
         container.removeChild(script);
       }
     };
-  }, [loginWithTelegram, navigate, requiresSetup, telegramWidgetReloadKey]);
+  }, [requiresSetup, telegramWidgetReloadKey]);
 
   const startOAuthLogin = async (provider) => {
     setLoading(true);
@@ -260,7 +277,7 @@ export default function LoginPage() {
       }
       window.location.assign(response.auth_url);
     } catch (err) {
-      setError(getApiErrorMessage(err, "РќРµ СѓРґР°Р»РѕСЃСЊ РЅР°С‡Р°С‚СЊ OAuth-РІС…РѕРґ"));
+      setError(getApiErrorMessage(err, "Не удалось начать OAuth-вход"));
       setLoading(false);
     }
   };
@@ -274,7 +291,7 @@ export default function LoginPage() {
       await loginWithPassword(loginForm);
       navigate("/", { replace: true });
     } catch (err) {
-      setError(getApiErrorMessage(err, "РќРµ СѓРґР°Р»РѕСЃСЊ РІС‹РїРѕР»РЅРёС‚СЊ РІС…РѕРґ. РџРѕРїСЂРѕР±СѓР№С‚Рµ СЃРЅРѕРІР°."));
+      setError(getApiErrorMessage(err, "Не удалось выполнить вход. Попробуйте снова."));
     } finally {
       setLoading(false);
     }
@@ -285,7 +302,7 @@ export default function LoginPage() {
     setError("");
 
     if (setupForm.password !== setupForm.passwordConfirm) {
-      setError("РџР°СЂРѕР»Рё РЅРµ СЃРѕРІРїР°РґР°СЋС‚.");
+      setError("Пароли не совпадают.");
       return;
     }
 
@@ -300,7 +317,7 @@ export default function LoginPage() {
       await loginWithAccessToken(response.access);
       navigate("/", { replace: true });
     } catch (err) {
-      setError(getApiErrorMessage(err, "РќРµ СѓРґР°Р»РѕСЃСЊ Р·Р°РІРµСЂС€РёС‚СЊ РїРµСЂРІРёС‡РЅСѓСЋ РЅР°СЃС‚СЂРѕР№РєСѓ"));
+      setError(getApiErrorMessage(err, "Не удалось завершить первичную настройку"));
     } finally {
       setLoading(false);
     }
@@ -319,7 +336,7 @@ export default function LoginPage() {
       >
         <Stack spacing={2} alignItems="center">
           <CircularProgress size={32} />
-          <Typography color="rgba(255,255,255,0.88)">РџСЂРѕРІРµСЂСЏРµРј СЃРѕСЃС‚РѕСЏРЅРёРµ СЃРёСЃС‚РµРјС‹...</Typography>
+          <Typography color="rgba(255,255,255,0.88)">Проверяем состояние системы...</Typography>
         </Stack>
       </Box>
     );
@@ -479,13 +496,42 @@ export default function LoginPage() {
         >
           <Stack spacing={2}>
             <Typography variant="h4" sx={{ fontWeight: 800, fontSize: { xs: 30, md: 38 }, color: "#f7fbff" }}>
-              {requiresSetup ? "РџРµСЂРІРёС‡РЅР°СЏ РЅР°СЃС‚СЂРѕР№РєР°" : "Р’С…РѕРґ РІ СЃРёСЃС‚РµРјСѓ"}
+              {requiresSetup ? "Первичная настройка" : "Вход в систему"}
             </Typography>
             <Typography sx={{ color: "rgba(210,225,248,0.78)", fontSize: 14 }}>
               {requiresSetup
-                ? "РЎРѕР·РґР°Р№С‚Рµ РїРµСЂРІРѕРіРѕ Р°РґРјРёРЅРёСЃС‚СЂР°С‚РѕСЂР° РґР»СЏ Р·Р°РїСѓСЃРєР° РїР»Р°С‚С„РѕСЂРјС‹."
-                : "Р’С…РѕРґ С‡РµСЂРµР· Google, РЇРЅРґРµРєСЃ, Telegram РёР»Рё Р»РѕРіРёРЅ/РїР°СЂРѕР»СЊ."}
+                ? "Создайте первого администратора для запуска платформы."
+                : "Вход через Google, Яндекс, Telegram или логин/пароль."}
             </Typography>
+
+            {!requiresSetup ? (
+              <Box
+                sx={{
+                  p: 1.25,
+                  borderRadius: 2,
+                  border: "1px solid rgba(118,168,255,0.28)",
+                  background: "linear-gradient(145deg, rgba(16,29,56,0.80) 0%, rgba(11,22,44,0.74) 100%)",
+                }}
+              >
+                <Typography sx={{ fontWeight: 700, color: "#dbe9ff", fontSize: 14, mb: 0.5 }}>
+                  Зачем нужен сервис
+                </Typography>
+                <Box
+                  component="ul"
+                  sx={{
+                    m: 0,
+                    pl: 2.2,
+                    color: "rgba(204,223,248,0.86)",
+                    fontSize: 13.5,
+                    lineHeight: 1.5,
+                  }}
+                >
+                  <li>Удаленная разблокировка без поездок в офис и очередей.</li>
+                  <li>Чат с мастером и прозрачные статусы работы по заявке.</li>
+                  <li>Оплата и подтверждение в одном окне, без лишних шагов.</li>
+                </Box>
+              </Box>
+            ) : null}
 
             {error && <Alert severity="error">{error}</Alert>}
             {success && <Alert severity="success">{success}</Alert>}
@@ -493,34 +539,34 @@ export default function LoginPage() {
             {requiresSetup ? (
               <Box component="form" onSubmit={submitBootstrap}>
                 <Stack spacing={1.4}>
-                  <Alert severity="info">РЎРѕР·РґР°Р№С‚Рµ РїРµСЂРІРѕРіРѕ Р°РґРјРёРЅРёСЃС‚СЂР°С‚РѕСЂР°. РџРѕСЃР»Рµ СЌС‚РѕРіРѕ РЅР°СЃС‚СЂРѕР№РєР° С‡РµСЂРµР· РєРѕРЅСЃРѕР»СЊ РЅРµ РїРѕС‚СЂРµР±СѓРµС‚СЃСЏ.</Alert>
+                  <Alert severity="info">Создайте первого администратора. После этого настройка через консоль не потребуется.</Alert>
                   <TextField
                     required
-                    label="Р›РѕРіРёРЅ Р°РґРјРёРЅРёСЃС‚СЂР°С‚РѕСЂР°"
+                    label="Логин администратора"
                     value={setupForm.username}
                     onChange={(e) => setSetupForm((prev) => ({ ...prev, username: e.target.value }))}
                   />
                   <TextField
                     required
-                    label="РџР°СЂРѕР»СЊ"
+                    label="Пароль"
                     type="password"
                     value={setupForm.password}
                     onChange={(e) => setSetupForm((prev) => ({ ...prev, password: e.target.value }))}
                   />
                   <TextField
                     required
-                    label="РџРѕРґС‚РІРµСЂР¶РґРµРЅРёРµ РїР°СЂРѕР»СЏ"
+                    label="Подтверждение пароля"
                     type="password"
                     value={setupForm.passwordConfirm}
                     onChange={(e) => setSetupForm((prev) => ({ ...prev, passwordConfirm: e.target.value }))}
                   />
                   <TextField
-                    label="РРјСЏ"
+                    label="Имя"
                     value={setupForm.first_name}
                     onChange={(e) => setSetupForm((prev) => ({ ...prev, first_name: e.target.value }))}
                   />
                   <TextField
-                    label="Р¤Р°РјРёР»РёСЏ"
+                    label="Фамилия"
                     value={setupForm.last_name}
                     onChange={(e) => setSetupForm((prev) => ({ ...prev, last_name: e.target.value }))}
                   />
@@ -537,7 +583,7 @@ export default function LoginPage() {
                       boxShadow: "0 10px 26px rgba(88,157,255,0.34)",
                     }}
                   >
-                    {loading ? "Р’С‹РїРѕР»РЅСЏРµС‚СЃСЏ..." : "РЎРѕР·РґР°С‚СЊ Р°РґРјРёРЅРёСЃС‚СЂР°С‚РѕСЂР° Рё РІРѕР№С‚Рё"}
+                    {loading ? "Выполняется..." : "Создать администратора и войти"}
                   </Button>
                 </Stack>
               </Box>
@@ -558,7 +604,7 @@ export default function LoginPage() {
                       boxShadow: "0 10px 26px rgba(62,133,255,0.32)",
                     }}
                   >
-                    Р’РѕР№С‚Рё С‡РµСЂРµР· Google
+                    Войти через Google
                   </Button>
                   <Button
                     fullWidth
@@ -575,12 +621,12 @@ export default function LoginPage() {
                       "&:hover": { borderColor: "rgba(145,186,255,0.88)" },
                     }}
                   >
-                    Р’РѕР№С‚Рё С‡РµСЂРµР· РЇРЅРґРµРєСЃ
+                    Войти через Яндекс
                   </Button>
                 </Stack>
 
                 {!BOT_USERNAME ? (
-                  <Alert severity="warning">РќРµ Р·Р°РґР°РЅРѕ Р·РЅР°С‡РµРЅРёРµ VITE_TELEGRAM_BOT_USERNAME.</Alert>
+                  <Alert severity="warning">Не задано значение VITE_TELEGRAM_BOT_USERNAME.</Alert>
                 ) : (
                   <Stack spacing={1}>
                     <Box
@@ -599,36 +645,49 @@ export default function LoginPage() {
                     {telegramWidgetError ? (
                       <Stack spacing={1}>
                         <Alert severity="warning">{telegramWidgetError}</Alert>
-                        <Button
-                          size="small"
-                          variant="outlined"
-                          onClick={() => {
-                            telegramWidgetRetryRef.current = 0;
-                            setTelegramWidgetReloadKey((prev) => prev + 1);
-                          }}
-                          sx={{ alignSelf: "flex-start", textTransform: "none", borderRadius: 1.5 }}
-                        >
-                          РџРµСЂРµР·Р°РіСЂСѓР·РёС‚СЊ Telegram РІС…РѕРґ
-                        </Button>
+                        <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            onClick={() => {
+                              telegramWidgetRetryRef.current = 0;
+                              setTelegramWidgetReloadKey((prev) => prev + 1);
+                            }}
+                            sx={{ alignSelf: "flex-start", textTransform: "none", borderRadius: 1.5 }}
+                          >
+                            Перезагрузить Telegram вход
+                          </Button>
+                          <Button
+                            size="small"
+                            variant="text"
+                            component="a"
+                            href={`https://t.me/${BOT_USERNAME}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            sx={{ alignSelf: "flex-start", textTransform: "none", borderRadius: 1.5 }}
+                          >
+                            Открыть @{BOT_USERNAME}
+                          </Button>
+                        </Stack>
                       </Stack>
                     ) : null}
                   </Stack>
                 )}
 
-                <Divider sx={{ color: "rgba(205,222,248,0.65)", fontSize: 13 }}>РёР»Рё</Divider>
+                <Divider sx={{ color: "rgba(205,222,248,0.65)", fontSize: 13 }}>или</Divider>
 
                 <Box component="form" onSubmit={submitPasswordLogin}>
                   <Stack spacing={1.2}>
                     <TextField
                       required
-                      label="Р›РѕРіРёРЅ"
+                      label="Логин"
                       autoComplete="username"
                       value={loginForm.username}
                       onChange={(e) => setLoginForm((prev) => ({ ...prev, username: e.target.value }))}
                     />
                     <TextField
                       required
-                      label="РџР°СЂРѕР»СЊ"
+                      label="Пароль"
                       type="password"
                       autoComplete="current-password"
                       value={loginForm.password}
@@ -648,7 +707,7 @@ export default function LoginPage() {
                         boxShadow: "0 10px 24px rgba(62,133,255,0.30)",
                       }}
                     >
-                      Р’РѕР№С‚Рё
+                      Войти
                     </Button>
                   </Stack>
                 </Box>
