@@ -2,7 +2,6 @@
 import GavelRoundedIcon from "@mui/icons-material/GavelRounded";
 import HomeRoundedIcon from "@mui/icons-material/HomeRounded";
 import ListAltRoundedIcon from "@mui/icons-material/ListAltRounded";
-import ManageAccountsRoundedIcon from "@mui/icons-material/ManageAccountsRounded";
 import NewReleasesRoundedIcon from "@mui/icons-material/NewReleasesRounded";
 import PersonRoundedIcon from "@mui/icons-material/PersonRounded";
 import QuickreplyRoundedIcon from "@mui/icons-material/QuickreplyRounded";
@@ -27,7 +26,7 @@ function getActions(role) {
       { label: "Новые", to: "/master/new", icon: <NewReleasesRoundedIcon /> },
       { label: "Активные", to: "/master/active", icon: <DashboardRoundedIcon /> },
       { label: "Шаблоны", to: "/master/quick-replies", icon: <QuickreplyRoundedIcon /> },
-      { label: "Отзывы", to: "/master/reviews", icon: <ReviewsRoundedIcon /> },
+      { label: "Профиль", to: "/master/profile", icon: <PersonRoundedIcon /> },
     ];
   }
 
@@ -37,7 +36,7 @@ function getActions(role) {
       { label: "Заявки", to: "/admin/appointments", icon: <ListAltRoundedIcon /> },
       { label: "Отзывы", to: "/admin/reviews", icon: <ReviewsRoundedIcon /> },
       { label: "Правила", to: "/admin/rules", icon: <GavelRoundedIcon /> },
-      { label: "Польз.", to: "/admin/users", icon: <ManageAccountsRoundedIcon /> },
+      { label: "Профиль", to: "/admin/profile", icon: <PersonRoundedIcon /> },
     ];
   }
 

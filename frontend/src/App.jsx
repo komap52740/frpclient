@@ -55,6 +55,7 @@ const MasterActivePage = lazyWithRetry(() => import("./pages/master/MasterActive
 const MasterNewPage = lazyWithRetry(() => import("./pages/master/MasterNewPage"));
 const MasterQuickRepliesPage = lazyWithRetry(() => import("./pages/master/MasterQuickRepliesPage"));
 const MasterReviewsPage = lazyWithRetry(() => import("./pages/master/MasterReviewsPage"));
+const RoleProfilePage = lazyWithRetry(() => import("./pages/RoleProfilePage"));
 
 function RouteFallback() {
   return (
@@ -208,6 +209,14 @@ function AuthenticatedLayout() {
               </ProtectedRoute>
             }
           />
+          <Route
+            path="/master/profile"
+            element={
+              <ProtectedRoute roles={["master"]}>
+                <RoleProfilePage />
+              </ProtectedRoute>
+            }
+          />
 
           <Route
             path="/admin/appointments"
@@ -262,6 +271,14 @@ function AuthenticatedLayout() {
             element={
               <ProtectedRoute roles={["admin"]}>
                 <AdminReviewsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/profile"
+            element={
+              <ProtectedRoute roles={["admin"]}>
+                <RoleProfilePage />
               </ProtectedRoute>
             }
           />

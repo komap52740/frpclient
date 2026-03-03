@@ -47,12 +47,14 @@ function buildMenu(role) {
       { label: "Активные", to: "/master/active" },
       { label: "Быстрые ответы", to: "/master/quick-replies" },
       { label: "Отзывы", to: "/master/reviews" },
+      { label: "Профиль", to: "/master/profile" },
     ];
   }
 
   if (role === "admin") {
     return [
       { label: "Система", to: "/admin/system" },
+      { label: "Профиль", to: "/admin/profile" },
       { label: "Заявки", to: "/admin/appointments" },
       { label: "Правила", to: "/admin/rules" },
       { label: "Отзывы", to: "/admin/reviews" },
@@ -122,10 +124,12 @@ function resolveRouteContext(role, pathname) {
     if (pathname.startsWith("/master/active")) return { title: "Активные заявки", subtitle: "Фокус на текущих работах" };
     if (pathname.startsWith("/master/quick-replies")) return { title: "Быстрые ответы", subtitle: "Личные шаблоны с фото и видео" };
     if (pathname.startsWith("/master/reviews")) return { title: "Отзывы", subtitle: "Оценка качества вашей работы" };
+    if (pathname.startsWith("/master/profile")) return { title: "Профиль", subtitle: "Публичные данные мастера" };
   }
 
   if (role === "admin") {
     if (pathname.startsWith("/admin/system")) return { title: "Система", subtitle: "Состояние платформы и ключевые метрики" };
+    if (pathname.startsWith("/admin/profile")) return { title: "Профиль", subtitle: "Публичные данные администратора" };
     if (pathname.startsWith("/admin/appointments")) return { title: "Заявки", subtitle: "Операционный контроль заказов" };
     if (pathname.startsWith("/admin/users")) return { title: "Пользователи", subtitle: "Управление доступами и ролями" };
     if (pathname.startsWith("/admin/rules")) return { title: "Правила", subtitle: "Автоматизация триггеров и уведомлений" };
@@ -169,6 +173,41 @@ export default function MainLayout({ children }) {
     [user?.role, location.pathname]
   );
   const menuItems = useMemo(() => buildMenu(user?.role), [user?.role]);
+  const controlSurfaceSx = useMemo(
+    () => ({
+      height: { xs: 36, md: 38 },
+      borderRadius: 1.5,
+      border: "1px solid",
+      borderColor: (themeValue) => alpha(themeValue.palette.divider, 0.95),
+      bgcolor: (themeValue) =>
+        themeValue.palette.mode === "dark"
+          ? alpha("#0b1322", 0.86)
+          : alpha("#ffffff", 0.9),
+      backdropFilter: "blur(6px)",
+    }),
+    []
+  );
+  const iconControlSx = useMemo(
+    () => ({
+      ...controlSurfaceSx,
+      width: { xs: 36, md: 38 },
+      minWidth: { xs: 36, md: 38 },
+      p: 0,
+      "& .MuiSvgIcon-root": { fontSize: 18 },
+    }),
+    [controlSurfaceSx]
+  );
+  const chipControlSx = useMemo(
+    () => ({
+      ...controlSurfaceSx,
+      "& .MuiChip-label": {
+        px: 1.2,
+        fontSize: 13,
+        fontWeight: 700,
+      },
+    }),
+    [controlSurfaceSx]
+  );
 
   const onLogout = async () => {
     await logout();
@@ -182,7 +221,8 @@ export default function MainLayout({ children }) {
         color="transparent"
         elevation={0}
         sx={{
-          px: { xs: 0.6, md: 1.2 },
+          px: { xs: 0.4, md: 1 },
+          pt: 0.4,
           backdropFilter: "blur(24px) saturate(160%)",
           backgroundColor: (themeValue) =>
             themeValue.palette.mode === "dark"
@@ -190,15 +230,24 @@ export default function MainLayout({ children }) {
               : "rgba(245, 249, 255, 0.72)",
         }}
       >
-        <Toolbar sx={{ minHeight: { xs: 62, md: 70 }, px: 0.5, gap: 1 }}>
+        <Toolbar
+          sx={{
+            minHeight: { xs: 62, md: 70 },
+            px: { xs: 0.8, md: 1.1 },
+            gap: 1,
+            borderRadius: 2,
+            border: "1px solid",
+            borderColor: (themeValue) => alpha(themeValue.palette.divider, 0.95),
+            bgcolor: (themeValue) =>
+              themeValue.palette.mode === "dark"
+                ? "rgba(5, 11, 22, 0.82)"
+                : "rgba(249, 252, 255, 0.86)",
+          }}
+        >
           <IconButton
             color="inherit"
             onClick={() => setDrawerOpen(true)}
-            sx={{
-              border: "1px solid",
-              borderColor: "divider",
-              bgcolor: "background.paper",
-            }}
+            sx={iconControlSx}
           >
             <MenuRoundedIcon />
           </IconButton>
@@ -252,61 +301,58 @@ export default function MainLayout({ children }) {
               to={quickAction.to}
               variant="contained"
               size="small"
-              sx={{ mr: 0.5 }}
+              sx={{
+                height: { xs: 36, md: 38 },
+                minWidth: 132,
+                px: 1.9,
+                borderRadius: 1.5,
+                fontWeight: 800,
+                letterSpacing: "-0.01em",
+                textTransform: "none",
+                boxShadow: "none",
+                "&:hover": { boxShadow: "none" },
+              }}
             >
               {quickAction.label}
             </Button>
           ) : null}
 
-          <Chip
-            size="small"
-            label={roleLabel}
-            sx={{
-              display: { xs: "none", sm: "inline-flex" },
-              bgcolor: "background.paper",
-              border: "1px solid",
-              borderColor: "divider",
-            }}
-          />
-          {wholesaleBadge ? (
+          <Stack direction="row" spacing={0.75} alignItems="center">
             <Chip
               size="small"
-              label={wholesaleBadge.label}
-              color={wholesaleBadge.color}
-              variant={wholesaleBadge.variant}
-              sx={{ display: { xs: "none", md: "inline-flex" } }}
+              label={roleLabel}
+              sx={{
+                ...chipControlSx,
+                display: { xs: "none", sm: "inline-flex" },
+              }}
             />
-          ) : null}
+            {wholesaleBadge ? (
+              <Chip
+                size="small"
+                label={wholesaleBadge.label}
+                color={wholesaleBadge.color}
+                variant={wholesaleBadge.variant}
+                sx={{
+                  ...chipControlSx,
+                  display: { xs: "none", md: "inline-flex" },
+                }}
+              />
+            ) : null}
 
-          <IconButton
-            color="inherit"
-            onClick={toggleMode}
-            sx={{
-              border: "1px solid",
-              borderColor: "divider",
-              bgcolor: "background.paper",
-            }}
-          >
-            {mode === "dark" ? (
-              <LightModeRoundedIcon fontSize="small" />
-            ) : (
-              <DarkModeRoundedIcon fontSize="small" />
-            )}
-          </IconButton>
+            <IconButton color="inherit" onClick={toggleMode} sx={iconControlSx}>
+              {mode === "dark" ? (
+                <LightModeRoundedIcon fontSize="small" />
+              ) : (
+                <DarkModeRoundedIcon fontSize="small" />
+              )}
+            </IconButton>
 
-          <NotificationBell />
+            <NotificationBell buttonSx={iconControlSx} />
 
-          <IconButton
-            color="inherit"
-            onClick={onLogout}
-            sx={{
-              border: "1px solid",
-              borderColor: "divider",
-              bgcolor: "background.paper",
-            }}
-          >
-            <LogoutRoundedIcon fontSize="small" />
-          </IconButton>
+            <IconButton color="inherit" onClick={onLogout} sx={iconControlSx}>
+              <LogoutRoundedIcon fontSize="small" />
+            </IconButton>
+          </Stack>
         </Toolbar>
       </AppBar>
 
