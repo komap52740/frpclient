@@ -127,7 +127,7 @@ export function createAppTheme(mode = "light") {
           },
           "::-webkit-scrollbar-thumb": {
             backgroundColor: isDark ? "rgba(124,140,164,0.42)" : "rgba(71,85,105,0.26)",
-            borderRadius: 999,
+            borderRadius: appTokens.radius.xs,
             border: "2px solid transparent",
             backgroundClip: "padding-box",
           },
@@ -179,7 +179,7 @@ export function createAppTheme(mode = "light") {
             boxShadow: appTokens.shadows.card,
             backgroundColor: colors.bgElevated,
             backgroundImage: "none",
-            backdropFilter: "blur(18px) saturate(145%)",
+            backdropFilter: "blur(12px) saturate(120%)",
             overflow: "clip",
           },
         },
@@ -191,7 +191,7 @@ export function createAppTheme(mode = "light") {
             border: `1px solid ${colors.borderSoft}`,
             boxShadow: appTokens.shadows.card,
             backgroundColor: isDark ? alpha("#0f172a", 0.8) : "rgba(255,255,255,0.88)",
-            backdropFilter: "blur(16px) saturate(138%)",
+            backdropFilter: "blur(10px) saturate(118%)",
             overflow: "clip",
           },
         },
@@ -203,7 +203,7 @@ export function createAppTheme(mode = "light") {
             color: colors.textMain,
             borderBottom: `1px solid ${colors.borderSoft}`,
             boxShadow: isDark ? "0 6px 30px rgba(2, 6, 23, 0.45)" : "0 4px 24px rgba(15, 23, 42, 0.07)",
-            backdropFilter: "blur(22px) saturate(150%)",
+            backdropFilter: "blur(12px) saturate(120%)",
           },
         },
       },
@@ -212,7 +212,7 @@ export function createAppTheme(mode = "light") {
           paper: {
             borderRadius: appTokens.radius.md,
             backgroundColor: isDark ? alpha("#111827", 0.94) : "rgba(255,255,255,0.92)",
-            backdropFilter: "blur(18px) saturate(130%)",
+            backdropFilter: "blur(12px) saturate(120%)",
           },
         },
       },
@@ -237,7 +237,7 @@ export function createAppTheme(mode = "light") {
         styleOverrides: {
           indicator: {
             height: 3,
-            borderRadius: 999,
+            borderRadius: appTokens.radius.xs,
             background: `linear-gradient(90deg, ${colors.brand} 0%, ${alpha(colors.brand, 0.7)} 100%)`,
           },
         },

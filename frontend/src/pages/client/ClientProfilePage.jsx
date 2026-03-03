@@ -41,15 +41,15 @@ function ProfileKpi({ title, value, helper, icon }) {
     <Paper
       elevation={0}
       sx={{
-        p: 1.2,
-        borderRadius: 2.8,
+        p: { xs: 1.4, md: 1.6 },
+        borderRadius: 1.6,
         border: "1px solid",
         borderColor: "divider",
         minWidth: 0,
       }}
     >
-      <Stack spacing={0.55}>
-        <Stack direction="row" spacing={0.7} alignItems="center">
+      <Stack spacing={0.75}>
+        <Stack direction="row" spacing={0.9} alignItems="center">
           {icon}
           <Typography variant="caption" color="text.secondary">
             {title}
@@ -152,11 +152,11 @@ export default function ClientProfilePage() {
   };
 
   return (
-    <Stack spacing={1.5}>
+    <Stack spacing={2}>
       <Paper
         sx={{
-          p: { xs: 1.5, md: 2.2 },
-          borderRadius: 3.6,
+          p: { xs: 1.7, md: 2.4 },
+          borderRadius: 1.8,
           border: "1px solid",
           borderColor: "divider",
           background: isDark
@@ -164,8 +164,8 @@ export default function ClientProfilePage() {
             : "linear-gradient(145deg, rgba(255,255,255,0.98) 0%, rgba(240,249,255,0.92) 100%)",
         }}
       >
-        <Stack spacing={1.2}>
-          <Stack direction="row" spacing={1.1} alignItems="center">
+        <Stack spacing={1.4}>
+          <Stack direction="row" spacing={1.2} alignItems="center">
             <Box
               sx={{
                 width: 54,
@@ -220,7 +220,7 @@ export default function ClientProfilePage() {
         </Stack>
       </Paper>
 
-      <Stack direction={{ xs: "column", md: "row" }} spacing={1}>
+      <Stack direction={{ xs: "column", md: "row" }} spacing={1.2}>
         <ProfileKpi
           title="Завершено"
           value={stats.completed_orders_count || 0}
@@ -241,10 +241,10 @@ export default function ClientProfilePage() {
         />
       </Stack>
 
-      <Paper sx={{ p: 1.4, borderRadius: 3 }}>
-        <Stack spacing={1}>
+      <Paper sx={{ p: { xs: 1.6, md: 1.8 }, borderRadius: 1.8 }}>
+        <Stack spacing={1.2}>
           <Typography variant="h3">Статус сервиса</Typography>
-          <Stack direction="row" spacing={0.8} flexWrap="wrap" useFlexGap alignItems="center">
+          <Stack direction="row" spacing={0.9} flexWrap="wrap" useFlexGap alignItems="center">
             <Chip
               icon={<StorefrontRoundedIcon />}
               label={isWholesaleApproved ? "Оптовый сервис" : "Обычный клиент"}
@@ -265,7 +265,7 @@ export default function ClientProfilePage() {
           </Typography>
 
           {!isWholesaleApproved ? (
-            <Stack spacing={1}>
+            <Stack spacing={1.15}>
               {requestError ? <Alert severity="error">{requestError}</Alert> : null}
               {requestSuccess ? <Alert severity="success">{requestSuccess}</Alert> : null}
               <TextField
@@ -291,7 +291,7 @@ export default function ClientProfilePage() {
                 onChange={(event) => updateServiceField("wholesale_comment", event.target.value)}
                 placeholder="Город, график, дополнительные данные"
               />
-              <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+              <Stack direction={{ xs: "column", sm: "row" }} spacing={1.1}>
                 <Button
                   component="label"
                   variant="outlined"
@@ -347,13 +347,13 @@ export default function ClientProfilePage() {
         </Stack>
       </Paper>
 
-      <Paper sx={{ p: 1.4, borderRadius: 3 }}>
-        <Stack spacing={1}>
+      <Paper sx={{ p: { xs: 1.6, md: 1.8 }, borderRadius: 1.8 }}>
+        <Stack spacing={1.2}>
           <Typography variant="h3">Быстрые действия</Typography>
           <Typography variant="caption" color="text.secondary">
             Один клик на основное действие, без перегрузки.
           </Typography>
-          <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={1.1}>
             <Button
               variant="contained"
               startIcon={<RocketLaunchRoundedIcon />}
@@ -374,8 +374,8 @@ export default function ClientProfilePage() {
         </Stack>
       </Paper>
 
-      <Paper sx={{ p: 1.3, borderRadius: 3 }}>
-        <Stack spacing={0.9}>
+      <Paper sx={{ p: { xs: 1.5, md: 1.7 }, borderRadius: 1.8 }}>
+        <Stack spacing={1}>
           <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
             Краткая памятка
           </Typography>

@@ -65,14 +65,14 @@ export default function AppBottomNav({ role }) {
         right: 10,
         bottom: "calc(env(safe-area-inset-bottom, 0px) + 10px)",
         zIndex: 1300,
-        borderRadius: 2.5,
+        borderRadius: 1.5,
         border: "1px solid",
         borderColor: "divider",
         backgroundColor: (theme) =>
           theme.palette.mode === "dark"
             ? "rgba(10, 16, 28, 0.9)"
             : "rgba(255,255,255,0.86)",
-        backdropFilter: "blur(18px) saturate(150%)",
+        backdropFilter: "blur(10px) saturate(120%)",
         overflow: "hidden",
         boxShadow: (theme) =>
           theme.palette.mode === "dark"
@@ -91,7 +91,7 @@ export default function AppBottomNav({ role }) {
             minWidth: 56,
             color: "text.secondary",
             py: 0.5,
-            borderRadius: 1.8,
+            borderRadius: 1.1,
             mx: 0.3,
             "& .MuiBottomNavigationAction-label": {
               fontSize: 11.5,

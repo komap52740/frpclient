@@ -1159,7 +1159,7 @@ export default function AppointmentDetailPage() {
       <Paper
         sx={{
           p: { xs: 1.8, md: 2.2 },
-          borderRadius: 3,
+          borderRadius: 1.8,
           border: "1px solid",
           borderColor: "divider",
           background: isClient
@@ -1222,7 +1222,7 @@ export default function AppointmentDetailPage() {
               elevation={0}
               sx={{
                 p: 1.3,
-                borderRadius: 2.5,
+                borderRadius: 1.5,
                 border: "1px solid",
                 borderColor: isDark ? "rgba(90,169,255,0.3)" : "rgba(2,132,199,0.16)",
                 background: isDark
@@ -1265,7 +1265,7 @@ export default function AppointmentDetailPage() {
             <Paper
               elevation={0}
               sx={{
-                borderRadius: 2.5,
+                borderRadius: 1.5,
                 border: "1px solid",
                 borderColor: "divider",
                 bgcolor: isDark ? "rgba(15,23,42,0.86)" : "rgba(255,255,255,0.78)",
@@ -1306,7 +1306,7 @@ export default function AppointmentDetailPage() {
               elevation={0}
               sx={{
                 p: 0.7,
-                borderRadius: 2.5,
+                borderRadius: 1.5,
                 border: "1px solid",
                 borderColor: "divider",
                 bgcolor: isDark ? "rgba(15,23,42,0.82)" : "rgba(255,255,255,0.82)",
@@ -1330,7 +1330,7 @@ export default function AppointmentDetailPage() {
                       color={active || action.emphasis ? "primary" : "inherit"}
                       onClick={() => handlePrimaryAction(action.key)}
                       sx={{
-                        borderRadius: 2.2,
+                        borderRadius: 1.4,
                         px: 1.2,
                         whiteSpace: "nowrap",
                         flexShrink: 0,
@@ -1345,7 +1345,7 @@ export default function AppointmentDetailPage() {
             </Paper>
           ) : null}
 
-          {isRefreshing && !isClient ? <LinearProgress sx={{ borderRadius: 999 }} /> : null}
+          {isRefreshing && !isClient ? <LinearProgress sx={{ borderRadius: 1 }} /> : null}
 
           {!isClient ? (
             <Stack
@@ -1399,7 +1399,7 @@ export default function AppointmentDetailPage() {
                   <Paper
                     sx={{
                       p: { xs: 1.8, md: 2.2 },
-                      borderRadius: 3,
+                      borderRadius: 1.8,
                       border: "1px solid",
                       borderColor: "divider",
                       background: isClient
@@ -1498,7 +1498,7 @@ export default function AppointmentDetailPage() {
             ) : null}
 
             {showMasterActionPanel ? (
-              <Paper sx={{ p: 2.2, borderRadius: 3 }}>
+              <Paper sx={{ p: 2.2, borderRadius: 1.8 }}>
                 <Stack spacing={1.1}>
                   <Typography variant="h3">Панель действий мастера</Typography>
                   <Typography variant="body2" color="text.secondary">
@@ -1594,7 +1594,7 @@ export default function AppointmentDetailPage() {
                 ref={paymentRef}
                 sx={{
                   p: { xs: 1.8, md: 2.2 },
-                  borderRadius: 3,
+                  borderRadius: 1.8,
                   border: "1px solid",
                   borderColor: isDark ? "rgba(255,179,71,0.45)" : "warning.light",
                   background:
@@ -1733,7 +1733,7 @@ export default function AppointmentDetailPage() {
                   <Button variant="contained" size="large" onClick={uploadPaymentProof} disabled={!canUploadPaymentProof}>
                     {uploadingProof ? "Загружаем чек..." : appointment.status === "AWAITING_PAYMENT" ? "Загрузить чек и продолжить" : "Отправить новый чек"}
                   </Button>
-                  {uploadingProof ? <LinearProgress sx={{ borderRadius: 999 }} /> : null}
+                  {uploadingProof ? <LinearProgress sx={{ borderRadius: 1 }} /> : null}
 
                   {appointment.status === "AWAITING_PAYMENT" ? (
                     <Stack spacing={0.5}>
@@ -1912,7 +1912,7 @@ export default function AppointmentDetailPage() {
                 <Accordion
                   disableGutters
                   sx={{
-                    borderRadius: 3,
+                    borderRadius: 1.8,
                     border: "1px solid",
                     borderColor: "divider",
                     boxShadow: isDark ? "0 8px 24px rgba(2,6,23,0.45)" : "0 8px 24px rgba(15,23,42,0.06)",
@@ -2195,7 +2195,7 @@ export default function AppointmentDetailPage() {
             bottom: "calc(env(safe-area-inset-bottom, 0px) + 86px)",
             zIndex: 1285,
             p: 0.8,
-            borderRadius: 2.5,
+            borderRadius: 1.5,
             border: "1px solid",
             borderColor: "divider",
             bgcolor: isDark ? "rgba(15,23,42,0.92)" : "rgba(255,255,255,0.92)",
@@ -2231,7 +2231,7 @@ export default function AppointmentDetailPage() {
             zIndex: 1290,
             width: { xs: "auto", md: 420 },
             p: 1.2,
-            borderRadius: 2.5,
+            borderRadius: 1.5,
             border: "1px solid",
             borderColor: isDark ? "rgba(255,179,71,0.5)" : "warning.light",
             boxShadow: (theme) =>
@@ -2243,7 +2243,7 @@ export default function AppointmentDetailPage() {
             <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
               {appointment.status === "AWAITING_PAYMENT" ? "Оплата ожидает вашего действия" : "Чек отправлен на проверку"}
             </Typography>
-            <LinearProgress variant="determinate" value={paymentProgressValue} sx={{ borderRadius: 999, height: 8 }} />
+            <LinearProgress variant="determinate" value={paymentProgressValue} sx={{ borderRadius: 1, height: 8 }} />
             <Stack direction="row" spacing={0.6} flexWrap="wrap" useFlexGap>
               <Chip
                 size="small"
@@ -2430,7 +2430,7 @@ export default function AppointmentDetailPage() {
                   ? "Загрузить чек и продолжить"
                   : "Отправить новый чек"}
             </Button>
-            {uploadingProof ? <LinearProgress sx={{ borderRadius: 999 }} /> : null}
+            {uploadingProof ? <LinearProgress sx={{ borderRadius: 1 }} /> : null}
 
             {isAwaitingPayment ? (
               <Button size="small" variant="text" onClick={() => runAction(() => appointmentsApi.markPaid(id, paymentMethod))}>
@@ -2461,7 +2461,7 @@ export default function AppointmentDetailPage() {
         maxWidth="sm"
         PaperProps={{
           sx: {
-            borderRadius: isMobile ? 0 : 3,
+            borderRadius: isMobile ? 0 : 1.8,
             border: "1px solid",
             borderColor: "divider",
             background: isDark
@@ -2597,7 +2597,7 @@ export default function AppointmentDetailPage() {
         maxWidth="sm"
         PaperProps={{
           sx: {
-            borderRadius: 3,
+            borderRadius: 1.8,
             border: isDark ? "1px solid rgba(90,169,255,0.28)" : "1px solid rgba(15,23,42,0.08)",
             background: isDark
               ? "linear-gradient(145deg, rgba(10,17,31,0.96) 0%, rgba(17,30,48,0.94) 100%)"
@@ -2664,7 +2664,7 @@ export default function AppointmentDetailPage() {
         maxWidth="xs"
         PaperProps={{
           sx: {
-            borderRadius: 3,
+            borderRadius: 1.8,
             border: isDark ? "1px solid rgba(67,209,122,0.35)" : "1px solid rgba(16,185,129,0.25)",
             background: isDark
               ? "linear-gradient(145deg, rgba(11,22,34,0.98) 0%, rgba(14,38,31,0.96) 100%)"
@@ -2769,7 +2769,7 @@ export default function AppointmentDetailPage() {
           }
           sx={{
             width: "100%",
-            borderRadius: 2.2,
+            borderRadius: 1.4,
             boxShadow: isDark ? "0 12px 28px rgba(2,6,23,0.56)" : "0 10px 24px rgba(15,23,42,0.14)",
           }}
         >
@@ -2779,4 +2779,5 @@ export default function AppointmentDetailPage() {
     </Stack>
   );
 }
+
 

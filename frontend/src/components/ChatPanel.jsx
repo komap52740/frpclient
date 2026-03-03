@@ -300,7 +300,7 @@ export default function ChatPanel({
       variant="outlined"
       sx={{
         p: 1.1,
-        borderRadius: 2,
+        borderRadius: 1.4,
         maxHeight: isMobile ? 400 : 460,
         overflowY: "auto",
         bgcolor: isDark ? alpha("#0f172a", 0.7) : alpha("#f8fbff", 0.95),
@@ -314,7 +314,7 @@ export default function ChatPanel({
               elevation={0}
               sx={{
                 p: 1,
-                borderRadius: 1.6,
+                borderRadius: 1.2,
                 border: "1px solid",
                 borderColor: "divider",
                 bgcolor: isDark ? alpha("#111b2f", 0.8) : "#ffffff",
@@ -374,8 +374,9 @@ export default function ChatPanel({
   return (
     <Paper
       sx={{
-        p: { xs: 1.4, sm: 2.1 },
-        borderRadius: 2.2,
+        p: { xs: 1.4, sm: 2 },
+        borderRadius: 1.6,
+        overflow: "hidden",
         background: isDark
           ? "linear-gradient(160deg, rgba(10,17,31,0.92) 0%, rgba(17,24,39,0.88) 100%)"
           : "linear-gradient(160deg, rgba(255,255,255,0.9) 0%, rgba(250,252,255,0.86) 100%)",
@@ -398,7 +399,7 @@ export default function ChatPanel({
             onChange={(_, value) => setChatView(value)}
             variant="fullWidth"
             sx={{
-              borderRadius: 2,
+              borderRadius: 1.4,
               bgcolor: (themeValue) =>
                 themeValue.palette.mode === "dark" ? alpha("#0f172a", 0.66) : alpha("#e5eefb", 0.62),
               minHeight: 40,
@@ -422,8 +423,8 @@ export default function ChatPanel({
           <Box
             sx={{
               display: "grid",
-              gridTemplateColumns: "minmax(0, 1.45fr) minmax(260px, 0.85fr)",
-              gap: 1,
+              gridTemplateColumns: "minmax(0, 1.35fr) minmax(250px, 0.9fr)",
+              gap: 1.2,
               alignItems: "start",
             }}
           >
@@ -431,7 +432,7 @@ export default function ChatPanel({
               variant="outlined"
               sx={{
                 p: 0.8,
-                borderRadius: 2,
+                borderRadius: 1.3,
                 bgcolor: isDark ? alpha("#0f172a", 0.56) : alpha("#f8fbff", 0.72),
               }}
             >
@@ -464,7 +465,7 @@ export default function ChatPanel({
                   variant="outlined"
                   sx={{
                     p: 1,
-                    borderRadius: 2,
+                    borderRadius: 1.3,
                     borderColor: "divider",
                     bgcolor: isDark ? alpha("#0f172a", 0.62) : alpha("#f8fbff", 0.9),
                   }}
@@ -482,7 +483,7 @@ export default function ChatPanel({
                         href={item.href}
                         target="_blank"
                         rel="noreferrer"
-                        sx={{ justifyContent: "flex-start", borderRadius: 2 }}
+                        sx={{ justifyContent: "flex-start", borderRadius: 1.1 }}
                       >
                         {item.label}
                       </Button>
@@ -530,7 +531,7 @@ export default function ChatPanel({
           sx={{
             mt: 0.2,
             p: 1,
-            borderRadius: 2,
+            borderRadius: 1.3,
             border: "1px solid",
             borderColor: "divider",
             position: isMobile ? "sticky" : "static",

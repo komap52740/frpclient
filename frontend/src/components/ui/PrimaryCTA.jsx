@@ -106,7 +106,7 @@ export default function PrimaryCTA({
         sx={{
           minHeight: 44,
           fontWeight: 780,
-          borderRadius: 2.2,
+          borderRadius: 1.2,
           ...sx,
         }}
       >

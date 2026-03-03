@@ -35,7 +35,7 @@ export default function KpiTiles({ items = [] }) {
             <Paper
               sx={{
                 p: 1.5,
-                borderRadius: 2.6,
+                borderRadius: 1.4,
                 border: "1px solid",
                 borderColor: alpha(palette.accent, isDark ? 0.35 : 0.22),
                 background: `linear-gradient(145deg, ${alpha(palette.bg, isDark ? 0.9 : 1)} 0%, ${alpha(

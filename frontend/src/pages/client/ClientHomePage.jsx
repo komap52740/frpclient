@@ -341,7 +341,7 @@ export default function ClientHomePage() {
       <Paper
         sx={{
           p: { xs: 1.7, md: 3 },
-          borderRadius: 3,
+          borderRadius: 1.8,
           background: isDark
             ? "linear-gradient(135deg, #10213a 0%, #143744 48%, #174b3a 100%)"
             : "linear-gradient(135deg, #0d6e9f 0%, #2e8a66 48%, #1c9a4d 100%)",
@@ -372,7 +372,7 @@ export default function ClientHomePage() {
       {error && <Alert severity="error">{error}</Alert>}
 
       {isMobile ? (
-        <Paper sx={{ p: 1, borderRadius: 2.5 }}>
+        <Paper sx={{ p: 1.1, borderRadius: 1.5 }}>
           <Stack direction="row" justifyContent="space-between" alignItems="center">
             <Typography variant="caption" color="text.secondary">
               Режим фокуса: только ключевые действия
@@ -389,7 +389,7 @@ export default function ClientHomePage() {
           <Paper
             sx={{
               p: { xs: 1.45, md: 2.25 },
-              borderRadius: 3,
+              borderRadius: 1.8,
               border: "1px solid",
               borderColor: isDark ? "divider" : `${scenario.tone}33`,
               background: isDark
@@ -456,7 +456,7 @@ export default function ClientHomePage() {
 
         {showSecondaryBlocks ? (
           <Grid item xs={12} md={5}>
-            <Paper sx={{ p: { xs: 1.45, md: 2.25 }, borderRadius: 3 }}>
+            <Paper sx={{ p: { xs: 1.55, md: 2.25 }, borderRadius: 1.8 }}>
               <Stack spacing={1.2}>
                 <Typography variant="h6">Готовность к сессии: {checklistProgress}%</Typography>
                 <LinearProgress
@@ -464,9 +464,9 @@ export default function ClientHomePage() {
                   value={checklistProgress}
                   sx={{
                     height: 8,
-                    borderRadius: 999,
+                    borderRadius: 1,
                     bgcolor: isDark ? "rgba(148,163,184,0.24)" : "#ecf2f8",
-                    "& .MuiLinearProgress-bar": { borderRadius: 999 },
+                    "& .MuiLinearProgress-bar": { borderRadius: 1 },
                   }}
                 />
                 <Typography variant="caption" color="text.secondary">
@@ -479,7 +479,7 @@ export default function ClientHomePage() {
                   onChange={(_, expanded) => setChecklistExpanded(expanded)}
                   sx={{
                     mt: 0.5,
-                    borderRadius: 2.5,
+                    borderRadius: 1.4,
                     border: "1px solid rgba(15,23,42,0.08)",
                     boxShadow: "none",
                     "&:before": { display: "none" },
@@ -530,7 +530,7 @@ export default function ClientHomePage() {
         </Grid>
       ) : null}
 
-      <Paper sx={{ p: { xs: 1.25, md: 2 }, borderRadius: 3 }}>
+      <Paper sx={{ p: { xs: 1.35, md: 2 }, borderRadius: 1.8 }}>
         <Stack
           direction={{ xs: "column", md: "row" }}
           spacing={1}

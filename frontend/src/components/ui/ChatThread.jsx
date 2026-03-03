@@ -32,7 +32,7 @@ export default function ChatThread({
         width: "100%",
         minWidth: 0,
         overflowY: "auto",
-        pr: 0.6,
+        pr: 0.3,
         pl: 0.1,
       }}
     >
@@ -43,9 +43,9 @@ export default function ChatThread({
               key={item.id}
               sx={{
                 alignSelf: "center",
-                px: 1.2,
-                py: 0.55,
-                borderRadius: 999,
+                px: 1.1,
+                py: 0.5,
+                borderRadius: 1.2,
                 border: "1px solid",
                 borderColor: isDark ? alpha("#74d7ff", 0.35) : alpha("#0284c7", 0.2),
                 bgcolor: isDark ? alpha("#0b2538", 0.66) : alpha("#e7f4ff", 0.9),
@@ -77,9 +77,9 @@ export default function ChatThread({
             key={message.id}
             sx={{
               alignSelf: own ? "flex-end" : "flex-start",
-              maxWidth: isMobile ? "94%" : "84%",
-              borderRadius: 2.4,
-              p: 1.15,
+              maxWidth: isMobile ? "92%" : "82%",
+              borderRadius: 1.4,
+              p: 1.05,
               border: "1px solid",
               borderColor: own
                 ? isDark
@@ -140,7 +140,7 @@ export default function ChatThread({
                   textDecoration: "none",
                   px: 1,
                   py: 0.4,
-                  borderRadius: 999,
+                  borderRadius: 1,
                   border: "1px solid",
                   borderColor: own
                     ? isDark

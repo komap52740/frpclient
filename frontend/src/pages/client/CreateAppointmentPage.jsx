@@ -229,7 +229,7 @@ export default function CreateAppointmentPage() {
   };
 
   return (
-    <Paper sx={{ p: { xs: 2.4, md: 3.2 }, borderRadius: 2.2 }}>
+    <Paper sx={{ p: { xs: 2.4, md: 3.2 }, borderRadius: 1.8 }}>
       <Stack spacing={0.8} sx={{ mb: 2 }}>
         <Typography variant="h5">Новая заявка</Typography>
         <Typography variant="body2" color="text.secondary">
@@ -261,7 +261,7 @@ export default function CreateAppointmentPage() {
             variant="determinate"
             value={progressValue}
             color={progressValue >= 75 ? "success" : "primary"}
-            sx={{ borderRadius: 999, height: 6 }}
+            sx={{ borderRadius: 1, height: 6 }}
           />
         </Stack>
       </Stack>
@@ -420,7 +420,7 @@ export default function CreateAppointmentPage() {
             fullWidth
             disabled={!canSubmit}
             startIcon={<LockOpenRoundedIcon />}
-            sx={{ minHeight: 52, borderRadius: 2.4, fontWeight: 800 }}
+            sx={{ minHeight: 52, borderRadius: 1.4, fontWeight: 800 }}
           >
             {submitting ? "Отправляем заявку..." : "Создать заявку"}
           </Button>

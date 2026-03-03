@@ -217,11 +217,11 @@ export default function MyAppointmentsPage() {
   };
 
   return (
-    <Stack spacing={1.5}>
+    <Stack spacing={1.8}>
       <Paper
         sx={{
-          p: { xs: 1.4, md: 2.2 },
-          borderRadius: 3.5,
+          p: { xs: 1.5, md: 2.2 },
+          borderRadius: 1.8,
           border: "1px solid",
           borderColor: "divider",
           background: (themeValue) =>
@@ -275,7 +275,7 @@ export default function MyAppointmentsPage() {
               elevation={0}
               sx={{
                 p: 1.1,
-                borderRadius: 2.8,
+                borderRadius: 1.4,
                 border: "1px solid",
                 borderColor: "divider",
                 backgroundColor: (themeValue) =>
@@ -308,7 +308,7 @@ export default function MyAppointmentsPage() {
         </Stack>
       </Paper>
 
-      <Paper sx={{ p: { xs: 1.2, md: 1.4 }, borderRadius: 3 }}>
+      <Paper sx={{ p: { xs: 1.3, md: 1.5 }, borderRadius: 1.8 }}>
         <Stack spacing={1}>
           <Stack direction="row" justifyContent="space-between" alignItems="center">
             <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>

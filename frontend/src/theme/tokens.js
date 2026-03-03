@@ -9,11 +9,11 @@ export const appTokens = {
     xxl: 7,
   },
   radius: {
-    xs: 8,
-    sm: 10,
-    md: 14,
-    lg: 16,
-    pill: 16,
+    xs: 6,
+    sm: 8,
+    md: 10,
+    lg: 12,
+    pill: 12,
   },
   typography: {
     fontFamily: '"Manrope", "SF Pro Display", "SF Pro Text", "Inter", "Segoe UI", sans-serif',
@@ -25,9 +25,9 @@ export const appTokens = {
     caption: "0.82rem",
   },
   shadows: {
-    soft: "0 8px 20px rgba(15, 23, 42, 0.1)",
-    card: "0 10px 28px rgba(15, 23, 42, 0.08)",
-    raised: "0 14px 34px rgba(15, 23, 42, 0.14)",
+    soft: "0 6px 16px rgba(15, 23, 42, 0.1)",
+    card: "0 6px 18px rgba(15, 23, 42, 0.08)",
+    raised: "0 10px 24px rgba(15, 23, 42, 0.14)",
     focus: "0 0 0 3px rgba(14, 116, 255, 0.2)",
   },
   colors: {
