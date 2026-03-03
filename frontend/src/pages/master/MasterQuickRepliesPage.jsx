@@ -46,6 +46,22 @@ function extractApiError(err, fallback) {
   const data = err?.response?.data;
   if (!data) return fallback;
 
+  if (typeof data === "string") {
+    const statusCode = Number(err?.response?.status || 0);
+    const trimmed = data.trim();
+    const looksLikeHtml = trimmed.startsWith("<!DOCTYPE") || trimmed.startsWith("<html") || trimmed.startsWith("<");
+    if (looksLikeHtml) {
+      if (statusCode === 413) {
+        return "Файл слишком большой. Для фото/видео шаблона максимум 25 МБ.";
+      }
+      if (statusCode === 502 || statusCode === 503 || statusCode === 504) {
+        return "Сервис временно недоступен. Повторите через 5-10 секунд.";
+      }
+      return fallback;
+    }
+    return normalizeRuText(trimmed || fallback);
+  }
+
   if (typeof data.detail === "string" && data.detail.trim()) {
     return normalizeRuText(data.detail);
   }
