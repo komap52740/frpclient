@@ -229,6 +229,7 @@ export default function ClientHomePage() {
   const [checklistExpanded, setChecklistExpanded] = useState(false);
   const [checklistState, setChecklistState] = useState(() => loadChecklistState());
   const [tipIndex, setTipIndex] = useState(0);
+  const [showSecondaryBlocks, setShowSecondaryBlocks] = useState(() => !isMobile);
 
   const loadData = useCallback(async ({ silent = false, withLoading = true } = {}) => {
     if (withLoading) {
@@ -262,6 +263,12 @@ export default function ClientHomePage() {
   useEffect(() => {
     localStorage.setItem(CHECKLIST_STORAGE_KEY, JSON.stringify(checklistState));
   }, [checklistState]);
+
+  useEffect(() => {
+    if (!isMobile) {
+      setShowSecondaryBlocks(true);
+    }
+  }, [isMobile]);
 
   const prioritizedAppointment = useMemo(() => pickPriorityAppointment(items), [items]);
   const scenario = useMemo(() => resolveScenario(prioritizedAppointment), [prioritizedAppointment]);
@@ -364,6 +371,19 @@ export default function ClientHomePage() {
 
       {error && <Alert severity="error">{error}</Alert>}
 
+      {isMobile ? (
+        <Paper sx={{ p: 1, borderRadius: 2.5 }}>
+          <Stack direction="row" justifyContent="space-between" alignItems="center">
+            <Typography variant="caption" color="text.secondary">
+              Режим фокуса: только ключевые действия
+            </Typography>
+            <Button size="small" onClick={() => setShowSecondaryBlocks((prev) => !prev)}>
+              {showSecondaryBlocks ? "Скрыть детали" : "Показать детали"}
+            </Button>
+          </Stack>
+        </Paper>
+      ) : null}
+
       <Grid container spacing={2}>
         <Grid item xs={12} md={7}>
           <Paper
@@ -434,77 +454,81 @@ export default function ClientHomePage() {
           </Paper>
         </Grid>
 
-        <Grid item xs={12} md={5}>
-          <Paper sx={{ p: { xs: 1.45, md: 2.25 }, borderRadius: 3 }}>
-            <Stack spacing={1.2}>
-              <Typography variant="h6">Готовность к сессии: {checklistProgress}%</Typography>
-              <LinearProgress
-                variant="determinate"
-                value={checklistProgress}
-                sx={{
-                  height: 8,
-                  borderRadius: 999,
-                  bgcolor: isDark ? "rgba(148,163,184,0.24)" : "#ecf2f8",
-                  "& .MuiLinearProgress-bar": { borderRadius: 999 },
-                }}
-              />
-              <Typography variant="caption" color="text.secondary">
-                Чем выше готовность, тем меньше пауз во время удаленной сессии.
-              </Typography>
+        {showSecondaryBlocks ? (
+          <Grid item xs={12} md={5}>
+            <Paper sx={{ p: { xs: 1.45, md: 2.25 }, borderRadius: 3 }}>
+              <Stack spacing={1.2}>
+                <Typography variant="h6">Готовность к сессии: {checklistProgress}%</Typography>
+                <LinearProgress
+                  variant="determinate"
+                  value={checklistProgress}
+                  sx={{
+                    height: 8,
+                    borderRadius: 999,
+                    bgcolor: isDark ? "rgba(148,163,184,0.24)" : "#ecf2f8",
+                    "& .MuiLinearProgress-bar": { borderRadius: 999 },
+                  }}
+                />
+                <Typography variant="caption" color="text.secondary">
+                  Чем выше готовность, тем меньше пауз во время удаленной сессии.
+                </Typography>
 
-              <Accordion
-                disableGutters
-                expanded={checklistExpanded}
-                onChange={(_, expanded) => setChecklistExpanded(expanded)}
-                sx={{
-                  mt: 0.5,
-                  borderRadius: 2.5,
-                  border: "1px solid rgba(15,23,42,0.08)",
-                  boxShadow: "none",
-                  "&:before": { display: "none" },
-                }}
-              >
-                <AccordionSummary expandIcon={<ExpandMoreRoundedIcon />}>
-                  <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-                    Проверить готовность
-                  </Typography>
-                </AccordionSummary>
-                <AccordionDetails>
-                  <Stack spacing={0.25}>
-                    {CHECKLIST_ITEMS.map((item) => (
-                      <FormControlLabel
-                        key={item.key}
-                        control={
-                          <Switch
-                            checked={Boolean(checklistState[item.key])}
-                            onChange={() => toggleChecklist(item.key)}
-                          />
-                        }
-                        label={<Typography variant="body2">{item.label}</Typography>}
-                      />
-                    ))}
-                  </Stack>
-                </AccordionDetails>
-              </Accordion>
-            </Stack>
-          </Paper>
-        </Grid>
+                <Accordion
+                  disableGutters
+                  expanded={checklistExpanded}
+                  onChange={(_, expanded) => setChecklistExpanded(expanded)}
+                  sx={{
+                    mt: 0.5,
+                    borderRadius: 2.5,
+                    border: "1px solid rgba(15,23,42,0.08)",
+                    boxShadow: "none",
+                    "&:before": { display: "none" },
+                  }}
+                >
+                  <AccordionSummary expandIcon={<ExpandMoreRoundedIcon />}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                      Проверить готовность
+                    </Typography>
+                  </AccordionSummary>
+                  <AccordionDetails>
+                    <Stack spacing={0.25}>
+                      {CHECKLIST_ITEMS.map((item) => (
+                        <FormControlLabel
+                          key={item.key}
+                          control={
+                            <Switch
+                              checked={Boolean(checklistState[item.key])}
+                              onChange={() => toggleChecklist(item.key)}
+                            />
+                          }
+                          label={<Typography variant="body2">{item.label}</Typography>}
+                        />
+                      ))}
+                    </Stack>
+                  </AccordionDetails>
+                </Accordion>
+              </Stack>
+            </Paper>
+          </Grid>
+        ) : null}
       </Grid>
 
-      <Grid container spacing={2}>
-        <Grid item xs={6} sm={6} lg={3}>
-          <KpiCard title="Всего заявок" value={summary?.appointments_total ?? "-"} />
+      {showSecondaryBlocks ? (
+        <Grid container spacing={2}>
+          <Grid item xs={6} sm={6} lg={3}>
+            <KpiCard title="Всего заявок" value={summary?.appointments_total ?? "-"} />
+          </Grid>
+          <Grid item xs={6} sm={6} lg={3}>
+            <KpiCard title="Активные" value={summary?.appointments_active ?? "-"} accent="#2e8a66" />
+          </Grid>
+          <Grid item xs={6} sm={6} lg={3}>
+            <KpiCard title="Ожидают оплату" value={summary?.awaiting_payment ?? "-"} accent="#c97a00" />
+          </Grid>
+          <Grid item xs={6} sm={6} lg={3}>
+            <KpiCard title="Непрочитанные" value={summary?.unread_total ?? "-"} accent="#7b2cbf" />
+          </Grid>
         </Grid>
-        <Grid item xs={6} sm={6} lg={3}>
-          <KpiCard title="Активные" value={summary?.appointments_active ?? "-"} accent="#2e8a66" />
-        </Grid>
-        <Grid item xs={6} sm={6} lg={3}>
-          <KpiCard title="Ожидают оплату" value={summary?.awaiting_payment ?? "-"} accent="#c97a00" />
-        </Grid>
-        <Grid item xs={6} sm={6} lg={3}>
-          <KpiCard title="Непрочитанные" value={summary?.unread_total ?? "-"} accent="#7b2cbf" />
-        </Grid>
-      </Grid>
+      ) : null}
 
       <Paper sx={{ p: { xs: 1.25, md: 2 }, borderRadius: 3 }}>
         <Stack
@@ -571,24 +595,26 @@ export default function ClientHomePage() {
         )}
       </Paper>
 
-      <Accordion disableGutters>
-        <AccordionSummary expandIcon={<ExpandMoreRoundedIcon />}>
-          <Stack direction="row" spacing={1} alignItems="center">
-            <SecurityRoundedIcon color="primary" fontSize="small" />
-            <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
-              Как проходит безопасная удаленная работа
-            </Typography>
-          </Stack>
-        </AccordionSummary>
-        <AccordionDetails>
-          <Stack spacing={0.8}>
-            <Typography variant="body2">1. Мастер объясняет шаги перед подключением и согласовывает действия.</Typography>
-            <Typography variant="body2">2. Вся коммуникация фиксируется в чате и ленте событий.</Typography>
-            <Typography variant="body2">3. Оплата подтверждается чеком, статус обновляется автоматически.</Typography>
-            <Typography variant="body2" color="text.secondary">Если что-то не получается, сразу пишите в чат заявки — это самый быстрый канал помощи.</Typography>
-          </Stack>
-        </AccordionDetails>
-      </Accordion>
+      {showSecondaryBlocks ? (
+        <Accordion disableGutters>
+          <AccordionSummary expandIcon={<ExpandMoreRoundedIcon />}>
+            <Stack direction="row" spacing={1} alignItems="center">
+              <SecurityRoundedIcon color="primary" fontSize="small" />
+              <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
+                Как проходит безопасная удаленная работа
+              </Typography>
+            </Stack>
+          </AccordionSummary>
+          <AccordionDetails>
+            <Stack spacing={0.8}>
+              <Typography variant="body2">1. Мастер объясняет шаги перед подключением и согласовывает действия.</Typography>
+              <Typography variant="body2">2. Вся коммуникация фиксируется в чате и ленте событий.</Typography>
+              <Typography variant="body2">3. Оплата подтверждается чеком, статус обновляется автоматически.</Typography>
+              <Typography variant="body2" color="text.secondary">Если что-то не получается, сразу пишите в чат заявки — это самый быстрый канал помощи.</Typography>
+            </Stack>
+          </AccordionDetails>
+        </Accordion>
+      ) : null}
     </Stack>
   );
 }

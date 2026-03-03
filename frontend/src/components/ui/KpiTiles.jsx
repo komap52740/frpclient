@@ -1,26 +1,47 @@
-import { Grid, Paper, Stack, Typography } from "@mui/material";
+﻿import { Grid, Paper, Stack, Typography } from "@mui/material";
+import { alpha, useTheme } from "@mui/material/styles";
 
 const toneStyles = {
-  default: { bg: "#f7fafc", accent: "#0d6e9f" },
-  success: { bg: "#eefaf3", accent: "#1c9a4d" },
-  warning: { bg: "#fff8ea", accent: "#b8740f" },
-  danger: { bg: "#fdeff0", accent: "#c63f38" },
-  info: { bg: "#edf4ff", accent: "#2678d8" },
+  default: { light: { bg: "#f7fafc", accent: "#0d6e9f" }, dark: { bg: "#152235", accent: "#8dc8ff" } },
+  success: { light: { bg: "#eefaf3", accent: "#1c9a4d" }, dark: { bg: "#163428", accent: "#7be3a7" } },
+  warning: { light: { bg: "#fff8ea", accent: "#b8740f" }, dark: { bg: "#3a2a12", accent: "#ffd186" } },
+  danger: { light: { bg: "#fdeff0", accent: "#c63f38" }, dark: { bg: "#3d1c20", accent: "#ff9f98" } },
+  info: { light: { bg: "#edf4ff", accent: "#2678d8" }, dark: { bg: "#172a42", accent: "#8fbfff" } },
 };
 
 export default function KpiTiles({ items = [] }) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === "dark";
+
   return (
     <Grid container spacing={1.25}>
       {items.map((item) => {
         const tone = toneStyles[item.tone || "default"] || toneStyles.default;
+        const palette = isDark ? tone.dark : tone.light;
+
         return (
           <Grid item xs={12} sm={6} md={3} key={item.id || item.label}>
-            <Paper sx={{ p: 1.5, bgcolor: tone.bg }}>
+            <Paper
+              sx={{
+                p: 1.5,
+                borderRadius: 2.6,
+                border: "1px solid",
+                borderColor: alpha(palette.accent, isDark ? 0.35 : 0.22),
+                background: `linear-gradient(145deg, ${alpha(palette.bg, isDark ? 0.9 : 1)} 0%, ${alpha(palette.bg, isDark ? 0.7 : 0.92)} 100%)`,
+                transition: "transform 180ms ease, box-shadow 180ms ease",
+                "&:hover": {
+                  transform: "translateY(-2px)",
+                  boxShadow: isDark
+                    ? `0 12px 24px ${alpha("#020617", 0.45)}`
+                    : `0 12px 24px ${alpha("#0f172a", 0.1)}`,
+                },
+              }}
+            >
               <Stack spacing={0.5}>
                 <Typography variant="caption" sx={{ fontWeight: 700, color: "text.secondary" }}>
                   {item.label}
                 </Typography>
-                <Typography variant="h3" sx={{ color: tone.accent }}>
+                <Typography variant="h3" sx={{ color: palette.accent }}>
                   {item.value ?? "-"}
                 </Typography>
                 {item.hint ? (

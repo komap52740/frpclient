@@ -14,6 +14,7 @@ import {
 } from "@mui/material";
 import dayjs from "dayjs";
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 import { adminApi, notificationsApi } from "../../api/client";
 import KpiTiles from "../../components/ui/KpiTiles";
@@ -66,6 +67,7 @@ function getActionError(error) {
 }
 
 export default function AdminSystemPage() {
+  const navigate = useNavigate();
   const [statusData, setStatusData] = useState(null);
   const [statusError, setStatusError] = useState("");
   const [loadingStatus, setLoadingStatus] = useState(false);
@@ -88,6 +90,7 @@ export default function AdminSystemPage() {
   const [metricsError, setMetricsError] = useState("");
 
   const [unreadNotifications, setUnreadNotifications] = useState([]);
+  const [wholesalePendingCount, setWholesalePendingCount] = useState(0);
 
   const loadStatus = async () => {
     setLoadingStatus(true);
@@ -134,11 +137,22 @@ export default function AdminSystemPage() {
     }
   };
 
+  const loadWholesalePending = async () => {
+    try {
+      const response = await adminApi.wholesaleRequests({ status: "pending" });
+      const rows = Array.isArray(response.data) ? response.data : response.data?.results || [];
+      setWholesalePendingCount(rows.length);
+    } catch {
+      // Keep dashboard stable on wholesale API hiccups.
+    }
+  };
+
   useEffect(() => {
     loadStatus();
     loadSettings();
     loadMetrics();
     loadUnreadNotifications();
+    loadWholesalePending();
   }, []);
 
   const saveSettings = async () => {
@@ -205,6 +219,25 @@ export default function AdminSystemPage() {
     return [actionResult.stdout || "", actionResult.stderr || ""].filter(Boolean).join("\n");
   }, [actionResult]);
 
+  const focusCards = useMemo(
+    () => [
+      { label: "Непрочитанные сигналы", value: unreadNotifications.length, color: unreadNotifications.length ? "error" : "default" },
+      { label: "Опт-заявки на проверке", value: wholesalePendingCount, color: wholesalePendingCount ? "warning" : "default" },
+      { label: "Платежи на подтверждении", value: Number(statusData?.appointments?.awaiting_payment_confirmation || 0), color: "info" },
+    ],
+    [statusData?.appointments?.awaiting_payment_confirmation, unreadNotifications.length, wholesalePendingCount]
+  );
+
+  const primaryOpsAction = useMemo(() => {
+    if (unreadNotifications.length) {
+      return { label: "Открыть заявки с сигналами", onClick: () => navigate("/admin/appointments") };
+    }
+    if (wholesalePendingCount > 0) {
+      return { label: "Проверить опт-клиентов", onClick: () => navigate("/admin/clients") };
+    }
+    return { label: "Открыть системные правила", onClick: () => navigate("/admin/rules") };
+  }, [navigate, unreadNotifications.length, wholesalePendingCount]);
+
   return (
     <Stack spacing={2}>
       <Stack direction={{ xs: "column", sm: "row" }} spacing={1} justifyContent="space-between" alignItems={{ xs: "flex-start", sm: "center" }}>
@@ -216,12 +249,37 @@ export default function AdminSystemPage() {
             loadStatus();
             loadMetrics();
             loadUnreadNotifications();
+            loadWholesalePending();
           }}
           disabled={loadingStatus}
         >
           Обновить
         </Button>
       </Stack>
+
+      <Paper sx={{ p: 2 }}>
+        <Stack spacing={1.2}>
+          <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" alignItems={{ xs: "flex-start", sm: "center" }}>
+            <Typography variant="h3">Операционный фокус</Typography>
+            <Button variant="contained" size="small" onClick={primaryOpsAction.onClick}>
+              {primaryOpsAction.label}
+            </Button>
+          </Stack>
+          <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+            {focusCards.map((card) => (
+              <Chip
+                key={card.label}
+                label={`${card.label}: ${card.value}`}
+                color={card.color}
+                variant={card.value ? "filled" : "outlined"}
+              />
+            ))}
+          </Stack>
+          <Typography variant="caption" color="text.secondary">
+            Начинайте работу с этого блока: он показывает, где сейчас самое узкое место по сервису.
+          </Typography>
+        </Stack>
+      </Paper>
 
       <Paper sx={{ p: 2 }}>
         <Typography variant="h3" sx={{ mb: 1 }}>Критичные сигналы</Typography>

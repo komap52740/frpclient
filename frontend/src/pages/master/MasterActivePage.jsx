@@ -1,7 +1,8 @@
 ﻿import RefreshIcon from "@mui/icons-material/Refresh";
-import { Alert, Button, Grid, Paper, Stack, Typography } from "@mui/material";
+import { Alert, Button, Chip, Grid, Paper, Stack, Tab, Tabs, Typography } from "@mui/material";
 import dayjs from "dayjs";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 import { appointmentsApi, authApi } from "../../api/client";
 import AppointmentCard from "../../components/AppointmentCard";
@@ -53,11 +54,27 @@ function sortByUrgency(items) {
   });
 }
 
+function isUrgent(item) {
+  if (item.sla_breached) {
+    return true;
+  }
+  if ((item.unread_count || 0) > 0) {
+    return true;
+  }
+  const deadline = item.completion_deadline_at || item.response_deadline_at;
+  if (!deadline) {
+    return false;
+  }
+  return dayjs(deadline).diff(dayjs(), "minute") <= 60;
+}
+
 export default function MasterActivePage() {
+  const navigate = useNavigate();
   const [items, setItems] = useState([]);
   const [summary, setSummary] = useState(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [focusMode, setFocusMode] = useState("urgent");
 
   const load = useCallback(async ({ silent = false, withLoading = true } = {}) => {
     if (withLoading) {
@@ -88,14 +105,54 @@ export default function MasterActivePage() {
 
   useAutoRefresh(() => load({ silent: true, withLoading: false }), { intervalMs: 5000 });
 
+  const urgentItems = useMemo(() => items.filter(isUrgent), [items]);
+  const visibleItems = useMemo(() => (focusMode === "urgent" ? urgentItems : items), [focusMode, items, urgentItems]);
+  const focusItem = visibleItems[0] || items[0] || null;
+
   return (
     <Stack spacing={2}>
       <Stack direction={{ xs: "column", sm: "row" }} spacing={1} justifyContent="space-between" alignItems={{ xs: "flex-start", sm: "center" }}>
         <Typography variant="h5">Активные заявки</Typography>
-        <Button variant="outlined" startIcon={<RefreshIcon />} onClick={load} disabled={loading}>
-          Обновить
-        </Button>
+        <Stack direction="row" spacing={1} alignItems="center">
+          <Chip
+            size="small"
+            color={urgentItems.length ? "error" : "default"}
+            variant={urgentItems.length ? "filled" : "outlined"}
+            label={`Срочные: ${urgentItems.length}`}
+          />
+          <Button variant="outlined" startIcon={<RefreshIcon />} onClick={load} disabled={loading}>
+            Обновить
+          </Button>
+        </Stack>
       </Stack>
+
+      <Paper sx={{ p: 1.4, borderRadius: 3 }}>
+        <Stack spacing={1}>
+          <Stack
+            direction={{ xs: "column", sm: "row" }}
+            spacing={1}
+            justifyContent="space-between"
+            alignItems={{ xs: "flex-start", sm: "center" }}
+          >
+            <Tabs
+              value={focusMode}
+              onChange={(_, value) => setFocusMode(value)}
+              sx={{ minHeight: 38, "& .MuiTab-root": { minHeight: 38, textTransform: "none", fontWeight: 700 } }}
+            >
+              <Tab value="urgent" label={`Срочные (${urgentItems.length})`} />
+              <Tab value="all" label={`Все (${items.length})`} />
+            </Tabs>
+            {focusItem ? (
+              <Button variant="contained" size="small" onClick={() => navigate(`/appointments/${focusItem.id}`)}>
+                Открыть ключевую заявку
+              </Button>
+            ) : null}
+          </Stack>
+          <Typography variant="caption" color="text.secondary">
+            Срочные: SLA риск, дедлайн до 60 минут или новые сообщения от клиента.
+          </Typography>
+        </Stack>
+      </Paper>
 
       <Grid container spacing={2}>
         <Grid item xs={12} sm={6} md={3}>
@@ -126,9 +183,9 @@ export default function MasterActivePage() {
           <AppointmentCardSkeleton />
           <AppointmentCardSkeleton />
         </Stack>
-      ) : items.length ? (
+      ) : visibleItems.length ? (
         <Stack spacing={1.25}>
-          {items.map((item) => (
+          {visibleItems.map((item) => (
             <AppointmentCard key={item.id} item={item} role="master" linkTo={`/appointments/${item.id}`} />
           ))}
         </Stack>
