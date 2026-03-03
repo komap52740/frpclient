@@ -648,28 +648,53 @@ export default function AppointmentDetailPage() {
     }
   };
 
-  const saveClientAccessData = async () => {
-    const payload = {
-      rustdesk_id: (clientAccessForm.rustdesk_id || "").trim(),
-      rustdesk_password: (clientAccessForm.rustdesk_password || "").trim(),
+  const persistClientAccessData = async (payload, options = {}) => {
+    const normalizedPayload = {
+      rustdesk_id: (payload?.rustdesk_id || "").trim(),
+      rustdesk_password: (payload?.rustdesk_password || "").trim(),
     };
-    if (!payload.rustdesk_id && !payload.rustdesk_password) {
-      setError("Укажите логин/ID и/или пароль RuDesktop");
-      return;
+    const closeDialog = Boolean(options?.closeDialog);
+    if (!normalizedPayload.rustdesk_id && !normalizedPayload.rustdesk_password) {
+      throw new Error("Укажите логин/ID и/или пароль RuDesktop");
     }
     try {
       setClientAccessSaving(true);
-      await appointmentsApi.updateClientAccess(id, payload);
+      await appointmentsApi.updateClientAccess(id, normalizedPayload);
       await loadData({ preserveDrafts: true, silent: true });
-      setClientAccessDialogOpen(false);
+      if (closeDialog) {
+        setClientAccessDialogOpen(false);
+      }
       setSuccess("Данные RuDesktop сохранены");
       setToast({ open: true, severity: "success", message: "Данные RuDesktop сохранены" });
+      return true;
     } catch (err) {
       const detail = err?.response?.data?.detail || "Не удалось сохранить данные RuDesktop";
       setError(detail);
       setToast({ open: true, severity: "error", message: detail });
+      throw err;
     } finally {
       setClientAccessSaving(false);
+    }
+  };
+
+  const saveClientAccessData = async () => {
+    try {
+      await persistClientAccessData(clientAccessForm, { closeDialog: true });
+    } catch (err) {
+      if (err?.message && !err?.response) {
+        setError(err.message);
+      }
+    }
+  };
+
+  const saveClientAccessInline = async (payload) => {
+    try {
+      await persistClientAccessData(payload, { closeDialog: false });
+    } catch (err) {
+      if (err?.message && !err?.response) {
+        setError(err.message);
+      }
+      throw err;
     }
   };
 
@@ -728,6 +753,7 @@ export default function AppointmentDetailPage() {
   }
 
   const isClient = user.role === "client";
+  const isClientStrictLayout = isClient;
   const isClientMinimal = isClient && clientCompactView;
   const isMasterAssigned = user.role === "master" && appointment.assigned_master === user.id;
 
@@ -739,7 +765,9 @@ export default function AppointmentDetailPage() {
   const showClientRepeat =
     user.role === "client" &&
     ["COMPLETED", "CANCELLED", "DECLINED_BY_MASTER"].includes(appointment.status);
-  const showClientTabs = user.role === "client" && !isClientMinimal && (!clientCompactView || showClientPaymentActions);
+  const showClientTabs = isClientStrictLayout
+    ? true
+    : user.role === "client" && !isClientMinimal && (!clientCompactView || showClientPaymentActions);
 
   const showMasterTake = user.role === "master" && appointment.status === "NEW";
   const showMasterReviewAndPrice = isMasterAssigned && appointment.status === "IN_REVIEW";
@@ -754,23 +782,26 @@ export default function AppointmentDetailPage() {
 
   const showAdminControls = user.role === "admin";
   const showAdminPaymentConfirm = showAdminControls && appointment.status === "PAYMENT_PROOF_UPLOADED";
-  const showClientPaymentHighlight = isClient && showClientPaymentActions;
-  const isClientCompact = isClient && clientCompactView;
-  const clientDetailsTabEnabled = !isClientCompact;
+  const showClientPaymentHighlight = isClientStrictLayout ? false : isClient && showClientPaymentActions;
+  const isClientCompact = isClientStrictLayout ? false : isClient && clientCompactView;
+  const clientDetailsTabEnabled = isClientStrictLayout ? false : !isClientCompact;
   const showClientDesktopSidebar = false;
-  const showClientPaymentDock = isClient && !isMobile && showClientPaymentActions;
-  const showClientFloatingActionBar = isClient && isMobile && showClientPaymentActions;
+  const showClientPaymentDock = isClientStrictLayout ? false : isClient && !isMobile && showClientPaymentActions;
+  const showClientFloatingActionBar = isClientStrictLayout ? false : isClient && isMobile && showClientPaymentActions;
   const showClientQuickRail = false;
   const clientPaymentTabDisabled = !showClientPaymentActions;
   const showClientDataCard = isClient
     ? false
     : !showClientTabs || (clientTab === "details" && clientDetailsTabEnabled);
-  const showClientPaymentCard =
-    showClientPaymentActions &&
-    !isClientMinimal &&
-    (!showClientTabs || clientTab === "payment");
-  const showClientChatPanel = !showClientTabs || clientTab === "chat";
-  const showClientDetailsCard = !isClientMinimal && showClientTabs && clientTab === "details" && clientDetailsTabEnabled;
+  const showClientPaymentCard = isClientStrictLayout
+    ? false
+    : showClientPaymentActions &&
+      !isClientMinimal &&
+      (!showClientTabs || clientTab === "payment");
+  const showClientChatPanel = isClientStrictLayout ? true : !showClientTabs || clientTab === "chat";
+  const showClientDetailsCard = isClientStrictLayout
+    ? false
+    : !isClientMinimal && showClientTabs && clientTab === "details" && clientDetailsTabEnabled;
   const showClientSecondaryCards = isClient
     ? false
     : !isClientMinimal && !isClientCompact && (!showClientTabs || clientTab === "details");
@@ -863,6 +894,12 @@ export default function AppointmentDetailPage() {
         ]
       : []),
   ];
+  const chatRuDesktop = {
+    id: rustdeskId,
+    password: rustdeskPassword,
+    downloadUrl: RU_DESKTOP_DOWNLOAD_URL,
+    helpUrl: RU_DESKTOP_HELP_URL,
+  };
   const actionEtaLabel = (() => {
     if (appointment.status === "AWAITING_PAYMENT") {
       return "После оплаты мастер продолжит обычно за 1-5 минут";
@@ -939,10 +976,10 @@ export default function AppointmentDetailPage() {
     }
     if (appointment.status === "AWAITING_PAYMENT") {
       return {
-        title: "Оплатите и прикрепите чек",
-        description: "После загрузки мастер сразу увидит оплату.",
-        actionKey: "open_payment",
-        cta: "К оплате",
+        title: "Ожидаем оплату",
+        description: "Оплатите по реквизитам и напишите в чат, если нужна помощь.",
+        actionKey: "open_chat",
+        cta: "Открыть чат",
       };
     }
     if (appointment.status === "PAYMENT_PROOF_UPLOADED") {
@@ -1196,19 +1233,12 @@ export default function AppointmentDetailPage() {
                 sx={{ bgcolor: statusUi.bg, color: statusUi.color, border: `1px solid ${statusUi.color}33`, fontWeight: 700 }}
               />
               {isClient ? (
-                <Button
-                  size="small"
-                  variant={clientCompactView ? "outlined" : "text"}
-                  onClick={() => setClientCompactView((prev) => !prev)}
-                  sx={{ minHeight: 28, px: 1.1, borderRadius: 2 }}
-                >
-                  {clientCompactView ? "Полный вид" : "Фокус"}
-                </Button>
+                <Chip size="small" variant="outlined" label="Фокус" />
               ) : null}
             </Stack>
           </Stack>
 
-          {!isClientMinimal ? (
+          {isClient || !isClientMinimal ? (
             <StatusStepper
               status={appointment.status}
               role={user.role}
@@ -1217,7 +1247,7 @@ export default function AppointmentDetailPage() {
             />
           ) : null}
 
-          {isClient && (!isClientMinimal || showClientPaymentActions) ? (
+          {isClient ? (
             <Paper
               elevation={0}
               sx={{
@@ -1901,8 +1931,11 @@ export default function AppointmentDetailPage() {
                   currentUser={user}
                   systemEvents={mappedSystemEvents}
                   initialView={chatPanelView}
-                  minimalClient={isClientMinimal}
-                  downloadLinks={isClient ? [] : sidebarLinks}
+                  downloadLinks={sidebarLinks}
+                  ruDesktop={chatRuDesktop}
+                  canEditRuDesktop={isClient}
+                  onSaveRuDesktop={isClient ? saveClientAccessInline : null}
+                  ruDesktopSaving={clientAccessSaving}
                 />
               </Box>
             </Fade>
