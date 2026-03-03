@@ -18,6 +18,7 @@ from .models import Appointment, AppointmentEventType, AppointmentStatusChoices
 from .serializers import (
     AdminManualStatusSerializer,
     AppointmentCreateSerializer,
+    ClientAccessUpdateSerializer,
     ClientSignalSerializer,
     AppointmentEventSerializer,
     AppointmentSerializer,
@@ -81,6 +82,46 @@ class AppointmentDetailView(APIView):
         appointment = get_appointment_for_user(request.user, appointment_id)
         data = AppointmentSerializer(appointment, context={"request": request}).data
         return Response(data)
+
+
+class ClientAccessUpdateView(APIView):
+    permission_classes = (IsAuthenticatedAndNotBanned,)
+
+    def post(self, request, appointment_id: int):
+        appointment = get_appointment_for_user(request.user, appointment_id)
+        if request.user.role != RoleChoices.CLIENT or appointment.client_id != request.user.id:
+            return Response({"detail": "Только клиент заявки"}, status=status.HTTP_403_FORBIDDEN)
+        if request.user.is_banned:
+            return Response({"detail": "Клиент забанен"}, status=status.HTTP_403_FORBIDDEN)
+
+        serializer = ClientAccessUpdateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        fields_to_update = ["updated_at"]
+        rustdesk_id = serializer.validated_data.get("rustdesk_id", "")
+        rustdesk_password = serializer.validated_data.get("rustdesk_password", "")
+        if rustdesk_id:
+            appointment.rustdesk_id = rustdesk_id
+            fields_to_update.append("rustdesk_id")
+        if rustdesk_password:
+            appointment.rustdesk_password = rustdesk_password
+            fields_to_update.append("rustdesk_password")
+        appointment.save(update_fields=fields_to_update)
+
+        add_event(
+            appointment,
+            request.user,
+            AppointmentEventType.CLIENT_SIGNAL,
+            note="Клиент обновил данные RuDesktop",
+            metadata={"signal": "rustdesk_updated"},
+        )
+        emit_event(
+            "appointment.client_access_updated",
+            appointment,
+            actor=request.user,
+            payload={"rustdesk_id_updated": bool(rustdesk_id), "rustdesk_password_updated": bool(rustdesk_password)},
+        )
+        return Response(AppointmentSerializer(appointment, context={"request": request}).data)
 
 
 class AppointmentEventsView(APIView):

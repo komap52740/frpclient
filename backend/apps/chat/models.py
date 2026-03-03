@@ -13,11 +13,22 @@ def validate_chat_file(value):
     if not value:
         return
     ext = os.path.splitext(value.name.lower())[1]
-    allowed = {".jpg", ".jpeg", ".png", ".pdf", ".txt", ".log", ".zip"}
+    allowed = {".jpg", ".jpeg", ".png", ".webp", ".pdf", ".txt", ".log", ".zip", ".mp4", ".mov", ".webm", ".m4v"}
     if ext not in allowed:
         raise ValidationError("Недопустимый тип файла")
     if value.size > 10 * 1024 * 1024:
         raise ValidationError("Максимальный размер файла 10MB")
+
+
+def validate_quick_reply_media(value):
+    if not value:
+        return
+    ext = os.path.splitext(value.name.lower())[1]
+    allowed = {".jpg", ".jpeg", ".png", ".webp", ".mp4", ".mov", ".webm", ".m4v"}
+    if ext not in allowed:
+        raise ValidationError("Медиа шаблона: только фото (jpg/png/webp) или видео (mp4/mov/webm)")
+    if value.size > 25 * 1024 * 1024:
+        raise ValidationError("Максимальный размер медиа шаблона 25MB")
 
 
 class Message(TimeStampedModel):
@@ -73,7 +84,13 @@ class MasterQuickReply(TimeStampedModel):
     )
     command = models.CharField(max_length=20)
     title = models.CharField(max_length=120, blank=True)
-    text = models.TextField()
+    text = models.TextField(blank=True)
+    media_file = models.FileField(
+        upload_to="quick_reply_media/",
+        null=True,
+        blank=True,
+        validators=[validate_quick_reply_media],
+    )
 
     class Meta:
         ordering = ("command", "id")

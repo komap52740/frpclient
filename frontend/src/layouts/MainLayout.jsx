@@ -45,6 +45,7 @@ function buildMenu(role) {
     return [
       { label: "Новые заявки", to: "/master/new" },
       { label: "Активные", to: "/master/active" },
+      { label: "Быстрые ответы", to: "/master/quick-replies" },
       { label: "Отзывы", to: "/master/reviews" },
     ];
   }
@@ -119,6 +120,7 @@ function resolveRouteContext(role, pathname) {
   if (role === "master") {
     if (pathname.startsWith("/master/new")) return { title: "Новые заявки", subtitle: "Выберите следующую задачу" };
     if (pathname.startsWith("/master/active")) return { title: "Активные заявки", subtitle: "Фокус на текущих работах" };
+    if (pathname.startsWith("/master/quick-replies")) return { title: "Быстрые ответы", subtitle: "Личные шаблоны с фото и видео" };
     if (pathname.startsWith("/master/reviews")) return { title: "Отзывы", subtitle: "Оценка качества вашей работы" };
   }
 

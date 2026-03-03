@@ -1,10 +1,11 @@
-import DashboardRoundedIcon from "@mui/icons-material/DashboardRounded";
+﻿import DashboardRoundedIcon from "@mui/icons-material/DashboardRounded";
 import GavelRoundedIcon from "@mui/icons-material/GavelRounded";
 import HomeRoundedIcon from "@mui/icons-material/HomeRounded";
 import ListAltRoundedIcon from "@mui/icons-material/ListAltRounded";
 import ManageAccountsRoundedIcon from "@mui/icons-material/ManageAccountsRounded";
 import NewReleasesRoundedIcon from "@mui/icons-material/NewReleasesRounded";
 import PersonRoundedIcon from "@mui/icons-material/PersonRounded";
+import QuickreplyRoundedIcon from "@mui/icons-material/QuickreplyRounded";
 import ReviewsRoundedIcon from "@mui/icons-material/ReviewsRounded";
 import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
 import { BottomNavigation, BottomNavigationAction, Paper } from "@mui/material";
@@ -25,6 +26,7 @@ function getActions(role) {
     return [
       { label: "Новые", to: "/master/new", icon: <NewReleasesRoundedIcon /> },
       { label: "Активные", to: "/master/active", icon: <DashboardRoundedIcon /> },
+      { label: "Шаблоны", to: "/master/quick-replies", icon: <QuickreplyRoundedIcon /> },
       { label: "Отзывы", to: "/master/reviews", icon: <ReviewsRoundedIcon /> },
     ];
   }
@@ -63,7 +65,7 @@ export default function AppBottomNav({ role }) {
         right: 10,
         bottom: "calc(env(safe-area-inset-bottom, 0px) + 10px)",
         zIndex: 1300,
-        borderRadius: 4,
+        borderRadius: 2.5,
         border: "1px solid",
         borderColor: "divider",
         backgroundColor: (theme) =>
@@ -89,7 +91,7 @@ export default function AppBottomNav({ role }) {
             minWidth: 56,
             color: "text.secondary",
             py: 0.5,
-            borderRadius: 2.5,
+            borderRadius: 1.8,
             mx: 0.3,
             "& .MuiBottomNavigationAction-label": {
               fontSize: 11.5,

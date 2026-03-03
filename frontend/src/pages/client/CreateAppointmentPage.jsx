@@ -1,4 +1,4 @@
-﻿import AddPhotoAlternateRoundedIcon from "@mui/icons-material/AddPhotoAlternateRounded";
+import AddPhotoAlternateRoundedIcon from "@mui/icons-material/AddPhotoAlternateRounded";
 import LockOpenRoundedIcon from "@mui/icons-material/LockOpenRounded";
 import {
   Alert,
@@ -23,6 +23,7 @@ import { getLockTypeLabel } from "../../constants/labels";
 const CREATE_DEFAULTS_KEY = "frp_create_defaults_v1";
 const RUSTDESK_ID_MIN_LEN = 8;
 const RUSTDESK_ID_MAX_LEN = 12;
+const RU_DESKTOP_DOWNLOAD_URL = "https://rudesktop.ru/downloads/";
 
 function splitDevice(rawDevice) {
   const normalized = (rawDevice || "").trim().replace(/\s+/g, " ");
@@ -60,9 +61,7 @@ function normalizeRustdeskId(raw) {
 
 function validateRustdeskId(raw) {
   const value = normalizeRustdeskId(raw);
-  if (!value) {
-    return "Укажите ID RuDesktop";
-  }
+  if (!value) return "";
   if (!/^\d+$/.test(value)) {
     return "ID RuDesktop должен содержать только цифры";
   }
@@ -74,9 +73,7 @@ function validateRustdeskId(raw) {
 
 function validateRustdeskPassword(raw) {
   const value = String(raw || "").trim();
-  if (!value) {
-    return "Укажите код доступа RuDesktop";
-  }
+  if (!value) return "";
   if (value.length < 4) {
     return "Код доступа слишком короткий (минимум 4 символа)";
   }
@@ -138,19 +135,19 @@ export default function CreateAppointmentPage() {
     () => validateRustdeskPassword(form.rustdesk_password),
     [form.rustdesk_password]
   );
+
   const showDeviceError = touched.device && Boolean(deviceError);
   const showRustdeskIdError = touched.rustdesk_id && Boolean(rustdeskIdError);
   const showRustdeskPasswordError = touched.rustdesk_password && Boolean(rustdeskPasswordError);
 
   const canSubmit = !submitting && !deviceError && !rustdeskIdError && !rustdeskPasswordError;
-  const requiredDoneCount = useMemo(() => {
-    let done = 0;
-    if (!deviceError && form.device.trim()) done += 1;
-    if (!rustdeskIdError && normalizeRustdeskId(form.rustdesk_id)) done += 1;
-    if (!rustdeskPasswordError && form.rustdesk_password.trim()) done += 1;
-    return done;
-  }, [deviceError, form.device, form.rustdesk_id, form.rustdesk_password, rustdeskIdError, rustdeskPasswordError]);
-  const requiredProgress = Math.round((requiredDoneCount / 3) * 100);
+
+  const progressValue = useMemo(() => {
+    let score = 1;
+    if (normalizeRustdeskId(form.rustdesk_id) && !rustdeskIdError) score += 0.5;
+    if (form.rustdesk_password.trim() && !rustdeskPasswordError) score += 0.5;
+    return Math.round((score / 2) * 100);
+  }, [form.rustdesk_id, form.rustdesk_password, rustdeskIdError, rustdeskPasswordError]);
 
   const updateField = (key, value) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -175,8 +172,8 @@ export default function CreateAppointmentPage() {
     setError("");
     setTouched({
       device: true,
-      rustdesk_id: true,
-      rustdesk_password: true,
+      rustdesk_id: Boolean(form.rustdesk_id),
+      rustdesk_password: Boolean(form.rustdesk_password),
     });
 
     if (deviceError || rustdeskIdError || rustdeskPasswordError) {
@@ -195,8 +192,16 @@ export default function CreateAppointmentPage() {
     payload.append("lock_type", form.lock_type);
     payload.append("has_pc", String(form.has_pc));
     payload.append("description", description);
-    payload.append("rustdesk_id", normalizeRustdeskId(form.rustdesk_id));
-    payload.append("rustdesk_password", form.rustdesk_password.trim());
+
+    const normalizedId = normalizeRustdeskId(form.rustdesk_id);
+    const normalizedPassword = form.rustdesk_password.trim();
+    if (normalizedId) {
+      payload.append("rustdesk_id", normalizedId);
+    }
+    if (normalizedPassword) {
+      payload.append("rustdesk_password", normalizedPassword);
+    }
+
     if (form.photo_lock_screen) {
       payload.append("photo_lock_screen", form.photo_lock_screen);
     }
@@ -207,8 +212,8 @@ export default function CreateAppointmentPage() {
         window.localStorage.setItem(
           CREATE_DEFAULTS_KEY,
           JSON.stringify({
-            rustdesk_id: normalizeRustdeskId(form.rustdesk_id),
-            rustdesk_password: form.rustdesk_password.trim(),
+            rustdesk_id: normalizedId,
+            rustdesk_password: normalizedPassword,
             lock_type: form.lock_type,
             has_pc: form.has_pc,
           })
@@ -224,25 +229,38 @@ export default function CreateAppointmentPage() {
   };
 
   return (
-    <Paper sx={{ p: { xs: 2, md: 3 }, borderRadius: 3.2 }}>
-      <Stack spacing={0.7} sx={{ mb: 2 }}>
+    <Paper sx={{ p: { xs: 2.4, md: 3.2 }, borderRadius: 2.2 }}>
+      <Stack spacing={0.8} sx={{ mb: 2 }}>
         <Typography variant="h5">Новая заявка</Typography>
         <Typography variant="body2" color="text.secondary">
-          Быстрый режим: заполните 3 поля и отправьте. Остальное добавится автоматически.
+          Минимум действий: укажите устройство и отправьте заявку. Данные RuDesktop можно добавить позже.
         </Typography>
+
+        <Alert
+          severity="info"
+          action={(
+            <Button size="small" color="inherit" href={RU_DESKTOP_DOWNLOAD_URL} target="_blank" rel="noreferrer">
+              Скачать RuDesktop
+            </Button>
+          )}
+        >
+          RuDesktop нужен для удалённого доступа к вашему ПК. Если программа не готова сейчас, просто добавите ID и код позже в карточке заявки или в чате.
+        </Alert>
+
         <Stack direction="row" spacing={0.8} flexWrap="wrap" useFlexGap>
-          <Chip size="small" color={requiredDoneCount >= 1 ? "success" : "default"} label="1. Устройство" variant={requiredDoneCount >= 1 ? "filled" : "outlined"} />
-          <Chip size="small" color={requiredDoneCount >= 2 ? "success" : "default"} label="2. ID RuDesktop" variant={requiredDoneCount >= 2 ? "filled" : "outlined"} />
-          <Chip size="small" color={requiredDoneCount >= 3 ? "success" : "default"} label="3. Код доступа" variant={requiredDoneCount >= 3 ? "filled" : "outlined"} />
+          <Chip size="small" color="success" label="1. Устройство (обязательно)" variant="filled" />
+          <Chip size="small" color={normalizeRustdeskId(form.rustdesk_id) ? "success" : "default"} label="2. ID RuDesktop (опц.)" variant={normalizeRustdeskId(form.rustdesk_id) ? "filled" : "outlined"} />
+          <Chip size="small" color={form.rustdesk_password.trim() ? "success" : "default"} label="3. Код доступа (опц.)" variant={form.rustdesk_password.trim() ? "filled" : "outlined"} />
         </Stack>
+
         <Stack spacing={0.5}>
           <Typography variant="caption" color="text.secondary">
-            Готовность заявки: {requiredDoneCount}/3
+            Готовность: {progressValue}%
           </Typography>
           <LinearProgress
             variant="determinate"
-            value={requiredProgress}
-            color={requiredDoneCount === 3 ? "success" : "primary"}
+            value={progressValue}
+            color={progressValue >= 75 ? "success" : "primary"}
             sx={{ borderRadius: 999, height: 6 }}
           />
         </Stack>
@@ -250,7 +268,7 @@ export default function CreateAppointmentPage() {
 
       {hasStoredAccess ? (
         <Alert severity="info" sx={{ mb: 1.4 }}>
-          Данные RuDesktop подставлены из последней заявки. Проверьте их перед отправкой.
+          Данные RuDesktop подставлены из последней заявки. При необходимости измените их.
         </Alert>
       ) : null}
       {error ? (
@@ -260,7 +278,6 @@ export default function CreateAppointmentPage() {
       ) : null}
 
       <Stack component="form" spacing={1.3} onSubmit={onSubmit} autoComplete="off" noValidate>
-
         <TextField
           label="Устройство"
           placeholder="Например: Samsung A54"
@@ -287,9 +304,8 @@ export default function CreateAppointmentPage() {
               ? rustdeskIdError
               : form.rustdesk_id && !rustdeskIdError
                 ? "ID выглядит корректно"
-                : "ID устройства для подключения мастера"
+                : "Опционально: можно добавить позже"
           }
-          required
           autoComplete="off"
           inputProps={{
             autoComplete: "off",
@@ -320,9 +336,8 @@ export default function CreateAppointmentPage() {
               ? rustdeskPasswordError
               : form.rustdesk_password && !rustdeskPasswordError
                 ? "Код доступа выглядит корректно"
-                : "Динамический код доступа из RuDesktop (вводится открыто)"
+                : "Опционально: динамический код из RuDesktop"
           }
-          required
           autoComplete="off"
           inputProps={{
             autoComplete: "one-time-code",
@@ -338,7 +353,7 @@ export default function CreateAppointmentPage() {
         />
 
         <Typography variant="caption" color="text.secondary">
-          Автошаблон будет добавлен автоматически. Вам не нужно заполнять длинное описание вручную.
+          Автошаблон добавится автоматически. Длинное описание писать не нужно.
         </Typography>
 
         <Button

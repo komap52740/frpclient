@@ -1,24 +1,12 @@
-import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import AttachFileIcon from "@mui/icons-material/AttachFile";
 import ContentCopyRoundedIcon from "@mui/icons-material/ContentCopyRounded";
-import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
-import EditRoundedIcon from "@mui/icons-material/EditRounded";
-import ExpandLessRoundedIcon from "@mui/icons-material/ExpandLessRounded";
-import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
 import LinkRoundedIcon from "@mui/icons-material/LinkRounded";
 import SendIcon from "@mui/icons-material/Send";
-import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
 import {
   Alert,
   Box,
   Button,
   Chip,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  Divider,
-  IconButton,
   Paper,
   Stack,
   Tab,
@@ -39,22 +27,9 @@ import ChatThread from "./ui/ChatThread";
 dayjs.locale("ru");
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
-const ALLOWED_EXTENSIONS = ["jpg", "jpeg", "png", "pdf", "txt", "log", "zip"];
+const ALLOWED_EXTENSIONS = ["jpg", "jpeg", "png", "pdf", "txt", "log", "zip", "webp", "mp4", "mov", "webm", "m4v"];
 const URL_REGEX = /\bhttps?:\/\/[^\s<>"']+/gi;
-
-const QUICK_TEMPLATES = {
-  client: [
-    "Я на месте, готов к подключению.",
-    "Оплату отправил, проверьте пожалуйста.",
-    "Не получается, нужна помощь пошагово.",
-  ],
-  master: [
-    "Проверил данные, сейчас продолжаю работу.",
-    "Нужен короткий доступ к ПК для следующего шага.",
-    "Проверьте результат и дайте обратную связь.",
-  ],
-  admin: ["Подключили поддержку, сейчас поможем решить вопрос."],
-};
+const LINK_SOURCE_ROLES = new Set(["master", "admin"]);
 
 function mapSystemEvents(systemEvents = []) {
   const seen = new Set();
@@ -90,29 +65,12 @@ function validateAttachment(file) {
 
   const extension = (file.name.split(".").pop() || "").toLowerCase();
   if (!ALLOWED_EXTENSIONS.includes(extension)) {
-    return "Файл должен быть в формате jpg/jpeg/png/pdf/txt/log/zip";
+    return "Файл должен быть в формате jpg/jpeg/png/pdf/txt/log/zip/webp/mp4/mov/webm";
   }
   if (file.size > MAX_FILE_SIZE) {
     return "Размер файла не должен превышать 10 МБ";
   }
   return "";
-}
-
-function normalizeCommand(value) {
-  const raw = (value || "").trim();
-  if (!raw) return "";
-  return raw.startsWith("/") ? raw.slice(1).toLowerCase() : raw.toLowerCase();
-}
-
-function splitCommandText(rawText) {
-  const text = (rawText || "").trim();
-  if (!text.startsWith("/") || text.startsWith("//")) return null;
-
-  const firstToken = text.split(" ")[0];
-  const command = normalizeCommand(firstToken);
-  if (!command) return null;
-
-  return { command, tail: text.slice(firstToken.length).trim() };
 }
 
 function normalizeUrl(rawUrl) {
@@ -132,6 +90,7 @@ function buildLinkItems(messages = []) {
 
   messages.forEach((message) => {
     if (message.is_deleted) return;
+    if (!LINK_SOURCE_ROLES.has(String(message.sender_role || "").toLowerCase())) return;
 
     extractUrls(message.text).forEach((url, index) => {
       const key = `${message.id}-${url}-${index}`;
@@ -142,20 +101,12 @@ function buildLinkItems(messages = []) {
         url,
         sender_username: message.sender_username || "Пользователь",
         created_at: message.created_at,
-        message_text: message.text || "",
       });
     });
   });
 
   return items.sort((a, b) => dayjs(b.created_at).valueOf() - dayjs(a.created_at).valueOf());
 }
-
-const EMPTY_REPLY_FORM = {
-  id: 0,
-  command: "",
-  title: "",
-  text: "",
-};
 
 export default function ChatPanel({
   appointmentId,
@@ -178,30 +129,16 @@ export default function ChatPanel({
 
   const [chatView, setChatView] = useState(initialView === "links" ? "links" : "messages");
   const [newIncomingCount, setNewIncomingCount] = useState(0);
-  const [quickPhrasesOpen, setQuickPhrasesOpen] = useState(!isMobile);
-
-  const [quickReplies, setQuickReplies] = useState([]);
-  const [quickRepliesOpen, setQuickRepliesOpen] = useState(false);
-  const [quickReplyError, setQuickReplyError] = useState("");
-  const [quickReplySaving, setQuickReplySaving] = useState(false);
-  const [replyForm, setReplyForm] = useState(EMPTY_REPLY_FORM);
 
   const threadRef = useRef(null);
 
-  const isMaster = currentUser.role === "master";
   const isMinimalClientMode = minimalClient && currentUser.role === "client";
   const isSplitClientLayout = isMinimalClientMode && !isMobile;
+
   const safeDownloadLinks = useMemo(
     () => (downloadLinks || []).filter((item) => item?.href && item?.label),
     [downloadLinks]
   );
-  const quickTemplates = QUICK_TEMPLATES[currentUser.role] || QUICK_TEMPLATES.client;
-
-  const quickReplyMap = useMemo(() => {
-    const map = new Map();
-    quickReplies.forEach((item) => map.set(item.command, item));
-    return map;
-  }, [quickReplies]);
 
   const lastMessageId = useMemo(
     () => messages.reduce((maxId, message) => (typeof message.id === "number" && message.id > maxId ? message.id : maxId), 0),
@@ -257,21 +194,6 @@ export default function ChatPanel({
     [appointmentId, currentUser.id, isNearBottom, scrollToBottom]
   );
 
-  const loadQuickReplies = useCallback(async () => {
-    if (!isMaster) {
-      setQuickReplies([]);
-      return;
-    }
-
-    try {
-      const response = await chatApi.listQuickReplies();
-      setQuickReplies(response.data || []);
-      setQuickReplyError("");
-    } catch {
-      setQuickReplyError("Не удалось загрузить быстрые ответы.");
-    }
-  }, [isMaster]);
-
   useEffect(() => {
     setMessages([]);
     setNewIncomingCount(0);
@@ -282,14 +204,6 @@ export default function ChatPanel({
   useEffect(() => {
     setChatView(initialView === "links" ? "links" : "messages");
   }, [initialView]);
-
-  useEffect(() => {
-    loadQuickReplies();
-  }, [loadQuickReplies]);
-
-  useEffect(() => {
-    setQuickPhrasesOpen(isMinimalClientMode ? false : !isMobile);
-  }, [appointmentId, isMobile, isMinimalClientMode]);
 
   useAutoRefresh(() => loadMessages(lastMessageId), { intervalMs: 2500 });
 
@@ -304,23 +218,6 @@ export default function ChatPanel({
     }
   }, [isNearBottom]);
 
-  const resolveQuickReplyText = useCallback(
-    (rawText) => {
-      const normalized = (rawText || "").trim();
-      if (!isMaster || !normalized) return normalized;
-      if (normalized.startsWith("//")) return normalized.slice(1);
-
-      const parsed = splitCommandText(normalized);
-      if (!parsed) return normalized;
-
-      const matched = quickReplyMap.get(parsed.command);
-      if (!matched) return normalized;
-
-      return parsed.tail ? `${matched.text}\n\n${parsed.tail}` : matched.text;
-    },
-    [isMaster, quickReplyMap]
-  );
-
   const onSend = async () => {
     const rawText = text.trim();
     if (!rawText && !file) return;
@@ -329,14 +226,13 @@ export default function ChatPanel({
     setFileError(attachmentError);
     if (attachmentError) return;
 
-    const resolvedText = resolveQuickReplyText(rawText);
-
     const optimisticId = `optimistic-${Date.now()}`;
     const optimisticMessage = {
       id: optimisticId,
       sender: currentUser.id,
       sender_username: currentUser.username || "Вы",
-      text: resolvedText,
+      sender_role: currentUser.role || "",
+      text: rawText,
       file_url: null,
       created_at: new Date().toISOString(),
       is_deleted: false,
@@ -346,7 +242,7 @@ export default function ChatPanel({
     setMessages((prev) => [...prev, optimisticMessage]);
 
     const formData = new FormData();
-    if (resolvedText) formData.append("text", resolvedText);
+    if (rawText) formData.append("text", rawText);
     if (file) formData.append("file", file);
 
     setText("");
@@ -386,14 +282,6 @@ export default function ChatPanel({
     }
   };
 
-  const applyTemplate = (templateText) => {
-    setText((prev) => (!prev.trim() ? templateText : `${prev.trim()} ${templateText}`));
-  };
-
-  const applyQuickReplyCommand = (command) => {
-    setText(`/${command}`);
-  };
-
   const onFileChange = (nextFile) => {
     setFile(nextFile);
     setFileError(validateAttachment(nextFile));
@@ -407,70 +295,12 @@ export default function ChatPanel({
     }
   };
 
-  const resetReplyForm = () => {
-    setReplyForm(EMPTY_REPLY_FORM);
-    setQuickReplyError("");
-  };
-
-  const startEditReply = (item) => {
-    setReplyForm({
-      id: item.id,
-      command: `/${item.command}`,
-      title: item.title || "",
-      text: item.text || "",
-    });
-    setQuickReplyError("");
-  };
-
-  const saveQuickReply = async () => {
-    const payload = {
-      command: normalizeCommand(replyForm.command),
-      title: (replyForm.title || "").trim(),
-      text: (replyForm.text || "").trim(),
-    };
-
-    if (!payload.command || !payload.text) {
-      setQuickReplyError("Заполните команду и текст шаблона.");
-      return;
-    }
-
-    setQuickReplySaving(true);
-    try {
-      if (replyForm.id) {
-        await chatApi.updateQuickReply(replyForm.id, payload);
-      } else {
-        await chatApi.createQuickReply(payload);
-      }
-      await loadQuickReplies();
-      resetReplyForm();
-    } catch (err) {
-      setQuickReplyError(err?.response?.data?.detail || "Не удалось сохранить быстрый ответ.");
-    } finally {
-      setQuickReplySaving(false);
-    }
-  };
-
-  const removeQuickReply = async (replyId) => {
-    setQuickReplySaving(true);
-    try {
-      await chatApi.deleteQuickReply(replyId);
-      await loadQuickReplies();
-      if (replyForm.id === replyId) {
-        resetReplyForm();
-      }
-    } catch (err) {
-      setQuickReplyError(err?.response?.data?.detail || "Не удалось удалить быстрый ответ.");
-    } finally {
-      setQuickReplySaving(false);
-    }
-  };
-
   const linksPanel = (
     <Paper
       variant="outlined"
       sx={{
         p: 1.1,
-        borderRadius: 2.5,
+        borderRadius: 2,
         maxHeight: isMobile ? 400 : 460,
         overflowY: "auto",
         bgcolor: isDark ? alpha("#0f172a", 0.7) : alpha("#f8fbff", 0.95),
@@ -484,7 +314,7 @@ export default function ChatPanel({
               elevation={0}
               sx={{
                 p: 1,
-                borderRadius: 2.2,
+                borderRadius: 1.6,
                 border: "1px solid",
                 borderColor: "divider",
                 bgcolor: isDark ? alpha("#111b2f", 0.8) : "#ffffff",
@@ -535,7 +365,7 @@ export default function ChatPanel({
         </Stack>
       ) : (
         <Typography variant="body2" color="text.secondary">
-          Ссылок пока нет. Отправьте сообщение с `https://...`, и ссылка появится здесь автоматически.
+          Пока нет ссылок от мастера или администратора.
         </Typography>
       )}
     </Paper>
@@ -545,7 +375,7 @@ export default function ChatPanel({
     <Paper
       sx={{
         p: { xs: 1.4, sm: 2.1 },
-        borderRadius: 3.2,
+        borderRadius: 2.2,
         background: isDark
           ? "linear-gradient(160deg, rgba(10,17,31,0.92) 0%, rgba(17,24,39,0.88) 100%)"
           : "linear-gradient(160deg, rgba(255,255,255,0.9) 0%, rgba(250,252,255,0.86) 100%)",
@@ -568,7 +398,7 @@ export default function ChatPanel({
             onChange={(_, value) => setChatView(value)}
             variant="fullWidth"
             sx={{
-              borderRadius: 2.4,
+              borderRadius: 2,
               bgcolor: (themeValue) =>
                 themeValue.palette.mode === "dark" ? alpha("#0f172a", 0.66) : alpha("#e5eefb", 0.62),
               minHeight: 40,
@@ -582,71 +412,6 @@ export default function ChatPanel({
             <Tab value="messages" label="Сообщения" />
             <Tab value="links" label={`Ссылки (${linkItems.length})`} />
           </Tabs>
-        ) : null}
-
-        {!isMinimalClientMode ? (
-          <Stack spacing={0.65}>
-            <Stack direction="row" justifyContent="space-between" alignItems="center">
-              <Typography variant="caption" color="text.secondary">
-                {isMaster ? "Быстрые фразы и команды" : "Быстрые фразы"}
-              </Typography>
-              <Button
-                size="small"
-                variant="text"
-                endIcon={quickPhrasesOpen ? <ExpandLessRoundedIcon fontSize="small" /> : <ExpandMoreRoundedIcon fontSize="small" />}
-                onClick={() => setQuickPhrasesOpen((prev) => !prev)}
-                sx={{ minHeight: 28, px: 1 }}
-              >
-                {quickPhrasesOpen ? "Скрыть" : "Показать"}
-              </Button>
-            </Stack>
-            {quickPhrasesOpen ? (
-              <Stack
-                direction="row"
-                spacing={0.7}
-                flexWrap={isMobile ? "nowrap" : "wrap"}
-                useFlexGap={!isMobile}
-                sx={{ overflowX: isMobile ? "auto" : "visible", pb: isMobile ? 0.4 : 0 }}
-              >
-                {quickTemplates.map((template) => (
-                  <Chip
-                    key={template}
-                    label={template}
-                    variant="outlined"
-                    onClick={() => applyTemplate(template)}
-                    sx={{ cursor: "pointer" }}
-                  />
-                ))}
-                {isMaster
-                  ? quickReplies.map((item) => (
-                      <Chip
-                        key={item.id}
-                        label={item.title ? `/${item.command} — ${item.title}` : `/${item.command}`}
-                        color="primary"
-                        variant="outlined"
-                        onClick={() => applyQuickReplyCommand(item.command)}
-                        sx={{ cursor: "pointer" }}
-                      />
-                    ))
-                  : null}
-              </Stack>
-            ) : null}
-          </Stack>
-        ) : null}
-
-        {isMaster ? (
-          <Stack direction="row" justifyContent="space-between" alignItems="center">
-            <Typography variant="caption" color="text.secondary">
-              Команды мастера: введите `/команда`, например `/1`.
-            </Typography>
-            <Button
-              size="small"
-              startIcon={<SettingsRoundedIcon fontSize="small" />}
-              onClick={() => setQuickRepliesOpen(true)}
-            >
-              Управлять
-            </Button>
-          </Stack>
         ) : null}
 
         {error ? <Alert severity="error">{error}</Alert> : null}
@@ -666,7 +431,7 @@ export default function ChatPanel({
               variant="outlined"
               sx={{
                 p: 0.8,
-                borderRadius: 2.5,
+                borderRadius: 2,
                 bgcolor: isDark ? alpha("#0f172a", 0.56) : alpha("#f8fbff", 0.72),
               }}
             >
@@ -699,14 +464,14 @@ export default function ChatPanel({
                   variant="outlined"
                   sx={{
                     p: 1,
-                    borderRadius: 2.5,
+                    borderRadius: 2,
                     borderColor: "divider",
                     bgcolor: isDark ? alpha("#0f172a", 0.62) : alpha("#f8fbff", 0.9),
                   }}
                 >
                   <Stack spacing={0.55}>
                     <Typography variant="caption" color="text.secondary">
-                      Скачать и открыть
+                      Ссылки для работы
                     </Typography>
                     {safeDownloadLinks.map((item) => (
                       <Button
@@ -765,7 +530,7 @@ export default function ChatPanel({
           sx={{
             mt: 0.2,
             p: 1,
-            borderRadius: 2.5,
+            borderRadius: 2,
             border: "1px solid",
             borderColor: "divider",
             position: isMobile ? "sticky" : "static",
@@ -777,8 +542,7 @@ export default function ChatPanel({
         >
           <Stack spacing={1}>
             <TextField
-              label={chatView === "links" && !isSplitClientLayout ? "Ссылка или сообщение" : "Сообщение"}
-              placeholder={chatView === "links" && !isSplitClientLayout ? "Вставьте ссылку вида https://..." : ""}
+              label="Сообщение"
               multiline
               minRows={isMobile ? 2.3 : 2}
               value={text}
@@ -790,15 +554,9 @@ export default function ChatPanel({
                 }
               }}
               helperText={
-                isMinimalClientMode
-                  ? "Пишите коротко и по делу. Ссылки автоматически появляются справа."
-                  : chatView === "links"
-                  ? "Режим «Ссылки»: вставьте URL, чтобы он появился во вкладке ссылок. Ctrl+Enter для отправки."
-                  : text.trim().length
-                    ? "Сообщение готово к отправке. Ctrl+Enter для быстрой отправки"
-                    : isMaster
-                      ? "Можно писать /команда (пример: /1). Ctrl+Enter для быстрой отправки"
-                      : "Пишите коротко и по делу. Ctrl+Enter для быстрой отправки"
+                text.trim().length
+                  ? "Сообщение готово к отправке. Ctrl+Enter для быстрой отправки"
+                  : "Пишите коротко и по делу. Ctrl+Enter для быстрой отправки"
               }
             />
             <Stack direction="row" spacing={1} alignItems="center">
@@ -816,96 +574,6 @@ export default function ChatPanel({
           </Stack>
         </Paper>
       </Stack>
-
-      <Dialog open={quickRepliesOpen} onClose={() => setQuickRepliesOpen(false)} fullWidth maxWidth="md">
-        <DialogTitle>Быстрые ответы мастера</DialogTitle>
-        <DialogContent dividers>
-          <Stack spacing={1.2}>
-            <Typography variant="body2" color="text.secondary">
-              Создайте свои команды и используйте их в чате: `/1`, `/привет` и т.д.
-            </Typography>
-
-            {quickReplyError ? <Alert severity="error">{quickReplyError}</Alert> : null}
-
-            <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
-              <TextField
-                label="Команда"
-                placeholder="/1"
-                value={replyForm.command}
-                onChange={(event) => setReplyForm((prev) => ({ ...prev, command: event.target.value }))}
-                sx={{ minWidth: { xs: "100%", sm: 160 } }}
-              />
-              <TextField
-                label="Название (опционально)"
-                placeholder="Инструкция по установке"
-                value={replyForm.title}
-                onChange={(event) => setReplyForm((prev) => ({ ...prev, title: event.target.value }))}
-                sx={{ flexGrow: 1 }}
-              />
-            </Stack>
-
-            <TextField
-              label="Текст шаблона"
-              multiline
-              minRows={3}
-              value={replyForm.text}
-              onChange={(event) => setReplyForm((prev) => ({ ...prev, text: event.target.value }))}
-            />
-
-            <Stack direction="row" spacing={1}>
-              <Button
-                variant="contained"
-                startIcon={replyForm.id ? <EditRoundedIcon /> : <AddRoundedIcon />}
-                onClick={saveQuickReply}
-                disabled={quickReplySaving}
-              >
-                {replyForm.id ? "Сохранить" : "Добавить"}
-              </Button>
-              {replyForm.id ? (
-                <Button variant="outlined" onClick={resetReplyForm} disabled={quickReplySaving}>
-                  Новый шаблон
-                </Button>
-              ) : null}
-            </Stack>
-
-            <Divider />
-
-            <Stack spacing={0.8}>
-              {quickReplies.length ? (
-                quickReplies.map((item) => (
-                  <Box key={item.id} sx={{ p: 1.1, border: "1px solid #dce6f0", borderRadius: 2 }}>
-                    <Stack direction="row" justifyContent="space-between" spacing={1}>
-                      <Box sx={{ minWidth: 0 }}>
-                        <Typography variant="body2" sx={{ fontWeight: 700 }}>
-                          /{item.command} {item.title ? `— ${item.title}` : ""}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: "pre-wrap" }}>
-                          {item.text}
-                        </Typography>
-                      </Box>
-                      <Stack direction="row" spacing={0.3}>
-                        <IconButton size="small" onClick={() => startEditReply(item)}>
-                          <EditRoundedIcon fontSize="small" />
-                        </IconButton>
-                        <IconButton size="small" color="error" onClick={() => removeQuickReply(item.id)}>
-                          <DeleteOutlineRoundedIcon fontSize="small" />
-                        </IconButton>
-                      </Stack>
-                    </Stack>
-                  </Box>
-                ))
-              ) : (
-                <Typography variant="body2" color="text.secondary">
-                  Шаблонов пока нет. Добавьте первый быстрый ответ.
-                </Typography>
-              )}
-            </Stack>
-          </Stack>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setQuickRepliesOpen(false)}>Закрыть</Button>
-        </DialogActions>
-      </Dialog>
     </Paper>
   );
 }

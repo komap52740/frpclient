@@ -53,6 +53,7 @@ const CreateAppointmentPage = lazyWithRetry(() => import("./pages/client/CreateA
 const MyAppointmentsPage = lazyWithRetry(() => import("./pages/client/MyAppointmentsPage"));
 const MasterActivePage = lazyWithRetry(() => import("./pages/master/MasterActivePage"));
 const MasterNewPage = lazyWithRetry(() => import("./pages/master/MasterNewPage"));
+const MasterQuickRepliesPage = lazyWithRetry(() => import("./pages/master/MasterQuickRepliesPage"));
 const MasterReviewsPage = lazyWithRetry(() => import("./pages/master/MasterReviewsPage"));
 
 function RouteFallback() {
@@ -195,6 +196,14 @@ function AuthenticatedLayout() {
             element={
               <ProtectedRoute roles={["master"]}>
                 <MasterReviewsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/master/quick-replies"
+            element={
+              <ProtectedRoute roles={["master"]}>
+                <MasterQuickRepliesPage />
               </ProtectedRoute>
             }
           />

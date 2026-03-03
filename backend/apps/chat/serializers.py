@@ -8,6 +8,7 @@ from .models import MasterQuickReply, Message
 
 class MessageSerializer(serializers.ModelSerializer):
     sender_username = serializers.CharField(source="sender.username", read_only=True)
+    sender_role = serializers.CharField(source="sender.role", read_only=True)
     file_url = serializers.SerializerMethodField()
 
     class Meta:
@@ -17,6 +18,7 @@ class MessageSerializer(serializers.ModelSerializer):
             "appointment",
             "sender",
             "sender_username",
+            "sender_role",
             "text",
             "file",
             "file_url",
@@ -66,6 +68,10 @@ class ReadStateSerializer(serializers.Serializer):
 
 
 class MasterQuickReplySerializer(serializers.ModelSerializer):
+    media_url = serializers.SerializerMethodField()
+    media_kind = serializers.SerializerMethodField()
+    remove_media = serializers.BooleanField(write_only=True, required=False, default=False)
+
     class Meta:
         model = MasterQuickReply
         fields = (
@@ -73,6 +79,10 @@ class MasterQuickReplySerializer(serializers.ModelSerializer):
             "command",
             "title",
             "text",
+            "media_file",
+            "remove_media",
+            "media_url",
+            "media_kind",
             "created_at",
             "updated_at",
         )
@@ -92,7 +102,36 @@ class MasterQuickReplySerializer(serializers.ModelSerializer):
         return command
 
     def validate_text(self, value: str) -> str:
-        text = (value or "").strip()
-        if not text:
-            raise serializers.ValidationError("Текст шаблона не может быть пустым.")
-        return text
+        return (value or "").strip()
+
+    def validate(self, attrs):
+        remove_media = bool(attrs.get("remove_media"))
+        if remove_media:
+            attrs["media_file"] = None
+
+        if self.instance is not None:
+            next_text = attrs.get("text", self.instance.text)
+            next_media = attrs.get("media_file", self.instance.media_file)
+        else:
+            next_text = attrs.get("text", "")
+            next_media = attrs.get("media_file")
+
+        if not (next_text or next_media):
+            raise serializers.ValidationError("Заполните текст шаблона или прикрепите фото/видео.")
+        return attrs
+
+    def get_media_url(self, obj: MasterQuickReply) -> str | None:
+        request = self.context.get("request")
+        if obj.media_file and hasattr(obj.media_file, "url"):
+            return request.build_absolute_uri(obj.media_file.url) if request else obj.media_file.url
+        return None
+
+    def get_media_kind(self, obj: MasterQuickReply) -> str:
+        if not obj.media_file:
+            return ""
+        name = (obj.media_file.name or "").lower()
+        if name.endswith((".jpg", ".jpeg", ".png", ".webp")):
+            return "image"
+        if name.endswith((".mp4", ".mov", ".webm", ".m4v")):
+            return "video"
+        return "file"

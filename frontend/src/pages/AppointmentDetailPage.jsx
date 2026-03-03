@@ -315,6 +315,9 @@ export default function AppointmentDetailPage() {
   const [paymentDragOver, setPaymentDragOver] = useState(false);
   const [clientTab, setClientTab] = useState("chat");
   const [chatPanelView, setChatPanelView] = useState("messages");
+  const [clientAccessDialogOpen, setClientAccessDialogOpen] = useState(false);
+  const [clientAccessSaving, setClientAccessSaving] = useState(false);
+  const [clientAccessForm, setClientAccessForm] = useState({ rustdesk_id: "", rustdesk_password: "" });
   const [clientDataExpanded, setClientDataExpanded] = useState(false);
   const [toast, setToast] = useState({ open: false, severity: "success", message: "", actionKey: "" });
   const [clientCompactView, setClientCompactView] = useState(() => {
@@ -545,6 +548,16 @@ export default function AppointmentDetailPage() {
   }, [appointment?.id, user?.role]);
 
   useEffect(() => {
+    if (!appointment || user?.role !== "client") {
+      return;
+    }
+    setClientAccessForm({
+      rustdesk_id: appointment.rustdesk_id || "",
+      rustdesk_password: appointment.rustdesk_password || "",
+    });
+  }, [appointment?.id, appointment?.rustdesk_id, appointment?.rustdesk_password, user?.role]);
+
+  useEffect(() => {
     if (user?.role !== "client") {
       return;
     }
@@ -632,6 +645,31 @@ export default function AppointmentDetailPage() {
       setSuccess("Скопировано в буфер обмена");
     } catch {
       setError("Не удалось скопировать автоматически. Скопируйте текст вручную.");
+    }
+  };
+
+  const saveClientAccessData = async () => {
+    const payload = {
+      rustdesk_id: (clientAccessForm.rustdesk_id || "").trim(),
+      rustdesk_password: (clientAccessForm.rustdesk_password || "").trim(),
+    };
+    if (!payload.rustdesk_id && !payload.rustdesk_password) {
+      setError("Укажите логин/ID и/или пароль RuDesktop");
+      return;
+    }
+    try {
+      setClientAccessSaving(true);
+      await appointmentsApi.updateClientAccess(id, payload);
+      await loadData({ preserveDrafts: true, silent: true });
+      setClientAccessDialogOpen(false);
+      setSuccess("Данные RuDesktop сохранены");
+      setToast({ open: true, severity: "success", message: "Данные RuDesktop сохранены" });
+    } catch (err) {
+      const detail = err?.response?.data?.detail || "Не удалось сохранить данные RuDesktop";
+      setError(detail);
+      setToast({ open: true, severity: "error", message: detail });
+    } finally {
+      setClientAccessSaving(false);
     }
   };
 
@@ -2050,18 +2088,34 @@ export default function AppointmentDetailPage() {
                             : "Подключение станет доступно после подтверждения оплаты и перехода заявки в работу."}
                         </Typography>
                       ) : null}
+                      {isClient ? (
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          onClick={() => setClientAccessDialogOpen(true)}
+                          sx={{ alignSelf: "flex-start" }}
+                        >
+                          Обновить данные RuDesktop
+                        </Button>
+                      ) : null}
                     </Stack>
                   ) : (
                     <Alert
                       severity={isClient ? "info" : "warning"}
                       action={(
-                        <Button size="small" color="inherit" onClick={() => handlePrimaryAction("open_chat")}>
-                          В чат
-                        </Button>
+                        isClient ? (
+                          <Button size="small" color="inherit" onClick={() => setClientAccessDialogOpen(true)}>
+                            Добавить
+                          </Button>
+                        ) : (
+                          <Button size="small" color="inherit" onClick={() => handlePrimaryAction("open_chat")}>
+                            В чат
+                          </Button>
+                        )
                       )}
                     >
                       {isClient
-                        ? "Логин/ID RuDesktop пока не указан. Отправьте его в чат, чтобы мастер подключился быстрее."
+                        ? "Логин/ID RuDesktop пока не указан. Добавьте данные — это можно сделать в любой момент."
                         : "Клиент еще не указал логин/ID RuDesktop. Запросите его в чате."}
                     </Alert>
                   )}
@@ -2642,6 +2696,49 @@ export default function AppointmentDetailPage() {
             }}
           >
             Открыть чат
+          </Button>
+        </DialogActions>
+      </Dialog>
+      <Dialog
+        open={clientAccessDialogOpen}
+        onClose={() => setClientAccessDialogOpen(false)}
+        fullWidth
+        maxWidth="xs"
+      >
+        <DialogTitle>Данные RuDesktop</DialogTitle>
+        <DialogContent dividers>
+          <Stack spacing={1.2} sx={{ pt: 0.4 }}>
+            <Typography variant="caption" color="text.secondary">
+              Эти данные можно обновить в любой момент. Мастер увидит их сразу.
+            </Typography>
+            <TextField
+              label="Логин/ID RuDesktop"
+              value={clientAccessForm.rustdesk_id}
+              onChange={(event) =>
+                setClientAccessForm((prev) => ({
+                  ...prev,
+                  rustdesk_id: event.target.value.replace(/[^\d\s-]/g, ""),
+                }))
+              }
+              autoComplete="off"
+            />
+            <TextField
+              label="Пароль RuDesktop"
+              value={clientAccessForm.rustdesk_password}
+              onChange={(event) =>
+                setClientAccessForm((prev) => ({
+                  ...prev,
+                  rustdesk_password: event.target.value,
+                }))
+              }
+              autoComplete="off"
+            />
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ px: 2, pb: 2 }}>
+          <Button onClick={() => setClientAccessDialogOpen(false)}>Отмена</Button>
+          <Button variant="contained" onClick={saveClientAccessData} disabled={clientAccessSaving}>
+            {clientAccessSaving ? "Сохраняем..." : "Сохранить"}
           </Button>
         </DialogActions>
       </Dialog>

@@ -18,5 +18,10 @@ class ReadStateAdmin(admin.ModelAdmin):
 
 @admin.register(MasterQuickReply)
 class MasterQuickReplyAdmin(admin.ModelAdmin):
-    list_display = ("id", "user", "command", "title", "updated_at")
+    list_display = ("id", "user", "command", "title", "has_media", "updated_at")
     search_fields = ("user__username", "command", "title", "text")
+    readonly_fields = ("has_media",)
+
+    def has_media(self, obj):
+        return bool(obj.media_file)
+    has_media.boolean = True

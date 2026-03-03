@@ -145,11 +145,10 @@ class AppointmentCreateSerializer(serializers.ModelSerializer):
         contact_phone = (attrs.get("contact_phone") or "").strip()
 
         errors = {}
-        if not rustdesk_id:
-            errors["rustdesk_id"] = "Укажите логин/ID RuDesktop"
-        if not rustdesk_password:
-            errors["rustdesk_password"] = "Укажите пароль RuDesktop"
-
+        if rustdesk_id and not rustdesk_id.replace(" ", "").replace("-", "").isdigit():
+            errors["rustdesk_id"] = "Логин/ID RuDesktop должен содержать только цифры"
+        if rustdesk_password and len(rustdesk_password) < 4:
+            errors["rustdesk_password"] = "Пароль RuDesktop слишком короткий (минимум 4 символа)"
         if errors:
             raise serializers.ValidationError(errors)
 
@@ -192,6 +191,26 @@ class AppointmentCreateSerializer(serializers.ModelSerializer):
 
 class SetPriceSerializer(serializers.Serializer):
     total_price = serializers.IntegerField(min_value=1)
+
+
+class ClientAccessUpdateSerializer(serializers.Serializer):
+    rustdesk_id = serializers.CharField(required=False, allow_blank=True, max_length=64)
+    rustdesk_password = serializers.CharField(required=False, allow_blank=True, max_length=128)
+
+    def validate(self, attrs):
+        rustdesk_id = (attrs.get("rustdesk_id") or "").strip()
+        rustdesk_password = (attrs.get("rustdesk_password") or "").strip()
+
+        if not rustdesk_id and not rustdesk_password:
+            raise serializers.ValidationError("Передайте логин/ID и/или пароль RuDesktop")
+        if rustdesk_id and not rustdesk_id.replace(" ", "").replace("-", "").isdigit():
+            raise serializers.ValidationError({"rustdesk_id": "Логин/ID должен содержать только цифры"})
+        if rustdesk_password and len(rustdesk_password) < 4:
+            raise serializers.ValidationError({"rustdesk_password": "Пароль слишком короткий (минимум 4 символа)"})
+
+        attrs["rustdesk_id"] = rustdesk_id
+        attrs["rustdesk_password"] = rustdesk_password
+        return attrs
 
 
 class UploadPaymentProofSerializer(serializers.ModelSerializer):

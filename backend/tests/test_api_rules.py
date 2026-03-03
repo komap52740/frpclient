@@ -791,7 +791,7 @@ def test_create_appointment_auto_marks_wholesale_for_approved_service(client_use
 
 
 @pytest.mark.django_db
-def test_create_appointment_requires_rudesktop_credentials_only(client_user):
+def test_create_appointment_allows_empty_rudesktop_credentials(client_user):
     payload = {
         "brand": "Samsung",
         "model": "A50",
@@ -801,9 +801,41 @@ def test_create_appointment_requires_rudesktop_credentials_only(client_user):
     }
 
     response = auth_as(client_user).post("/api/appointments/", payload, format="json")
-    assert response.status_code == 400
-    assert "rustdesk_id" in response.data
-    assert "rustdesk_password" in response.data
+    assert response.status_code == 201
+    assert response.data["rustdesk_id"] == ""
+    assert response.data["rustdesk_password"] == ""
+
+
+@pytest.mark.django_db
+def test_client_can_update_rudesktop_after_appointment_created(client_user, master_user):
+    appointment = Appointment.objects.create(
+        client=client_user,
+        assigned_master=master_user,
+        brand="Samsung",
+        model="A50",
+        lock_type="PIN",
+        has_pc=True,
+        description="desc",
+        status=AppointmentStatusChoices.AWAITING_PAYMENT,
+        rustdesk_id="",
+        rustdesk_password="",
+    )
+
+    response = auth_as(client_user).post(
+        f"/api/appointments/{appointment.id}/client-access/",
+        {"rustdesk_id": "123456789", "rustdesk_password": "7788"},
+        format="json",
+    )
+    assert response.status_code == 200
+    assert response.data["rustdesk_id"] == "123456789"
+    assert response.data["rustdesk_password"] == "7788"
+
+    forbidden_response = auth_as(master_user).post(
+        f"/api/appointments/{appointment.id}/client-access/",
+        {"rustdesk_id": "999888777"},
+        format="json",
+    )
+    assert forbidden_response.status_code == 403
 
 
 @pytest.mark.django_db

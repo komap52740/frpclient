@@ -102,6 +102,44 @@ def test_master_message_expands_quick_reply_command(master_user, client_user):
 
 
 @pytest.mark.django_db
+def test_master_quick_reply_can_attach_media(master_user, client_user):
+    appointment = Appointment.objects.create(
+        client=client_user,
+        assigned_master=master_user,
+        brand="Samsung",
+        model="A50",
+        lock_type="PIN",
+        has_pc=True,
+        description="desc",
+        status=AppointmentStatusChoices.IN_PROGRESS,
+    )
+
+    media = SimpleUploadedFile("guide.mp4", b"fake-video", content_type="video/mp4")
+    create_response = auth_as(master_user).post(
+        "/api/chat/quick-replies/",
+        {
+            "command": "/video",
+            "title": "Видео-инструкция",
+            "text": "Откройте видео и повторите шаги.",
+            "media_file": media,
+        },
+        format="multipart",
+    )
+    assert create_response.status_code == 201
+    assert create_response.data["media_url"]
+    assert create_response.data["media_kind"] == "video"
+
+    send_response = auth_as(master_user).post(
+        f"/api/appointments/{appointment.id}/messages/",
+        {"text": "/video"},
+        format="json",
+    )
+    assert send_response.status_code == 201
+    assert "Откройте видео" in send_response.data["text"]
+    assert send_response.data["file_url"] is not None
+
+
+@pytest.mark.django_db
 def test_client_message_with_profanity_is_rejected(client_user, master_user):
     appointment = Appointment.objects.create(
         client=client_user,

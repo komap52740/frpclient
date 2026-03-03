@@ -156,8 +156,8 @@ export function createAppTheme(mode = "light") {
         styleOverrides: {
           root: {
             borderRadius: appTokens.radius.sm,
-            minHeight: 44,
-            paddingInline: 20,
+            minHeight: 42,
+            paddingInline: 18,
             transition: "all 220ms cubic-bezier(0.22, 1, 0.36, 1)",
             fontWeight: 750,
             maxWidth: "100%",
@@ -180,19 +180,19 @@ export function createAppTheme(mode = "light") {
             backgroundColor: colors.bgElevated,
             backgroundImage: "none",
             backdropFilter: "blur(18px) saturate(145%)",
-            overflow: "hidden",
+            overflow: "clip",
           },
         },
       },
       MuiCard: {
         styleOverrides: {
           root: {
-            borderRadius: appTokens.radius.lg,
+            borderRadius: appTokens.radius.md,
             border: `1px solid ${colors.borderSoft}`,
             boxShadow: appTokens.shadows.card,
             backgroundColor: isDark ? alpha("#0f172a", 0.8) : "rgba(255,255,255,0.88)",
             backdropFilter: "blur(16px) saturate(138%)",
-            overflow: "hidden",
+            overflow: "clip",
           },
         },
       },
@@ -210,7 +210,7 @@ export function createAppTheme(mode = "light") {
       MuiDialog: {
         styleOverrides: {
           paper: {
-            borderRadius: appTokens.radius.lg,
+            borderRadius: appTokens.radius.md,
             backgroundColor: isDark ? alpha("#111827", 0.94) : "rgba(255,255,255,0.92)",
             backdropFilter: "blur(18px) saturate(130%)",
           },
@@ -245,7 +245,7 @@ export function createAppTheme(mode = "light") {
       MuiChip: {
         styleOverrides: {
           root: {
-            borderRadius: appTokens.radius.pill,
+            borderRadius: appTokens.radius.sm,
             fontWeight: 700,
             maxWidth: "100%",
           },

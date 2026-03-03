@@ -154,6 +154,9 @@ export const appointmentsApi = {
   detail(id) {
     return api.get(`/appointments/${id}/`);
   },
+  updateClientAccess(id, payload) {
+    return api.post(`/appointments/${id}/client-access/`, payload);
+  },
   repeat(id) {
     return api.post(`/appointments/${id}/repeat/`);
   },
@@ -216,10 +219,16 @@ export const chatApi = {
     return api.get("/chat/quick-replies/");
   },
   createQuickReply(payload) {
-    return api.post("/chat/quick-replies/", payload);
+    const isFormData = typeof FormData !== "undefined" && payload instanceof FormData;
+    return api.post("/chat/quick-replies/", payload, isFormData ? { headers: { "Content-Type": "multipart/form-data" } } : undefined);
   },
   updateQuickReply(replyId, payload) {
-    return api.patch(`/chat/quick-replies/${replyId}/`, payload);
+    const isFormData = typeof FormData !== "undefined" && payload instanceof FormData;
+    return api.patch(
+      `/chat/quick-replies/${replyId}/`,
+      payload,
+      isFormData ? { headers: { "Content-Type": "multipart/form-data" } } : undefined
+    );
   },
   deleteQuickReply(replyId) {
     return api.delete(`/chat/quick-replies/${replyId}/`);
