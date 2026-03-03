@@ -120,6 +120,14 @@ class MasterQuickReplySerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Заполните текст шаблона или прикрепите фото/видео.")
         return attrs
 
+    def create(self, validated_data):
+        validated_data.pop("remove_media", None)
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        validated_data.pop("remove_media", None)
+        return super().update(instance, validated_data)
+
     def get_media_url(self, obj: MasterQuickReply) -> str | None:
         request = self.context.get("request")
         if obj.media_file and hasattr(obj.media_file, "url"):
