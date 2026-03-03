@@ -150,7 +150,12 @@ export const authApi = {
     return response.data;
   },
   async requestWholesale(payload) {
-    const response = await api.post("/wholesale/request/", payload);
+    const isFormData = typeof FormData !== "undefined" && payload instanceof FormData;
+    const response = await api.post(
+      "/wholesale/request/",
+      payload,
+      isFormData ? { headers: { "Content-Type": "multipart/form-data" } } : undefined
+    );
     return response.data;
   },
   async dashboardSummary() {
@@ -205,8 +210,8 @@ export const appointmentsApi = {
       headers: { "Content-Type": "multipart/form-data" },
     });
   },
-  markPaid(id, payment_method) {
-    return api.post(`/appointments/${id}/mark-paid/`, { payment_method });
+  markPaid(id, payment_method, payment_requisites_note) {
+    return api.post(`/appointments/${id}/mark-paid/`, { payment_method, payment_requisites_note });
   },
   confirmPayment(id) {
     return api.post(`/appointments/${id}/confirm-payment/`);

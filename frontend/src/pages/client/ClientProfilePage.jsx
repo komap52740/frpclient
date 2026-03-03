@@ -192,8 +192,47 @@ export default function ClientProfilePage() {
       setRequestSuccess("Заявка на оптовый статус отправлена. Ожидайте проверку администратора.");
       setServiceForm((prev) => ({ ...prev, wholesale_service_photo_1: null, wholesale_service_photo_2: null }));
     } catch (error) {
-      const detail = error?.response?.data?.detail;
-      setRequestError(detail || "Не удалось отправить заявку на оптовый статус");
+      const responseData = error?.response?.data;
+      const detail = responseData?.detail;
+
+      let fieldError = "";
+      if (!detail && responseData && typeof responseData === "object") {
+        const preferredFields = [
+          "wholesale_company_name",
+          "wholesale_service_details",
+          "wholesale_comment",
+          "wholesale_service_photo_1",
+          "wholesale_service_photo_2",
+          "is_service_center",
+        ];
+
+        for (const field of preferredFields) {
+          const value = responseData[field];
+          if (typeof value === "string" && value) {
+            fieldError = value;
+            break;
+          }
+          if (Array.isArray(value) && typeof value[0] === "string" && value[0]) {
+            fieldError = value[0];
+            break;
+          }
+        }
+
+        if (!fieldError) {
+          for (const value of Object.values(responseData)) {
+            if (typeof value === "string" && value) {
+              fieldError = value;
+              break;
+            }
+            if (Array.isArray(value) && typeof value[0] === "string" && value[0]) {
+              fieldError = value[0];
+              break;
+            }
+          }
+        }
+      }
+
+      setRequestError(detail || fieldError || "Не удалось отправить заявку на оптовый статус");
     } finally {
       setRequestLoading(false);
     }
