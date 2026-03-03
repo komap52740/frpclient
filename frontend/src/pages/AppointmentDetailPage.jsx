@@ -302,6 +302,7 @@ export default function AppointmentDetailPage() {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const isDark = theme.palette.mode === "dark";
+  const isClient = user?.role === "client";
 
   const [appointment, setAppointment] = useState(null);
   const [events, setEvents] = useState([]);
@@ -775,7 +776,6 @@ export default function AppointmentDetailPage() {
     return <AppointmentDetailSkeleton />;
   }
 
-  const isClient = user.role === "client";
   const isClientStrictLayout = isClient;
   const isClientMinimal = isClient && clientCompactView;
   const isMasterAssigned = user.role === "master" && appointment.assigned_master === user.id;
