@@ -17,7 +17,8 @@ import { useNavigate } from "react-router-dom";
 import { authApi } from "../../api/client";
 import { useAuth } from "../../auth/AuthContext";
 
-const BOT_USERNAME = import.meta.env.VITE_TELEGRAM_BOT_USERNAME || "";
+const BOT_USERNAME_RAW = import.meta.env.VITE_TELEGRAM_BOT_USERNAME || "";
+const BOT_USERNAME = BOT_USERNAME_RAW.trim().replace(/^@/, "");
 
 function getApiErrorMessage(error, fallback) {
   const data = error?.response?.data;
@@ -53,6 +54,8 @@ export default function LoginPage() {
   const [success, setSuccess] = useState("");
   const [setupLoading, setSetupLoading] = useState(true);
   const [requiresSetup, setRequiresSetup] = useState(false);
+  const [telegramWidgetError, setTelegramWidgetError] = useState("");
+  const [telegramWidgetReloadKey, setTelegramWidgetReloadKey] = useState(0);
 
   const [setupForm, setSetupForm] = useState({
     username: "",
@@ -126,6 +129,7 @@ export default function LoginPage() {
       return undefined;
     }
 
+    setTelegramWidgetError("");
     window.onTelegramAuth = async (user) => {
       setLoading(true);
       setError("");
@@ -155,13 +159,23 @@ export default function LoginPage() {
       container.appendChild(script);
     }
 
+    const timer = window.setTimeout(() => {
+      const hasIframe = Boolean(container?.querySelector("iframe"));
+      if (!hasIframe) {
+        setTelegramWidgetError(
+          "Виджет Telegram не загрузился. Проверьте блокировку скриптов в браузере и имя бота."
+        );
+      }
+    }, 2500);
+
     return () => {
+      window.clearTimeout(timer);
       window.onTelegramAuth = null;
       if (container?.contains(script)) {
         container.removeChild(script);
       }
     };
-  }, [loginWithTelegram, navigate, requiresSetup]);
+  }, [loginWithTelegram, navigate, requiresSetup, telegramWidgetReloadKey]);
 
   const startOAuthLogin = async (provider) => {
     setLoading(true);
@@ -438,19 +452,34 @@ export default function LoginPage() {
                 {!BOT_USERNAME ? (
                   <Alert severity="warning">Не задано значение VITE_TELEGRAM_BOT_USERNAME.</Alert>
                 ) : (
-                  <Box
-                    id="telegram-login-container"
-                    sx={{
-                      minHeight: 48,
-                      px: 1.2,
-                      py: 1,
-                      borderRadius: 2,
-                      border: `1px solid ${alpha("#86bdff", 0.45)}`,
-                      bgcolor: alpha("#0e2042", 0.46),
-                      display: "flex",
-                      alignItems: "center",
-                    }}
-                  />
+                  <Stack spacing={1}>
+                    <Box
+                      id="telegram-login-container"
+                      sx={{
+                        minHeight: 48,
+                        px: 1.2,
+                        py: 1,
+                        borderRadius: 2,
+                        border: `1px solid ${alpha("#86bdff", 0.45)}`,
+                        bgcolor: alpha("#0e2042", 0.46),
+                        display: "flex",
+                        alignItems: "center",
+                      }}
+                    />
+                    {telegramWidgetError ? (
+                      <Stack spacing={1}>
+                        <Alert severity="warning">{telegramWidgetError}</Alert>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          onClick={() => setTelegramWidgetReloadKey((prev) => prev + 1)}
+                          sx={{ alignSelf: "flex-start", textTransform: "none", borderRadius: 1.5 }}
+                        >
+                          Перезагрузить Telegram вход
+                        </Button>
+                      </Stack>
+                    ) : null}
+                  </Stack>
                 )}
 
                 <Divider sx={{ color: "rgba(205,222,248,0.65)", fontSize: 13 }}>или</Divider>
