@@ -42,6 +42,7 @@ class SiteSettingsSerializer(serializers.ModelSerializer):
 class MeSerializer(serializers.ModelSerializer):
     client_stats = ClientStatsSerializer(read_only=True)
     master_stats = serializers.SerializerMethodField()
+    profile_photo_url = serializers.SerializerMethodField()
     wholesale_service_photo_1_url = serializers.SerializerMethodField()
     wholesale_service_photo_2_url = serializers.SerializerMethodField()
 
@@ -55,6 +56,7 @@ class MeSerializer(serializers.ModelSerializer):
             "telegram_id",
             "telegram_username",
             "telegram_photo_url",
+            "profile_photo_url",
             "role",
             "is_master_active",
             "master_level",
@@ -97,6 +99,9 @@ class MeSerializer(serializers.ModelSerializer):
 
     def get_wholesale_service_photo_2_url(self, obj: User):
         return self._build_file_url(obj, "wholesale_service_photo_2")
+
+    def get_profile_photo_url(self, obj: User):
+        return self._build_file_url(obj, "profile_photo")
 
 
 class MasterStatsSerializer(serializers.ModelSerializer):
@@ -220,6 +225,7 @@ class WholesaleStatusSerializer(serializers.Serializer):
 
 class ClientProfileDetailSerializer(serializers.ModelSerializer):
     client_stats = ClientStatsSerializer(read_only=True)
+    profile_photo_url = serializers.SerializerMethodField()
     wholesale_service_photo_1_url = serializers.SerializerMethodField()
     wholesale_service_photo_2_url = serializers.SerializerMethodField()
     appointments_total = serializers.SerializerMethodField()
@@ -235,6 +241,7 @@ class ClientProfileDetailSerializer(serializers.ModelSerializer):
             "first_name",
             "last_name",
             "telegram_username",
+            "profile_photo_url",
             "is_banned",
             "ban_reason",
             "banned_at",
@@ -270,6 +277,9 @@ class ClientProfileDetailSerializer(serializers.ModelSerializer):
     def get_wholesale_service_photo_2_url(self, obj: User):
         return self._build_file_url(obj, "wholesale_service_photo_2")
 
+    def get_profile_photo_url(self, obj: User):
+        return self._build_file_url(obj, "profile_photo")
+
     def _queryset(self, obj: User):
         return Appointment.objects.filter(client_id=obj.id)
 
@@ -292,3 +302,29 @@ class ClientProfileDetailSerializer(serializers.ModelSerializer):
 
     def get_last_appointment_at(self, obj: User):
         return self._queryset(obj).order_by("-updated_at").values_list("updated_at", flat=True).first()
+
+
+class ProfileUpdateSerializer(serializers.ModelSerializer):
+    remove_profile_photo = serializers.BooleanField(required=False, default=False, write_only=True)
+
+    class Meta:
+        model = User
+        fields = ("username", "profile_photo", "remove_profile_photo")
+
+    def validate_username(self, value: str) -> str:
+        username = (value or "").strip()
+        if len(username) < 3:
+            raise serializers.ValidationError("Ник должен содержать минимум 3 символа.")
+        user = self.instance
+        if (
+            user
+            and user.username != username
+            and User.objects.filter(username=username).exists()
+        ):
+            raise serializers.ValidationError("Пользователь с таким ником уже существует.")
+        return username
+
+    def validate(self, attrs):
+        if not attrs:
+            raise serializers.ValidationError("Передайте данные для обновления профиля.")
+        return attrs

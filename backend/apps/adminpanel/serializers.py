@@ -13,6 +13,7 @@ class BanUserSerializer(serializers.Serializer):
 class AdminUserSerializer(serializers.ModelSerializer):
     client_stats = ClientStatsSerializer(read_only=True)
     master_stats = MasterStatsSerializer(read_only=True)
+    profile_photo_url = serializers.SerializerMethodField()
     wholesale_service_photo_1_url = serializers.SerializerMethodField()
     wholesale_service_photo_2_url = serializers.SerializerMethodField()
 
@@ -23,6 +24,7 @@ class AdminUserSerializer(serializers.ModelSerializer):
             "username",
             "first_name",
             "last_name",
+            "profile_photo_url",
             "role",
             "telegram_username",
             "is_banned",
@@ -63,6 +65,9 @@ class AdminUserSerializer(serializers.ModelSerializer):
 
     def get_wholesale_service_photo_2_url(self, obj: User):
         return self._build_file_url(obj, "wholesale_service_photo_2")
+
+    def get_profile_photo_url(self, obj: User):
+        return self._build_file_url(obj, "profile_photo")
 
 
 class AdminUserRoleSerializer(serializers.Serializer):

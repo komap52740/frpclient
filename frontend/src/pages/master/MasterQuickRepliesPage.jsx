@@ -35,6 +35,38 @@ function normalizeCommand(value) {
   return raw.startsWith("/") ? raw.slice(1).toLowerCase() : raw.toLowerCase();
 }
 
+function isValidCommand(command) {
+  if (!command) return false;
+  if (command.length > 20) return false;
+  return /^[a-zа-яё0-9_-]+$/i.test(command);
+}
+
+function extractApiError(err, fallback) {
+  const data = err?.response?.data;
+  if (!data) return fallback;
+
+  if (typeof data.detail === "string" && data.detail.trim()) {
+    return data.detail;
+  }
+  if (typeof data.non_field_errors?.[0] === "string") {
+    return data.non_field_errors[0];
+  }
+
+  const fieldOrder = ["command", "title", "text", "media_file", "remove_media"];
+  for (const field of fieldOrder) {
+    const value = data[field];
+    if (typeof value === "string" && value.trim()) return value;
+    if (Array.isArray(value) && typeof value[0] === "string") return value[0];
+  }
+
+  for (const value of Object.values(data)) {
+    if (typeof value === "string" && value.trim()) return value;
+    if (Array.isArray(value) && typeof value[0] === "string") return value[0];
+  }
+
+  return fallback;
+}
+
 function inferMediaKind(fileName = "") {
   const name = String(fileName || "").toLowerCase();
   if (name.endsWith(".jpg") || name.endsWith(".jpeg") || name.endsWith(".png") || name.endsWith(".webp")) return "image";
@@ -101,20 +133,38 @@ export default function MasterQuickRepliesPage() {
       setError("Укажите команду, например /1");
       return;
     }
+    if (!isValidCommand(normalizedCommand)) {
+      setError("Команда: только буквы, цифры, _, - (до 20 символов).");
+      return;
+    }
+    if (items.some((item) => item.command === normalizedCommand && item.id !== form.id)) {
+      setError(`Команда /${normalizedCommand} уже существует.`);
+      return;
+    }
     if (!normalizedText && !mediaFile && !(activeEditItem?.media_url && !removeMedia)) {
       setError("Добавьте текст или фото/видео");
       return;
     }
-
-    const payload = new FormData();
-    payload.append("command", normalizedCommand);
-    payload.append("title", (form.title || "").trim());
-    payload.append("text", normalizedText);
-    if (mediaFile) {
-      payload.append("media_file", mediaFile);
-    } else if (removeMedia) {
-      payload.append("remove_media", "true");
-    }
+    const normalizedTitle = (form.title || "").trim();
+    const shouldUseMultipart = Boolean(mediaFile || removeMedia);
+    const payload = shouldUseMultipart
+      ? (() => {
+          const fd = new FormData();
+          fd.append("command", normalizedCommand);
+          fd.append("title", normalizedTitle);
+          fd.append("text", normalizedText);
+          if (mediaFile) {
+            fd.append("media_file", mediaFile);
+          } else if (removeMedia) {
+            fd.append("remove_media", "true");
+          }
+          return fd;
+        })()
+      : {
+          command: normalizedCommand,
+          title: normalizedTitle,
+          text: normalizedText,
+        };
 
     try {
       setSaving(true);
@@ -128,7 +178,7 @@ export default function MasterQuickRepliesPage() {
       setSuccess("Шаблон сохранен");
       setError("");
     } catch (err) {
-      setError(err?.response?.data?.detail || "Не удалось сохранить шаблон");
+      setError(extractApiError(err, "Не удалось сохранить шаблон"));
     } finally {
       setSaving(false);
     }
@@ -144,7 +194,7 @@ export default function MasterQuickRepliesPage() {
       }
       setSuccess("Шаблон удален");
     } catch (err) {
-      setError(err?.response?.data?.detail || "Не удалось удалить шаблон");
+      setError(extractApiError(err, "Не удалось удалить шаблон"));
     } finally {
       setSaving(false);
     }

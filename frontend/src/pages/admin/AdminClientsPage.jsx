@@ -1,4 +1,8 @@
-﻿import {
+import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
+import {
+  Accordion,
+  AccordionDetails,
+  AccordionSummary,
   Alert,
   Button,
   Chip,
@@ -6,11 +10,6 @@
   MenuItem,
   Paper,
   Stack,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableRow,
   TextField,
   Typography,
 } from "@mui/material";
@@ -19,24 +18,11 @@ import { useNavigate } from "react-router-dom";
 
 import { adminApi } from "../../api/client";
 
-const WHOLESALE_LABELS = {
-  none: "Не запрошено",
-  pending: "На рассмотрении",
-  approved: "Одобрено",
-  rejected: "Отклонено",
-};
-
 function WholesaleStatusChip({ status, discountPercent = 0 }) {
-  if (status === "approved") {
-    return <Chip size="small" color="success" label={`Одобрено (${discountPercent || 0}%)`} />;
-  }
-  if (status === "pending") {
-    return <Chip size="small" color="warning" variant="outlined" label="На рассмотрении" />;
-  }
-  if (status === "rejected") {
-    return <Chip size="small" color="error" variant="outlined" label="Отклонено" />;
-  }
-  return <Chip size="small" variant="outlined" label="Не запрошено" />;
+  if (status === "approved") return <Chip size="small" color="success" label={`Опт: одобрено (${discountPercent || 0}%)`} />;
+  if (status === "pending") return <Chip size="small" color="warning" variant="outlined" label="Опт: на рассмотрении" />;
+  if (status === "rejected") return <Chip size="small" color="error" variant="outlined" label="Опт: отклонено" />;
+  return <Chip size="small" variant="outlined" label="Опт: не запрошено" />;
 }
 
 export default function AdminClientsPage() {
@@ -53,11 +39,12 @@ export default function AdminClientsPage() {
     setLoading(true);
     try {
       const response = await adminApi.clients();
-      setRows(response.data || []);
+      const items = response.data || [];
+      setRows(items);
       setError("");
       setReviewDraftById((prev) => {
         const next = { ...prev };
-        (response.data || []).forEach((row) => {
+        items.forEach((row) => {
           if (!next[row.id]) {
             next[row.id] = {
               discount_percent: row.wholesale_discount_percent || 10,
@@ -104,9 +91,7 @@ export default function AdminClientsPage() {
       decision,
       review_comment: (draft.review_comment || "").trim(),
     };
-    if (decision === "approve") {
-      payload.discount_percent = Number(draft.discount_percent || 0);
-    }
+    if (decision === "approve") payload.discount_percent = Number(draft.discount_percent || 0);
 
     setSavingId(id);
     try {
@@ -127,7 +112,7 @@ export default function AdminClientsPage() {
   return (
     <Stack spacing={2}>
       <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" spacing={1}>
-        <Typography variant="h5">Админ: клиенты, бан и оптовая скидка</Typography>
+        <Typography variant="h5">Клиенты и оптовый статус</Typography>
         <TextField
           select
           size="small"
@@ -147,95 +132,43 @@ export default function AdminClientsPage() {
       {error ? <Alert severity="error">{error}</Alert> : null}
       {loading ? <Alert severity="info">Загрузка...</Alert> : null}
 
-      <Paper sx={{ overflowX: "auto" }}>
-        <Table size="small">
-          <TableHead>
-            <TableRow>
-              <TableCell>ID</TableCell>
-              <TableCell>Логин</TableCell>
-              <TableCell>Профиль</TableCell>
-              <TableCell>Блокировка</TableCell>
-              <TableCell>Причина бана</TableCell>
-              <TableCell>Опт-статус</TableCell>
-              <TableCell>Сервис</TableCell>
-              <TableCell>Данные сервиса</TableCell>
-              <TableCell>Фото</TableCell>
-              <TableCell>Комментарий</TableCell>
-              <TableCell>Скидка, %</TableCell>
-              <TableCell>Действия</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {filteredRows.map((row) => {
-              const isSaving = savingId === row.id;
-              const draft = reviewDraftById[row.id] || { discount_percent: 10, review_comment: "" };
+      <Stack spacing={1}>
+        {filteredRows.map((row) => {
+          const isSaving = savingId === row.id;
+          const draft = reviewDraftById[row.id] || { discount_percent: 10, review_comment: "" };
+          return (
+            <Accordion key={row.id} disableGutters>
+              <AccordionSummary expandIcon={<ExpandMoreRoundedIcon />}>
+                <Stack
+                  direction={{ xs: "column", sm: "row" }}
+                  spacing={1}
+                  alignItems={{ xs: "flex-start", sm: "center" }}
+                  justifyContent="space-between"
+                  sx={{ width: "100%", pr: 1 }}
+                >
+                  <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>{row.username}</Typography>
+                    <WholesaleStatusChip status={row.wholesale_status} discountPercent={row.wholesale_discount_percent} />
+                    {row.is_banned ? <Chip size="small" color="error" variant="outlined" label="Заблокирован" /> : null}
+                  </Stack>
+                  <Button size="small" variant="outlined" onClick={() => navigate(`/clients/${row.id}/profile`)}>
+                    Профиль
+                  </Button>
+                </Stack>
+              </AccordionSummary>
+              <AccordionDetails>
+                <Stack spacing={1.1}>
+                  <TextField
+                    size="small"
+                    label="Причина бана"
+                    value={reasonById[row.id] || row.ban_reason || ""}
+                    onChange={(e) => setReasonById((prev) => ({ ...prev, [row.id]: e.target.value }))}
+                  />
 
-              return (
-                <TableRow key={row.id} hover>
-                  <TableCell>{row.id}</TableCell>
-                  <TableCell>{row.username}</TableCell>
-                  <TableCell>
-                    <Button size="small" variant="outlined" onClick={() => navigate(`/clients/${row.id}/profile`)}>
-                      Открыть
-                    </Button>
-                  </TableCell>
-                  <TableCell>{row.is_banned ? "Забанен" : "Активен"}</TableCell>
-                  <TableCell>
+                  <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
                     <TextField
                       size="small"
-                      value={reasonById[row.id] || row.ban_reason || ""}
-                      onChange={(e) => setReasonById((prev) => ({ ...prev, [row.id]: e.target.value }))}
-                      placeholder="Причина"
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <WholesaleStatusChip
-                      status={row.wholesale_status}
-                      discountPercent={row.wholesale_discount_percent}
-                    />
-                  </TableCell>
-                  <TableCell>{row.wholesale_company_name || "—"}</TableCell>
-                  <TableCell sx={{ minWidth: 260 }}>
-                    {row.wholesale_service_details ? (
-                      <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>
-                        {row.wholesale_service_details}
-                      </Typography>
-                    ) : (
-                      "—"
-                    )}
-                  </TableCell>
-                  <TableCell sx={{ minWidth: 170 }}>
-                    <Stack spacing={0.4}>
-                      {row.wholesale_service_photo_1_url ? (
-                        <Link href={row.wholesale_service_photo_1_url} target="_blank" rel="noreferrer">
-                          Фото сервиса 1
-                        </Link>
-                      ) : null}
-                      {row.wholesale_service_photo_2_url ? (
-                        <Link href={row.wholesale_service_photo_2_url} target="_blank" rel="noreferrer">
-                          Фото сервиса 2
-                        </Link>
-                      ) : null}
-                      {!row.wholesale_service_photo_1_url && !row.wholesale_service_photo_2_url ? "—" : null}
-                    </Stack>
-                  </TableCell>
-                  <TableCell sx={{ minWidth: 220 }}>
-                    <TextField
-                      size="small"
-                      fullWidth
-                      value={draft.review_comment}
-                      onChange={(e) =>
-                        setReviewDraftById((prev) => ({
-                          ...prev,
-                          [row.id]: { ...draft, review_comment: e.target.value },
-                        }))
-                      }
-                      placeholder="Комментарий админа"
-                    />
-                  </TableCell>
-                  <TableCell sx={{ width: 110 }}>
-                    <TextField
-                      size="small"
+                      label="Скидка, %"
                       type="number"
                       inputProps={{ min: 0, max: 90 }}
                       value={draft.discount_percent}
@@ -245,48 +178,64 @@ export default function AdminClientsPage() {
                           [row.id]: { ...draft, discount_percent: e.target.value },
                         }))
                       }
+                      sx={{ width: { xs: "100%", sm: 160 } }}
                     />
-                  </TableCell>
-                  <TableCell>
-                    <Stack direction="row" spacing={0.8} flexWrap="wrap" useFlexGap>
-                      {row.is_banned ? (
-                        <Button size="small" color="success" disabled={isSaving} onClick={() => unban(row.id)}>
-                          Разбанить
-                        </Button>
-                      ) : (
-                        <Button size="small" color="error" disabled={isSaving} onClick={() => ban(row.id)}>
-                          Забанить
-                        </Button>
-                      )}
-                      <Button
-                        size="small"
-                        variant="contained"
-                        disabled={isSaving}
-                        onClick={() => reviewWholesale(row.id, "approve")}
-                      >
-                        Одобрить опт
-                      </Button>
-                      <Button
-                        size="small"
-                        variant="outlined"
-                        color="warning"
-                        disabled={isSaving}
-                        onClick={() => reviewWholesale(row.id, "reject")}
-                      >
-                        Отклонить
-                      </Button>
-                    </Stack>
-                  </TableCell>
-                </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
-      </Paper>
+                    <TextField
+                      size="small"
+                      label="Комментарий админа"
+                      value={draft.review_comment}
+                      onChange={(e) =>
+                        setReviewDraftById((prev) => ({
+                          ...prev,
+                          [row.id]: { ...draft, review_comment: e.target.value },
+                        }))
+                      }
+                      fullWidth
+                    />
+                  </Stack>
 
-      <Typography variant="body2" color="text.secondary">
-        Опт-статусы: {WHOLESALE_LABELS.none}, {WHOLESALE_LABELS.pending}, {WHOLESALE_LABELS.approved}, {WHOLESALE_LABELS.rejected}.
-      </Typography>
+                  {row.wholesale_service_details ? (
+                    <Paper variant="outlined" sx={{ p: 1, borderRadius: 1.2 }}>
+                      <Typography variant="caption" color="text.secondary">Описание сервиса</Typography>
+                      <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>
+                        {row.wholesale_service_details}
+                      </Typography>
+                    </Paper>
+                  ) : null}
+                  {(row.wholesale_service_photo_1_url || row.wholesale_service_photo_2_url) ? (
+                    <Stack direction="row" spacing={1}>
+                      {row.wholesale_service_photo_1_url ? (
+                        <Link href={row.wholesale_service_photo_1_url} target="_blank" rel="noreferrer">Фото 1</Link>
+                      ) : null}
+                      {row.wholesale_service_photo_2_url ? (
+                        <Link href={row.wholesale_service_photo_2_url} target="_blank" rel="noreferrer">Фото 2</Link>
+                      ) : null}
+                    </Stack>
+                  ) : null}
+
+                  <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                    {row.is_banned ? (
+                      <Button size="small" color="success" variant="outlined" disabled={isSaving} onClick={() => unban(row.id)}>
+                        Разбанить
+                      </Button>
+                    ) : (
+                      <Button size="small" color="error" variant="outlined" disabled={isSaving} onClick={() => ban(row.id)}>
+                        Забанить
+                      </Button>
+                    )}
+                    <Button size="small" variant="contained" disabled={isSaving} onClick={() => reviewWholesale(row.id, "approve")}>
+                      Одобрить опт
+                    </Button>
+                    <Button size="small" variant="outlined" color="warning" disabled={isSaving} onClick={() => reviewWholesale(row.id, "reject")}>
+                      Отклонить
+                    </Button>
+                  </Stack>
+                </Stack>
+              </AccordionDetails>
+            </Accordion>
+          );
+        })}
+      </Stack>
     </Stack>
   );
 }

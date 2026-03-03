@@ -126,6 +126,15 @@ export const authApi = {
     const response = await api.get("/me/");
     return response.data;
   },
+  async updateProfile(payload) {
+    const isFormData = typeof FormData !== "undefined" && payload instanceof FormData;
+    const response = await api.patch(
+      "/me/profile/",
+      payload,
+      isFormData ? { headers: { "Content-Type": "multipart/form-data" } } : undefined
+    );
+    return response.data;
+  },
   async wholesaleStatus() {
     const response = await api.get("/wholesale/status/");
     return response.data;

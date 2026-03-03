@@ -39,11 +39,27 @@ def validate_service_photo(value):
         raise ValidationError("Максимальный размер фото сервиса — 10 МБ")
 
 
+def validate_profile_photo(value):
+    if not value:
+        return
+    name = (value.name or "").lower()
+    if not name.endswith((".jpg", ".jpeg", ".png", ".webp")):
+        raise ValidationError("Фото профиля должно быть jpg/jpeg/png/webp")
+    if value.size > 5 * 1024 * 1024:
+        raise ValidationError("Максимальный размер фото профиля — 5 МБ")
+
+
 class User(AbstractUser, TimeStampedModel):
     role = models.CharField(max_length=20, choices=RoleChoices.choices, default=RoleChoices.CLIENT)
     telegram_id = models.BigIntegerField(unique=True, null=True, blank=True)
     telegram_username = models.CharField(max_length=255, blank=True)
     telegram_photo_url = models.URLField(blank=True)
+    profile_photo = models.FileField(
+        upload_to="profile_photos/",
+        null=True,
+        blank=True,
+        validators=[validate_profile_photo],
+    )
 
     is_master_active = models.BooleanField(default=False)
     master_level = models.CharField(max_length=20, choices=MasterLevelChoices.choices, default=MasterLevelChoices.JUNIOR)

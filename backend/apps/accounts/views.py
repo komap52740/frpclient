@@ -22,6 +22,7 @@ from .serializers import (
     BootstrapAdminSerializer,
     MeSerializer,
     PasswordLoginSerializer,
+    ProfileUpdateSerializer,
     RegisterSerializer,
     TelegramAuthSerializer,
     WholesaleRequestSerializer,
@@ -223,6 +224,34 @@ class MeView(APIView):
             },
         }
         return Response(payload, status=status.HTTP_200_OK)
+
+
+class MeProfileUpdateView(APIView):
+    permission_classes = (IsAuthenticatedAndNotBanned,)
+
+    def patch(self, request):
+        serializer = ProfileUpdateSerializer(instance=request.user, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        user = request.user
+        update_fields = ["updated_at"]
+
+        if "username" in data:
+            user.username = data["username"]
+            update_fields.append("username")
+        if data.get("remove_profile_photo"):
+            user.profile_photo = None
+            update_fields.append("profile_photo")
+        elif "profile_photo" in data:
+            user.profile_photo = data.get("profile_photo")
+            update_fields.append("profile_photo")
+
+        user.save(update_fields=sorted(set(update_fields)))
+
+        return Response(
+            {"user": MeSerializer(user, context={"request": request}).data},
+            status=status.HTTP_200_OK,
+        )
 
 
 class ClientProfileDetailView(APIView):

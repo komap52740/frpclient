@@ -1,15 +1,14 @@
-﻿import {
+import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
+import {
+  Accordion,
+  AccordionDetails,
+  AccordionSummary,
   Alert,
   Button,
   Chip,
   MenuItem,
   Paper,
   Stack,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableRow,
   TextField,
   Typography,
 } from "@mui/material";
@@ -25,29 +24,23 @@ const LEVEL_OPTIONS = [
   { value: "lead", label: "Lead" },
 ];
 
-function qualityChip(row) {
-  if (row.master_quality_approved) {
-    return <Chip size="small" color="success" label="Допущен" />;
-  }
+function qualityChip(approved) {
+  if (approved) return <Chip size="small" color="success" label="Допущен" />;
   return <Chip size="small" color="warning" variant="outlined" label="Без допуска" />;
 }
 
 export default function AdminMastersPage() {
   const [rows, setRows] = useState([]);
   const [error, setError] = useState("");
-  const [savingId, setSavingId] = useState(null);
+  const [savingId, setSavingId] = useState(0);
   const [qualityFilter, setQualityFilter] = useState("all");
   const [levelFilter, setLevelFilter] = useState("all");
   const [drafts, setDrafts] = useState({});
 
   const requestParams = useMemo(() => {
     const params = {};
-    if (qualityFilter !== "all") {
-      params.quality = qualityFilter;
-    }
-    if (levelFilter !== "all") {
-      params.level = levelFilter;
-    }
+    if (qualityFilter !== "all") params.quality = qualityFilter;
+    if (levelFilter !== "all") params.level = levelFilter;
     return params;
   }, [levelFilter, qualityFilter]);
 
@@ -86,7 +79,7 @@ export default function AdminMastersPage() {
       await adminApi.activateMaster(id);
       await load();
     } finally {
-      setSavingId(null);
+      setSavingId(0);
     }
   };
 
@@ -96,17 +89,14 @@ export default function AdminMastersPage() {
       await adminApi.suspendMaster(id);
       await load();
     } finally {
-      setSavingId(null);
+      setSavingId(0);
     }
   };
 
   const onDraftChange = (id, key, value) => {
     setDrafts((prev) => ({
       ...prev,
-      [id]: {
-        ...(prev[id] || {}),
-        [key]: value,
-      },
+      [id]: { ...(prev[id] || {}), [key]: value },
     }));
   };
 
@@ -121,28 +111,26 @@ export default function AdminMastersPage() {
       });
       await load();
     } finally {
-      setSavingId(null);
+      setSavingId(0);
     }
   };
 
   const toggleQualityApproval = async (row) => {
     try {
       setSavingId(row.id);
-      await adminApi.updateMasterQuality(row.id, {
-        master_quality_approved: !row.master_quality_approved,
-      });
+      await adminApi.updateMasterQuality(row.id, { master_quality_approved: !row.master_quality_approved });
       await load();
     } finally {
-      setSavingId(null);
+      setSavingId(0);
     }
   };
 
   return (
     <Stack spacing={2}>
-      <Typography variant="h5">Админ: качество мастеров</Typography>
+      <Typography variant="h5">Качество мастеров</Typography>
       {error ? <Alert severity="error">{error}</Alert> : null}
 
-      <Paper sx={{ p: 1.5 }}>
+      <Paper sx={{ p: 1.5, borderRadius: 1.8 }}>
         <Stack direction={{ xs: "column", md: "row" }} spacing={1}>
           <TextField
             select
@@ -174,39 +162,44 @@ export default function AdminMastersPage() {
         </Stack>
       </Paper>
 
-      <Paper sx={{ overflowX: "auto" }}>
-        <Table size="small">
-          <TableHead>
-            <TableRow>
-              <TableCell>ID</TableCell>
-              <TableCell>Логин</TableCell>
-              <TableCell>Скор</TableCell>
-              <TableCell>Активность</TableCell>
-              <TableCell>Допуск</TableCell>
-              <TableCell>Уровень</TableCell>
-              <TableCell>Специализация</TableCell>
-              <TableCell>Комментарий QA</TableCell>
-              <TableCell>Действия</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {rows.map((row) => {
-              const draft = drafts[row.id] || {};
-              const busy = savingId === row.id;
-              return (
-                <TableRow key={row.id} hover>
-                  <TableCell>{row.id}</TableCell>
-                  <TableCell>{row.username}</TableCell>
-                  <TableCell>{row.master_stats?.master_score ?? "—"}</TableCell>
-                  <TableCell>{row.is_master_active ? "Активен" : "Отключен"}</TableCell>
-                  <TableCell>{qualityChip(row)}</TableCell>
-                  <TableCell sx={{ minWidth: 160 }}>
+      <Stack spacing={1}>
+        {rows.map((row) => {
+          const draft = drafts[row.id] || {};
+          const busy = savingId === row.id;
+
+          return (
+            <Accordion key={row.id} disableGutters>
+              <AccordionSummary expandIcon={<ExpandMoreRoundedIcon />}>
+                <Stack
+                  direction={{ xs: "column", sm: "row" }}
+                  spacing={1}
+                  alignItems={{ xs: "flex-start", sm: "center" }}
+                  justifyContent="space-between"
+                  sx={{ width: "100%", pr: 1 }}
+                >
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>{row.username}</Typography>
+                    {qualityChip(row.master_quality_approved)}
+                    <Chip size="small" variant="outlined" label={`Score: ${row.master_stats?.master_score ?? "—"}`} />
+                  </Stack>
+                  <Chip
+                    size="small"
+                    color={row.is_master_active ? "success" : "default"}
+                    variant={row.is_master_active ? "filled" : "outlined"}
+                    label={row.is_master_active ? "Активен" : "Отключен"}
+                  />
+                </Stack>
+              </AccordionSummary>
+              <AccordionDetails>
+                <Stack spacing={1.1}>
+                  <Stack direction={{ xs: "column", md: "row" }} spacing={1}>
                     <TextField
                       select
                       size="small"
-                      fullWidth
+                      label="Уровень"
                       value={draft.master_level || "junior"}
                       onChange={(event) => onDraftChange(row.id, "master_level", event.target.value)}
+                      sx={{ minWidth: 200 }}
                     >
                       {LEVEL_OPTIONS.map((option) => (
                         <MenuItem key={option.value} value={option.value}>
@@ -214,56 +207,51 @@ export default function AdminMastersPage() {
                         </MenuItem>
                       ))}
                     </TextField>
-                  </TableCell>
-                  <TableCell sx={{ minWidth: 220 }}>
                     <TextField
                       size="small"
-                      fullWidth
+                      label="Специализация"
                       value={draft.master_specializations || ""}
                       onChange={(event) => onDraftChange(row.id, "master_specializations", event.target.value)}
-                      placeholder="Samsung FRP, Xiaomi, iPhone"
+                      sx={{ flexGrow: 1 }}
                     />
-                  </TableCell>
-                  <TableCell sx={{ minWidth: 220 }}>
-                    <TextField
+                  </Stack>
+                  <TextField
+                    size="small"
+                    label="Комментарий QA"
+                    value={draft.master_quality_comment || ""}
+                    onChange={(event) => onDraftChange(row.id, "master_quality_comment", event.target.value)}
+                    fullWidth
+                  />
+
+                  <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                    {row.is_master_active ? (
+                      <Button size="small" color="warning" variant="outlined" disabled={busy} onClick={() => suspend(row.id)}>
+                        Отключить
+                      </Button>
+                    ) : (
+                      <Button size="small" color="success" variant="outlined" disabled={busy} onClick={() => activate(row.id)}>
+                        Активировать
+                      </Button>
+                    )}
+                    <Button size="small" variant="contained" disabled={busy} onClick={() => saveQuality(row.id)}>
+                      Сохранить
+                    </Button>
+                    <Button
                       size="small"
-                      fullWidth
-                      value={draft.master_quality_comment || ""}
-                      onChange={(event) => onDraftChange(row.id, "master_quality_comment", event.target.value)}
-                      placeholder="Качество, дисциплина, SLA"
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Stack direction="row" spacing={0.6} flexWrap="wrap" useFlexGap>
-                      {row.is_master_active ? (
-                        <Button size="small" color="warning" disabled={busy} onClick={() => suspend(row.id)}>
-                          Отключить
-                        </Button>
-                      ) : (
-                        <Button size="small" color="success" disabled={busy} onClick={() => activate(row.id)}>
-                          Активировать
-                        </Button>
-                      )}
-                      <Button size="small" variant="outlined" disabled={busy} onClick={() => saveQuality(row.id)}>
-                        Сохранить
-                      </Button>
-                      <Button
-                        size="small"
-                        variant={row.master_quality_approved ? "outlined" : "contained"}
-                        color={row.master_quality_approved ? "warning" : "success"}
-                        disabled={busy}
-                        onClick={() => toggleQualityApproval(row)}
-                      >
-                        {row.master_quality_approved ? "Снять допуск" : "Допустить"}
-                      </Button>
-                    </Stack>
-                  </TableCell>
-                </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
-      </Paper>
+                      variant={row.master_quality_approved ? "outlined" : "contained"}
+                      color={row.master_quality_approved ? "warning" : "success"}
+                      disabled={busy}
+                      onClick={() => toggleQualityApproval(row)}
+                    >
+                      {row.master_quality_approved ? "Снять допуск" : "Допустить"}
+                    </Button>
+                  </Stack>
+                </Stack>
+              </AccordionDetails>
+            </Accordion>
+          );
+        })}
+      </Stack>
     </Stack>
   );
 }

@@ -140,6 +140,7 @@ function AuthenticatedLayout() {
     <ProtectedRoute>
       <MainLayout>
         <Routes>
+          <Route index element={<RoleHomeRedirect />} />
           <Route path="/" element={<RoleHomeRedirect />} />
 
           <Route
