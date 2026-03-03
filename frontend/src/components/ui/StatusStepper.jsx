@@ -38,69 +38,88 @@ export default function StatusStepper({ status, role, compact = false, slaBreach
   const isTerminalError = status === "DECLINED_BY_MASTER" || status === "CANCELLED";
 
   return (
-    <Stack spacing={compact ? 0.75 : 1.2}>
-      <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between">
-        <Typography variant={compact ? "caption" : "body2"} sx={{ fontWeight: 760, color: ui.color }}>
+    <Stack spacing={compact ? 0.7 : 1.05} sx={{ minWidth: 0 }}>
+      <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between" sx={{ minWidth: 0 }}>
+        <Typography
+          variant={compact ? "caption" : "body2"}
+          sx={{ fontWeight: 760, color: ui.color, lineHeight: 1.2, minWidth: 0 }}
+        >
           {ui.stepLabel}
         </Typography>
         {isTerminalError || slaBreached ? <ErrorOutlineRoundedIcon fontSize="small" sx={{ color: ui.color }} /> : null}
       </Stack>
 
       {compact ? (
-        <Box>
+        <Box sx={{ overflow: "hidden", borderRadius: 999 }}>
           <LinearProgress
             variant="determinate"
             value={getProgressValue(status)}
             sx={{
-              height: 8,
+              height: 7,
               borderRadius: 999,
               bgcolor: ui.bg,
               "& .MuiLinearProgress-bar": {
                 borderRadius: 999,
                 bgcolor: ui.color,
-                transition: "transform 360ms cubic-bezier(0.22, 1, 0.36, 1)",
+                transition: "none",
               },
             }}
           />
         </Box>
       ) : (
-        <Stepper
-          activeStep={activeStep}
-          alternativeLabel
-          sx={{
-            "& .MuiStepLabel-label": {
-              fontSize: 12,
-              fontWeight: 650,
-              color: "text.secondary",
-              mt: 0.45,
-            },
-            "& .MuiStepLabel-label.Mui-active": {
-              color: ui.color,
-              fontWeight: 800,
-            },
-            "& .MuiStepLabel-label.Mui-completed": {
-              color: "text.primary",
-              fontWeight: 750,
-            },
-            "& .MuiStepIcon-root": {
-              color: alpha(ui.color, 0.24),
-            },
-            "& .MuiStepIcon-root.Mui-active, & .MuiStepIcon-root.Mui-completed": {
-              color: ui.color,
-            },
-          }}
-        >
-          {STATUS_PROGRESS_ORDER.map((stepStatus) => (
-            <Step key={stepStatus} completed={activeStep > (STEP_INDEX_MAP[stepStatus] ?? 0) || status === "COMPLETED"}>
-              <StepLabel>{STEP_TITLES[stepStatus]}</StepLabel>
-            </Step>
-          ))}
-        </Stepper>
+        <Box sx={{ width: "100%", minWidth: 0, overflowX: "clip" }}>
+          <Stepper
+            activeStep={activeStep}
+            alternativeLabel
+            sx={{
+              width: "100%",
+              minWidth: 0,
+              "& .MuiStep-root": {
+                px: { xs: 0.15, sm: 0.35 },
+                minWidth: 0,
+              },
+              "& .MuiStepLabel-labelContainer": {
+                minWidth: 0,
+              },
+              "& .MuiStepLabel-label": {
+                fontSize: 12,
+                fontWeight: 650,
+                color: "text.secondary",
+                mt: 0.4,
+                lineHeight: 1.15,
+                whiteSpace: "normal",
+              },
+              "& .MuiStepLabel-label.Mui-active": {
+                color: ui.color,
+                fontWeight: 800,
+              },
+              "& .MuiStepLabel-label.Mui-completed": {
+                color: "text.primary",
+                fontWeight: 760,
+              },
+              "& .MuiStepIcon-root": {
+                color: alpha(ui.color, 0.24),
+              },
+              "& .MuiStepIcon-root.Mui-active, & .MuiStepIcon-root.Mui-completed": {
+                color: ui.color,
+              },
+              "& .MuiStepConnector-line": {
+                borderColor: alpha("#7ba8e8", 0.36),
+              },
+            }}
+          >
+            {STATUS_PROGRESS_ORDER.map((stepStatus) => (
+              <Step key={stepStatus} completed={activeStep > (STEP_INDEX_MAP[stepStatus] ?? 0) || status === "COMPLETED"}>
+                <StepLabel>{STEP_TITLES[stepStatus]}</StepLabel>
+              </Step>
+            ))}
+          </Stepper>
+        </Box>
       )}
 
       {!compact ? (
-        <Typography variant="caption" color="text.secondary">
-          {ui.hint || (role === "master" ? "Если зависли на шаге, уточните детали у клиента в чате." : "Если что-то не получается, напишите мастеру в чат.")}
+        <Typography variant="caption" color="text.secondary" sx={{ minHeight: 18 }}>
+          {ui.hint || (role === "master" ? "Если шаг завис, уточните детали у клиента в чате." : "Если не получается — напишите мастеру в чат.")}
         </Typography>
       ) : null}
     </Stack>

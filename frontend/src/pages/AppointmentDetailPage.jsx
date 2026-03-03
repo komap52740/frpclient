@@ -245,6 +245,20 @@ function dedupeEvents(eventItems = []) {
   });
 }
 
+function areEventListsEqual(prevEvents = [], nextEvents = []) {
+  if (prevEvents.length !== nextEvents.length) {
+    return false;
+  }
+  for (let index = 0; index < prevEvents.length; index += 1) {
+    const prev = prevEvents[index];
+    const next = nextEvents[index];
+    if (prev.id !== next.id || getEventFingerprint(prev) !== getEventFingerprint(next)) {
+      return false;
+    }
+  }
+  return true;
+}
+
 function getAppointmentSnapshot(appointment) {
   if (!appointment || typeof appointment !== "object") {
     return "";
@@ -307,8 +321,6 @@ export default function AppointmentDetailPage() {
   const [manualNote, setManualNote] = useState("");
   const [clientSignal, setClientSignal] = useState("need_help");
   const [clientSignalComment, setClientSignalComment] = useState("");
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [lastSyncedAt, setLastSyncedAt] = useState(() => dayjs());
   const [uploadingProof, setUploadingProof] = useState(false);
   const [paymentUploadedDialogOpen, setPaymentUploadedDialogOpen] = useState(false);
   const [paymentGuideOpen, setPaymentGuideOpen] = useState(false);
@@ -348,6 +360,9 @@ export default function AppointmentDetailPage() {
       const merged = dedupeEvents([...prev, ...incomingEvents]).sort(
         (a, b) => dayjs(b.created_at).valueOf() - dayjs(a.created_at).valueOf()
       );
+      if (areEventListsEqual(prev, merged)) {
+        return prev;
+      }
       lastEventIdRef.current = getLatestEventId(merged);
       return merged;
     });
@@ -373,7 +388,6 @@ export default function AppointmentDetailPage() {
       if (changed) {
         lastDetailSnapshotRef.current = nextSnapshot;
         setAppointment(nextDetail);
-        setLastSyncedAt(dayjs());
       }
       if (!preserveDrafts && nextDetail) {
         setPrice(nextDetail.total_price || "");
@@ -405,9 +419,8 @@ export default function AppointmentDetailPage() {
         const normalized = dedupeEvents(incoming).sort(
           (a, b) => dayjs(b.created_at).valueOf() - dayjs(a.created_at).valueOf()
         );
-        setEvents(normalized);
+        setEvents((prev) => (areEventListsEqual(prev, normalized) ? prev : normalized));
         lastEventIdRef.current = getLatestEventId(normalized);
-        setLastSyncedAt(dayjs());
       } catch {
         if (!silent) {
           setError("Не удалось загрузить ленту событий");
@@ -472,23 +485,17 @@ export default function AppointmentDetailPage() {
   }, [appointment?.id, appointment?.status, clientCompactView, searchParams, user?.role]);
 
   useAutoRefresh(async () => {
-    const showRefreshingState = user?.role !== "client";
-    if (showRefreshingState) {
-      setIsRefreshing(true);
-    }
     try {
       await Promise.all([
         loadDetail({ preserveDrafts: true, silent: true }),
         loadEvents({ silent: true, incremental: true }),
       ]);
     } finally {
-      if (showRefreshingState) {
-        setIsRefreshing(false);
-      }
+      // Silent polling to avoid visual flicker.
     }
   }, {
     enabled: Boolean(id),
-    intervalMs: 2500,
+    intervalMs: isClient ? 4000 : 5000,
   });
 
   useEffect(() => {
@@ -866,12 +873,7 @@ export default function AppointmentDetailPage() {
     transition: "all .2s ease",
     cursor: "pointer",
   };
-  const lastSyncLabel = dayjs(lastSyncedAt).format("HH:mm:ss");
-  const syncStatusText = isClient
-    ? `Последнее обновление: ${lastSyncLabel}`
-    : isRefreshing
-      ? "Обновляем статус и чат..."
-      : `Последнее обновление: ${lastSyncLabel}`;
+  const syncStatusText = "Автообновление статуса и чата";
   const visibleTimelineEvents = isClient ? timelineEvents.slice(0, isClientCompact ? 3 : 6) : timelineEvents;
   const sidebarTimelineEvents = isClient ? visibleTimelineEvents.slice(0, isClientCompact ? 2 : 4) : visibleTimelineEvents;
   const showCompletionHero = appointment.status === "COMPLETED";
@@ -1228,6 +1230,7 @@ export default function AppointmentDetailPage() {
               : "0 18px 40px rgba(15,23,42,0.10)"
             : undefined,
           transition: "box-shadow .24s ease, transform .24s ease, border-color .24s ease",
+          overflowX: "clip",
           "&:hover": isClient
             ? {
                 boxShadow: isDark ? "0 24px 48px rgba(2,6,23,0.62)" : "0 24px 48px rgba(15,23,42,0.14)",
@@ -1391,7 +1394,6 @@ export default function AppointmentDetailPage() {
             </Paper>
           ) : null}
 
-          {isRefreshing && !isClient ? <LinearProgress sx={{ borderRadius: 1 }} /> : null}
 
           {!isClient ? (
             <Stack
