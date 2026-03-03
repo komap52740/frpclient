@@ -4,6 +4,7 @@ import HomeRoundedIcon from "@mui/icons-material/HomeRounded";
 import ListAltRoundedIcon from "@mui/icons-material/ListAltRounded";
 import NewReleasesRoundedIcon from "@mui/icons-material/NewReleasesRounded";
 import PersonRoundedIcon from "@mui/icons-material/PersonRounded";
+import PeopleRoundedIcon from "@mui/icons-material/PeopleRounded";
 import QuickreplyRoundedIcon from "@mui/icons-material/QuickreplyRounded";
 import ReviewsRoundedIcon from "@mui/icons-material/ReviewsRounded";
 import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
@@ -25,6 +26,7 @@ function getActions(role) {
     return [
       { label: "Новые", to: "/master/new", icon: <NewReleasesRoundedIcon /> },
       { label: "Активные", to: "/master/active", icon: <DashboardRoundedIcon /> },
+      { label: "Клиенты", to: "/master/clients", icon: <PeopleRoundedIcon /> },
       { label: "Шаблоны", to: "/master/quick-replies", icon: <QuickreplyRoundedIcon /> },
       { label: "Профиль", to: "/master/profile", icon: <PersonRoundedIcon /> },
     ];

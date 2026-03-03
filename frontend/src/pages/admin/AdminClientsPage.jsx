@@ -17,16 +17,20 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { adminApi } from "../../api/client";
+import { useAuth } from "../../auth/AuthContext";
 
-function WholesaleStatusChip({ status, discountPercent = 0 }) {
-  if (status === "approved") return <Chip size="small" color="success" label={`Опт: одобрено (${discountPercent || 0}%)`} />;
+function WholesaleStatusChip({ status }) {
+  if (status === "approved") return <Chip size="small" color="success" label="Опт: одобрено" />;
   if (status === "pending") return <Chip size="small" color="warning" variant="outlined" label="Опт: на рассмотрении" />;
   if (status === "rejected") return <Chip size="small" color="error" variant="outlined" label="Опт: отклонено" />;
   return <Chip size="small" variant="outlined" label="Опт: не запрошено" />;
 }
 
 export default function AdminClientsPage() {
+  const { user } = useAuth();
   const navigate = useNavigate();
+  const canManage = user?.role === "admin";
+
   const [rows, setRows] = useState([]);
   const [error, setError] = useState("");
   const [reasonById, setReasonById] = useState({});
@@ -47,7 +51,6 @@ export default function AdminClientsPage() {
         items.forEach((row) => {
           if (!next[row.id]) {
             next[row.id] = {
-              discount_percent: row.wholesale_discount_percent || 10,
               review_comment: row.wholesale_review_comment || "",
             };
           }
@@ -66,6 +69,7 @@ export default function AdminClientsPage() {
   }, []);
 
   const ban = async (id) => {
+    if (!canManage) return;
     setSavingId(id);
     try {
       await adminApi.ban(id, reasonById[id] || "");
@@ -76,6 +80,7 @@ export default function AdminClientsPage() {
   };
 
   const unban = async (id) => {
+    if (!canManage) return;
     setSavingId(id);
     try {
       await adminApi.unban(id);
@@ -86,12 +91,12 @@ export default function AdminClientsPage() {
   };
 
   const reviewWholesale = async (id, decision) => {
+    if (!canManage) return;
     const draft = reviewDraftById[id] || {};
     const payload = {
       decision,
       review_comment: (draft.review_comment || "").trim(),
     };
-    if (decision === "approve") payload.discount_percent = Number(draft.discount_percent || 0);
 
     setSavingId(id);
     try {
@@ -112,7 +117,7 @@ export default function AdminClientsPage() {
   return (
     <Stack spacing={2}>
       <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" spacing={1}>
-        <Typography variant="h5">Клиенты и оптовый статус</Typography>
+        <Typography variant="h5">{canManage ? "Клиенты и оптовый статус" : "Клиенты"}</Typography>
         <TextField
           select
           size="small"
@@ -135,7 +140,8 @@ export default function AdminClientsPage() {
       <Stack spacing={1}>
         {filteredRows.map((row) => {
           const isSaving = savingId === row.id;
-          const draft = reviewDraftById[row.id] || { discount_percent: 10, review_comment: "" };
+          const draft = reviewDraftById[row.id] || { review_comment: "" };
+
           return (
             <Accordion key={row.id} disableGutters>
               <AccordionSummary expandIcon={<ExpandMoreRoundedIcon />}>
@@ -147,9 +153,13 @@ export default function AdminClientsPage() {
                   sx={{ width: "100%", pr: 1 }}
                 >
                   <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
-                    <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>{row.username}</Typography>
-                    <WholesaleStatusChip status={row.wholesale_status} discountPercent={row.wholesale_discount_percent} />
-                    {row.is_banned ? <Chip size="small" color="error" variant="outlined" label="Заблокирован" /> : null}
+                    <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
+                      {row.username}
+                    </Typography>
+                    <WholesaleStatusChip status={row.wholesale_status} />
+                    {row.is_banned ? (
+                      <Chip size="small" color="error" variant="outlined" label="Заблокирован" />
+                    ) : null}
                   </Stack>
                   <Button size="small" variant="outlined" onClick={() => navigate(`/clients/${row.id}/profile`)}>
                     Профиль
@@ -158,31 +168,19 @@ export default function AdminClientsPage() {
               </AccordionSummary>
               <AccordionDetails>
                 <Stack spacing={1.1}>
-                  <TextField
-                    size="small"
-                    label="Причина бана"
-                    value={reasonById[row.id] || row.ban_reason || ""}
-                    onChange={(e) => setReasonById((prev) => ({ ...prev, [row.id]: e.target.value }))}
-                  />
-
-                  <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+                  {canManage ? (
                     <TextField
                       size="small"
-                      label="Скидка, %"
-                      type="number"
-                      inputProps={{ min: 0, max: 90 }}
-                      value={draft.discount_percent}
-                      onChange={(e) =>
-                        setReviewDraftById((prev) => ({
-                          ...prev,
-                          [row.id]: { ...draft, discount_percent: e.target.value },
-                        }))
-                      }
-                      sx={{ width: { xs: "100%", sm: 160 } }}
+                      label="Причина бана"
+                      value={reasonById[row.id] || row.ban_reason || ""}
+                      onChange={(e) => setReasonById((prev) => ({ ...prev, [row.id]: e.target.value }))}
                     />
+                  ) : null}
+
+                  {canManage ? (
                     <TextField
                       size="small"
-                      label="Комментарий админа"
+                      label="Комментарий администратора"
                       value={draft.review_comment}
                       onChange={(e) =>
                         setReviewDraftById((prev) => ({
@@ -192,44 +190,53 @@ export default function AdminClientsPage() {
                       }
                       fullWidth
                     />
-                  </Stack>
+                  ) : null}
 
                   {row.wholesale_service_details ? (
                     <Paper variant="outlined" sx={{ p: 1, borderRadius: 1.2 }}>
-                      <Typography variant="caption" color="text.secondary">Описание сервиса</Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        Описание сервиса
+                      </Typography>
                       <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>
                         {row.wholesale_service_details}
                       </Typography>
                     </Paper>
                   ) : null}
-                  {(row.wholesale_service_photo_1_url || row.wholesale_service_photo_2_url) ? (
+
+                  {row.wholesale_service_photo_1_url || row.wholesale_service_photo_2_url ? (
                     <Stack direction="row" spacing={1}>
                       {row.wholesale_service_photo_1_url ? (
-                        <Link href={row.wholesale_service_photo_1_url} target="_blank" rel="noreferrer">Фото 1</Link>
+                        <Link href={row.wholesale_service_photo_1_url} target="_blank" rel="noreferrer">
+                          Фото 1
+                        </Link>
                       ) : null}
                       {row.wholesale_service_photo_2_url ? (
-                        <Link href={row.wholesale_service_photo_2_url} target="_blank" rel="noreferrer">Фото 2</Link>
+                        <Link href={row.wholesale_service_photo_2_url} target="_blank" rel="noreferrer">
+                          Фото 2
+                        </Link>
                       ) : null}
                     </Stack>
                   ) : null}
 
-                  <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-                    {row.is_banned ? (
-                      <Button size="small" color="success" variant="outlined" disabled={isSaving} onClick={() => unban(row.id)}>
-                        Разбанить
+                  {canManage ? (
+                    <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                      {row.is_banned ? (
+                        <Button size="small" color="success" variant="outlined" disabled={isSaving} onClick={() => unban(row.id)}>
+                          Разбанить
+                        </Button>
+                      ) : (
+                        <Button size="small" color="error" variant="outlined" disabled={isSaving} onClick={() => ban(row.id)}>
+                          Забанить
+                        </Button>
+                      )}
+                      <Button size="small" variant="contained" disabled={isSaving} onClick={() => reviewWholesale(row.id, "approve")}>
+                        Одобрить опт
                       </Button>
-                    ) : (
-                      <Button size="small" color="error" variant="outlined" disabled={isSaving} onClick={() => ban(row.id)}>
-                        Забанить
+                      <Button size="small" variant="outlined" color="warning" disabled={isSaving} onClick={() => reviewWholesale(row.id, "reject")}>
+                        Отклонить
                       </Button>
-                    )}
-                    <Button size="small" variant="contained" disabled={isSaving} onClick={() => reviewWholesale(row.id, "approve")}>
-                      Одобрить опт
-                    </Button>
-                    <Button size="small" variant="outlined" color="warning" disabled={isSaving} onClick={() => reviewWholesale(row.id, "reject")}>
-                      Отклонить
-                    </Button>
-                  </Stack>
+                    </Stack>
+                  ) : null}
                 </Stack>
               </AccordionDetails>
             </Accordion>
@@ -239,3 +246,4 @@ export default function AdminClientsPage() {
     </Stack>
   );
 }
+

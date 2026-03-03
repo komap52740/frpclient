@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import io
 import time
@@ -10,6 +10,7 @@ from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import generics, permissions, status
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -31,6 +32,14 @@ from .serializers import (
     AdminWholesaleReviewSerializer,
     BanUserSerializer,
 )
+
+
+def _master_level_to_tier(level: str) -> str:
+    return "senior" if level == MasterLevelChoices.SENIOR else "regular"
+
+
+def _master_tier_to_level(tier: str) -> str:
+    return MasterLevelChoices.SENIOR if tier == "senior" else MasterLevelChoices.JUNIOR
 
 
 class AdminAppointmentListView(generics.ListAPIView):
@@ -100,10 +109,13 @@ class AdminSuspendMasterView(APIView):
 
 
 class AdminClientsView(generics.ListAPIView):
-    permission_classes = (IsAuthenticatedAndNotBanned, IsAdminRole)
+    permission_classes = (IsAuthenticatedAndNotBanned,)
     serializer_class = AdminUserSerializer
 
     def get_queryset(self):
+        user = self.request.user
+        if not (user.is_superuser or user.role in {RoleChoices.ADMIN, RoleChoices.MASTER}):
+            raise PermissionDenied("Только для админа и мастера.")
         return User.objects.filter(role=RoleChoices.CLIENT).order_by("-id")
 
 
@@ -149,13 +161,11 @@ class AdminWholesaleReviewView(APIView):
         user.wholesale_review_comment = review_comment
 
         if decision == "approve":
-            discount_percent = min(max(int(serializer.validated_data.get("discount_percent", 0)), 0), 90)
             user.wholesale_status = WholesaleStatusChoices.APPROVED
-            user.wholesale_discount_percent = discount_percent
         else:
-            discount_percent = 0
             user.wholesale_status = WholesaleStatusChoices.REJECTED
-            user.wholesale_discount_percent = 0
+        # Discount amount should not be shown in UI anymore.
+        user.wholesale_discount_percent = 0
 
         update_fields.extend(["wholesale_status", "wholesale_discount_percent"])
         user.save(update_fields=sorted(set(update_fields)))
@@ -163,19 +173,19 @@ class AdminWholesaleReviewView(APIView):
         create_notification(
             user=user,
             type="system",
-            title="Решение по оптовой скидке",
+            title="Решение по оптовому статусу",
             message=(
-                f"Оптовая скидка одобрена: {discount_percent}%."
+                "Оптовый статус одобрен. Ваш аккаунт отмечен как оптовый сервис."
                 if decision == "approve"
-                else "Оптовая скидка отклонена. Уточните детали в чате с поддержкой."
+                else "Оптовый статус отклонен. Уточните детали в чате с поддержкой."
             ),
-            payload={"decision": decision, "discount_percent": discount_percent},
+            payload={"decision": decision},
         )
         emit_event(
             "wholesale.reviewed",
             user,
             actor=request.user,
-            payload={"decision": decision, "discount_percent": discount_percent},
+            payload={"decision": decision},
         )
 
         return Response(AdminUserSerializer(user).data, status=status.HTTP_200_OK)
@@ -189,18 +199,16 @@ class AdminMastersView(generics.ListAPIView):
         queryset = User.objects.filter(role=RoleChoices.MASTER).select_related("master_stats").order_by("-id")
         min_score = self.request.query_params.get("min_score")
         ordering = self.request.query_params.get("ordering")
-        quality = (self.request.query_params.get("quality") or "").strip().lower()
         level = (self.request.query_params.get("level") or "").strip().lower()
 
         if min_score and str(min_score).isdigit():
             queryset = queryset.filter(master_stats__master_score__gte=int(min_score))
 
-        if quality == "approved":
-            queryset = queryset.filter(master_quality_approved=True)
-        elif quality == "pending":
-            queryset = queryset.filter(master_quality_approved=False)
-
-        if level in MasterLevelChoices.values:
+        if level == "senior":
+            queryset = queryset.filter(master_level=MasterLevelChoices.SENIOR)
+        elif level == "regular":
+            queryset = queryset.exclude(master_level=MasterLevelChoices.SENIOR)
+        elif level in MasterLevelChoices.values:
             queryset = queryset.filter(master_level=level)
 
         if ordering in {"master_score", "-master_score"}:
@@ -218,24 +226,25 @@ class AdminMasterQualityUpdateView(APIView):
 
         data = serializer.validated_data
         update_fields = ["updated_at"]
-
-        if "master_level" in data:
-            user.master_level = data["master_level"]
+        next_tier = data.get("master_tier")
+        if not next_tier and "master_level" in data:
+            next_tier = _master_level_to_tier(data["master_level"])
+        if next_tier:
+            user.master_level = _master_tier_to_level(next_tier)
             update_fields.append("master_level")
-        if "master_specializations" in data:
-            user.master_specializations = data["master_specializations"].strip()
+
+        # Legacy QA/specialization fields are no longer used in master management.
+        if user.master_specializations:
+            user.master_specializations = ""
             update_fields.append("master_specializations")
-        if "master_quality_comment" in data:
-            user.master_quality_comment = data["master_quality_comment"].strip()
+        if user.master_quality_comment:
+            user.master_quality_comment = ""
             update_fields.append("master_quality_comment")
-        if "master_quality_approved" in data:
-            approved = bool(data["master_quality_approved"])
-            user.master_quality_approved = approved
+        if not user.master_quality_approved:
+            user.master_quality_approved = True
             update_fields.append("master_quality_approved")
-            if approved:
-                user.master_quality_approved_at = timezone.now()
-            else:
-                user.master_quality_approved_at = None
+        if not user.master_quality_approved_at:
+            user.master_quality_approved_at = timezone.now()
             update_fields.append("master_quality_approved_at")
 
         user.save(update_fields=sorted(set(update_fields)))
@@ -260,14 +269,14 @@ class AdminUserRoleUpdateView(APIView):
     def post(self, request, user_id: int):
         user = get_object_or_404(User, id=user_id)
         if user.is_superuser and not request.user.is_superuser:
-            return Response({"detail": "Изменение суперпользователя запрещено."}, status=status.HTTP_403_FORBIDDEN)
+            return Response({"detail": "РР·РјРµРЅРµРЅРёРµ СЃСѓРїРµСЂРїРѕР»СЊР·РѕРІР°С‚РµР»СЏ Р·Р°РїСЂРµС‰РµРЅРѕ."}, status=status.HTTP_403_FORBIDDEN)
 
         serializer = AdminUserRoleSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
         new_role = serializer.validated_data["role"]
         if request.user.id == user.id and not request.user.is_superuser and new_role != RoleChoices.ADMIN:
-            return Response({"detail": "Нельзя снять с себя роль администратора."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"detail": "РќРµР»СЊР·СЏ СЃРЅСЏС‚СЊ СЃ СЃРµР±СЏ СЂРѕР»СЊ Р°РґРјРёРЅРёСЃС‚СЂР°С‚РѕСЂР°."}, status=status.HTTP_400_BAD_REQUEST)
 
         user.role = new_role
         update_fields = ["role", "updated_at"]
@@ -276,6 +285,18 @@ class AdminUserRoleUpdateView(APIView):
             if "is_master_active" in serializer.validated_data:
                 user.is_master_active = serializer.validated_data["is_master_active"]
                 update_fields.append("is_master_active")
+            if not user.master_quality_approved:
+                user.master_quality_approved = True
+                update_fields.append("master_quality_approved")
+            if not user.master_quality_approved_at:
+                user.master_quality_approved_at = timezone.now()
+                update_fields.append("master_quality_approved_at")
+            if user.master_specializations:
+                user.master_specializations = ""
+                update_fields.append("master_specializations")
+            if user.master_quality_comment:
+                user.master_quality_comment = ""
+                update_fields.append("master_quality_comment")
         else:
             user.is_master_active = False
             update_fields.append("is_master_active")
@@ -430,4 +451,6 @@ class AdminSystemRunActionView(APIView):
             },
             status=status.HTTP_200_OK if success else status.HTTP_400_BAD_REQUEST,
         )
+
+
 

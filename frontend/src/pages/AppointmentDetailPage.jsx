@@ -9,6 +9,7 @@ import OpenInNewRoundedIcon from "@mui/icons-material/OpenInNewRounded";
 import PaymentsRoundedIcon from "@mui/icons-material/PaymentsRounded";
 import ReplayRoundedIcon from "@mui/icons-material/ReplayRounded";
 import ShieldRoundedIcon from "@mui/icons-material/ShieldRounded";
+import TaskAltRoundedIcon from "@mui/icons-material/TaskAltRounded";
 import TimelineRoundedIcon from "@mui/icons-material/TimelineRounded";
 import UploadFileRoundedIcon from "@mui/icons-material/UploadFileRounded";
 import {
@@ -873,6 +874,7 @@ export default function AppointmentDetailPage() {
       : `Последнее обновление: ${lastSyncLabel}`;
   const visibleTimelineEvents = isClient ? timelineEvents.slice(0, isClientCompact ? 3 : 6) : timelineEvents;
   const sidebarTimelineEvents = isClient ? visibleTimelineEvents.slice(0, isClientCompact ? 2 : 4) : visibleTimelineEvents;
+  const showCompletionHero = appointment.status === "COMPLETED";
   const rustdeskId = (appointment.rustdesk_id || "").trim();
   const rustdeskPassword = (appointment.rustdesk_password || "").trim();
   const clientProfilePath = !isClient && appointment.client ? `/clients/${appointment.client}/profile` : "";
@@ -1419,6 +1421,46 @@ export default function AppointmentDetailPage() {
 
       {error ? <Alert severity="error">{error}</Alert> : null}
       {success ? <Alert severity="success">{success}</Alert> : null}
+      {showCompletionHero ? (
+        <Paper
+          sx={{
+            p: { xs: 1.6, md: 2 },
+            borderRadius: 1.6,
+            border: "1px solid",
+            borderColor: isDark ? "rgba(34,197,94,0.45)" : "rgba(16,185,129,0.32)",
+            background: isDark
+              ? "linear-gradient(145deg, rgba(11,35,27,0.9) 0%, rgba(15,23,42,0.9) 100%)"
+              : "linear-gradient(145deg, rgba(236,253,245,0.95) 0%, rgba(255,255,255,0.95) 100%)",
+            boxShadow: isDark ? "0 12px 28px rgba(2,6,23,0.55)" : "0 12px 28px rgba(15,23,42,0.08)",
+          }}
+        >
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={1.2} alignItems={{ xs: "flex-start", sm: "center" }} justifyContent="space-between">
+            <Stack direction="row" spacing={1} alignItems="center">
+              <TaskAltRoundedIcon color="success" />
+              <Stack spacing={0.2}>
+                <Typography variant="h3" sx={{ fontWeight: 800 }}>
+                  {isClient ? "Заказ успешно завершен" : "Работа по заявке завершена"}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {isClient
+                    ? "Спасибо! Если захотите, оставьте короткий отзыв и создайте новую заявку в один клик."
+                    : "Клиент увидит завершение автоматически. При необходимости оставьте сообщение в чате."}
+                </Typography>
+              </Stack>
+            </Stack>
+            <Stack direction="row" spacing={1}>
+              {isClient ? (
+                <Button size="small" variant="contained" onClick={() => navigate("/client/create")}>
+                  Новая заявка
+                </Button>
+              ) : null}
+              <Button size="small" variant="outlined" onClick={() => handlePrimaryAction("open_chat")}>
+                Открыть чат
+              </Button>
+            </Stack>
+          </Stack>
+        </Paper>
+      ) : null}
       {showClientPaymentHighlight ? (
         <Alert
           severity={appointment.status === "AWAITING_PAYMENT" ? "warning" : "info"}

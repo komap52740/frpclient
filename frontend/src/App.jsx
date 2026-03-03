@@ -217,6 +217,14 @@ function AuthenticatedLayout() {
               </ProtectedRoute>
             }
           />
+          <Route
+            path="/master/clients"
+            element={
+              <ProtectedRoute roles={["master"]}>
+                <AdminClientsPage />
+              </ProtectedRoute>
+            }
+          />
 
           <Route
             path="/admin/appointments"

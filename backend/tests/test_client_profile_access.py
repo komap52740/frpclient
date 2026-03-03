@@ -70,3 +70,12 @@ def test_client_cannot_open_client_profile(client_user, other_client_user):
     response = auth_as(client_user).get(f"/api/clients/{other_client_user.id}/profile/")
 
     assert response.status_code == 403
+
+
+@pytest.mark.django_db
+def test_master_can_open_clients_list(master_user, client_user):
+    response = auth_as(master_user).get("/api/admin/users/")
+
+    assert response.status_code == 200
+    assert isinstance(response.data, list)
+    assert any(item["id"] == client_user.id for item in response.data)
