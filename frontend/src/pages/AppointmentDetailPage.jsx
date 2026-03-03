@@ -817,11 +817,11 @@ export default function AppointmentDetailPage() {
     ? false
     : !showClientTabs || (clientTab === "details" && clientDetailsTabEnabled);
   const showClientPaymentCard = isClientStrictLayout
-    ? false
+    ? showClientPaymentActions && clientTab === "payment"
     : showClientPaymentActions &&
       !isClientMinimal &&
       (!showClientTabs || clientTab === "payment");
-  const showClientChatPanel = isClientStrictLayout ? true : !showClientTabs || clientTab === "chat";
+  const showClientChatPanel = isClientStrictLayout ? clientTab === "chat" : !showClientTabs || clientTab === "chat";
   const showClientDetailsCard = isClientStrictLayout
     ? false
     : !isClientMinimal && showClientTabs && clientTab === "details" && clientDetailsTabEnabled;
@@ -992,16 +992,16 @@ export default function AppointmentDetailPage() {
       return {
         title: "Ожидаем оплату",
         description: "Оплатите по реквизитам и напишите в чат, если нужна помощь.",
-        actionKey: "open_chat",
-        cta: "Открыть чат",
+        actionKey: "open_payment",
+        cta: "Перейти к оплате",
       };
     }
     if (appointment.status === "PAYMENT_PROOF_UPLOADED") {
       return {
         title: "Чек на проверке",
         description: "Обычно подтверждение занимает 1-5 минут.",
-        actionKey: "open_chat",
-        cta: "Открыть чат",
+        actionKey: "open_payment",
+        cta: "Открыть оплату",
       };
     }
     if (["NEW", "IN_REVIEW"].includes(appointment.status)) {
