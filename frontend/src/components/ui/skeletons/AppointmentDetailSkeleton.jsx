@@ -11,7 +11,7 @@ export default function AppointmentDetailSkeleton() {
         </Stack>
       </Paper>
 
-      <Grid container spacing={2}>
+      <Grid container spacing={2} sx={{ width: "100%", m: 0, minWidth: 0 }}>
         <Grid item xs={12} lg={8}>
           <Stack spacing={2}>
             {[0, 1, 2].map((index) => (

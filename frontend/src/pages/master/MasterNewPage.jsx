@@ -130,7 +130,7 @@ export default function MasterNewPage() {
         </Stack>
       </Paper>
 
-      <Grid container spacing={2}>
+      <Grid container spacing={2} sx={{ width: "100%", m: 0, minWidth: 0 }}>
         <Grid item xs={12} sm={6} md={4}>
           <KpiCard title="Доступно новых" value={summary?.new_available ?? "-"} accent="#15616d" />
         </Grid>

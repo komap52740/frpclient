@@ -384,7 +384,7 @@ export default function ClientHomePage() {
         </Paper>
       ) : null}
 
-      <Grid container spacing={2}>
+      <Grid container spacing={2} sx={{ width: "100%", m: 0, minWidth: 0 }}>
         <Grid item xs={12} md={7}>
           <Paper
             sx={{
@@ -514,7 +514,7 @@ export default function ClientHomePage() {
       </Grid>
 
       {showSecondaryBlocks ? (
-        <Grid container spacing={2}>
+        <Grid container spacing={2} sx={{ width: "100%", m: 0, minWidth: 0 }}>
           <Grid item xs={6} sm={6} lg={3}>
             <KpiCard title="Всего заявок" value={summary?.appointments_total ?? "-"} />
           </Grid>

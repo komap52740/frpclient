@@ -9,7 +9,6 @@ import {
   Button,
   Chip,
   CircularProgress,
-  Grid,
   Paper,
   Stack,
   Typography,
@@ -155,8 +154,8 @@ export default function ClientProfileDetailPage() {
   }
 
   return (
-    <Stack spacing={1.5}>
-      <Paper sx={{ p: 2, borderRadius: 3 }}>
+    <Stack spacing={1.5} sx={{ width: "100%", minWidth: 0, overflowX: "clip" }}>
+      <Paper sx={{ p: 2, borderRadius: 2.8 }}>
         <Stack spacing={1}>
           <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={1}>
             <Stack spacing={0.4}>
@@ -203,22 +202,40 @@ export default function ClientProfileDetailPage() {
         </Stack>
       </Paper>
 
-      <Grid container spacing={1}>
-        <Grid item xs={12} sm={6} md={3}>
+      <Box
+        sx={{
+          display: "grid",
+          gap: 1,
+          gridTemplateColumns: {
+            xs: "1fr",
+            sm: "repeat(2, minmax(0, 1fr))",
+            md: "repeat(4, minmax(0, 1fr))",
+          },
+          width: "100%",
+          minWidth: 0,
+        }}
+      >
+        <Box sx={{ minWidth: 0 }}>
           <StatCard title="Всего заявок" value={profile.appointments_total || 0} />
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
+        </Box>
+        <Box sx={{ minWidth: 0 }}>
           <StatCard title="Активные" value={profile.appointments_active || 0} />
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
+        </Box>
+        <Box sx={{ minWidth: 0 }}>
           <StatCard title="Завершенные" value={profile.appointments_completed || 0} />
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
+        </Box>
+        <Box sx={{ minWidth: 0 }}>
           <StatCard title="Последняя активность" value={formatDate(profile.last_appointment_at)} />
-        </Grid>
-      </Grid>
+        </Box>
+      </Box>
 
-      <Paper sx={{ p: 2, borderRadius: 3 }}>
+      <Paper
+        sx={{
+          p: 2,
+          borderRadius: 2.8,
+          "& .MuiTypography-body2": { overflowWrap: "anywhere" },
+        }}
+      >
         <Stack spacing={0.75}>
           <Typography variant="h3">Риск и поведение</Typography>
           <Typography variant="body2">
@@ -240,7 +257,13 @@ export default function ClientProfileDetailPage() {
         </Stack>
       </Paper>
 
-      <Paper sx={{ p: 2, borderRadius: 3 }}>
+      <Paper
+        sx={{
+          p: 2,
+          borderRadius: 2.8,
+          "& .MuiTypography-body2": { overflowWrap: "anywhere" },
+        }}
+      >
         <Stack spacing={0.8}>
           <Typography variant="h3">Данные сервисного центра</Typography>
           <Typography variant="body2">

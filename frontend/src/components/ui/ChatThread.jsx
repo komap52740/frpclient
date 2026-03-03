@@ -29,6 +29,8 @@ export default function ChatThread({
       spacing={1}
       sx={{
         maxHeight: isMobile ? 420 : 460,
+        width: "100%",
+        minWidth: 0,
         overflowY: "auto",
         pr: 0.6,
         pl: 0.1,
@@ -52,7 +54,10 @@ export default function ChatThread({
             >
               <Stack direction="row" spacing={0.55} alignItems="center" justifyContent="center">
                 <InfoOutlinedIcon sx={{ fontSize: 14, color: "info.main" }} />
-                <Typography variant="caption" sx={{ fontWeight: 700, color: "text.primary" }}>
+                <Typography
+                  variant="caption"
+                  sx={{ fontWeight: 700, color: "text.primary", overflowWrap: "anywhere", textAlign: "center" }}
+                >
                   {normalizeRuText(item.text)}
                 </Typography>
               </Stack>
@@ -111,7 +116,10 @@ export default function ChatThread({
               </Typography>
             </Stack>
 
-            <Typography variant="body2" sx={{ mt: 0.35, color: message.is_deleted ? "text.secondary" : "text.primary" }}>
+            <Typography
+              variant="body2"
+              sx={{ mt: 0.35, color: message.is_deleted ? "text.secondary" : "text.primary", overflowWrap: "anywhere" }}
+            >
               {message.is_deleted ? "Сообщение удалено" : normalizeRuText(message.text)}
             </Typography>
 

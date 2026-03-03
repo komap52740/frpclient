@@ -1352,8 +1352,8 @@ export default function AppointmentDetailPage() {
         </Alert>
       ) : null}
 
-      <Grid container spacing={2}>
-        <Grid item xs={12} lg={(!isClient || showClientDesktopSidebar) ? 8 : 12}>
+      <Grid container spacing={2} sx={{ width: "100%", m: 0, minWidth: 0 }}>
+        <Grid item xs={12} lg={(!isClient || showClientDesktopSidebar) ? 8 : 12} sx={{ minWidth: 0 }}>
           <Stack spacing={2}>
             {showClientDataCard ? (
               <Fade in={showClientDataCard} timeout={220}>
@@ -1924,7 +1924,7 @@ export default function AppointmentDetailPage() {
         </Grid>
 
         {(!isClient || showClientDesktopSidebar) ? (
-          <Grid item xs={12} lg={4}>
+          <Grid item xs={12} lg={4} sx={{ minWidth: 0 }}>
             <Stack spacing={2} sx={{ position: { lg: "sticky" }, top: { lg: 88 } }}>
               {!isClient ? (
                 <Paper sx={{ p: 2.2 }}>

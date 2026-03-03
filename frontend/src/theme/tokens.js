@@ -9,10 +9,10 @@ export const appTokens = {
     xxl: 6,
   },
   radius: {
-    xs: 12,
-    sm: 16,
-    md: 20,
-    lg: 28,
+    xs: 10,
+    sm: 14,
+    md: 18,
+    lg: 24,
     pill: 999,
   },
   typography: {
@@ -25,9 +25,9 @@ export const appTokens = {
     caption: "0.82rem",
   },
   shadows: {
-    soft: "0 12px 32px rgba(15, 23, 42, 0.1)",
-    card: "0 14px 36px rgba(15, 23, 42, 0.08)",
-    raised: "0 22px 52px rgba(15, 23, 42, 0.16)",
+    soft: "0 8px 20px rgba(15, 23, 42, 0.1)",
+    card: "0 10px 28px rgba(15, 23, 42, 0.08)",
+    raised: "0 14px 34px rgba(15, 23, 42, 0.14)",
     focus: "0 0 0 3px rgba(14, 116, 255, 0.2)",
   },
   colors: {

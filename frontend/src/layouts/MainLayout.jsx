@@ -174,7 +174,7 @@ export default function MainLayout({ children }) {
   };
 
   return (
-    <Box sx={{ minHeight: "100vh" }}>
+    <Box sx={{ minHeight: "100vh", width: "100%", overflowX: "clip" }}>
       <AppBar
         position="sticky"
         color="transparent"
@@ -366,7 +366,16 @@ export default function MainLayout({ children }) {
         </List>
       </Drawer>
 
-      <Container maxWidth="lg" sx={{ py: { xs: 1.4, md: 2.8 }, pb: { xs: 12, md: 3 } }}>
+      <Container
+        maxWidth="lg"
+        sx={{
+          py: { xs: 1.4, md: 2.8 },
+          pb: { xs: 12, md: 3 },
+          px: { xs: 1.1, sm: 1.8, md: 2.2 },
+          width: "100%",
+          overflowX: "clip",
+        }}
+      >
         <PageMotion>{children}</PageMotion>
       </Container>
 

@@ -1,4 +1,4 @@
-﻿import { Grid, Paper, Stack, Typography } from "@mui/material";
+import { Box, Paper, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 
 const toneStyles = {
@@ -14,20 +14,34 @@ export default function KpiTiles({ items = [] }) {
   const isDark = theme.palette.mode === "dark";
 
   return (
-    <Grid container spacing={1.25}>
+    <Box
+      sx={{
+        display: "grid",
+        gap: 1.25,
+        gridTemplateColumns: {
+          xs: "1fr",
+          sm: "repeat(2, minmax(0, 1fr))",
+          md: "repeat(4, minmax(0, 1fr))",
+        },
+        width: "100%",
+      }}
+    >
       {items.map((item) => {
         const tone = toneStyles[item.tone || "default"] || toneStyles.default;
         const palette = isDark ? tone.dark : tone.light;
 
         return (
-          <Grid item xs={12} sm={6} md={3} key={item.id || item.label}>
+          <Box key={item.id || item.label} sx={{ minWidth: 0 }}>
             <Paper
               sx={{
                 p: 1.5,
                 borderRadius: 2.6,
                 border: "1px solid",
                 borderColor: alpha(palette.accent, isDark ? 0.35 : 0.22),
-                background: `linear-gradient(145deg, ${alpha(palette.bg, isDark ? 0.9 : 1)} 0%, ${alpha(palette.bg, isDark ? 0.7 : 0.92)} 100%)`,
+                background: `linear-gradient(145deg, ${alpha(palette.bg, isDark ? 0.9 : 1)} 0%, ${alpha(
+                  palette.bg,
+                  isDark ? 0.7 : 0.92
+                )} 100%)`,
                 transition: "transform 180ms ease, box-shadow 180ms ease",
                 "&:hover": {
                   transform: "translateY(-2px)",
@@ -37,7 +51,7 @@ export default function KpiTiles({ items = [] }) {
                 },
               }}
             >
-              <Stack spacing={0.5}>
+              <Stack spacing={0.5} sx={{ minWidth: 0 }}>
                 <Typography variant="caption" sx={{ fontWeight: 700, color: "text.secondary" }}>
                   {item.label}
                 </Typography>
@@ -51,9 +65,9 @@ export default function KpiTiles({ items = [] }) {
                 ) : null}
               </Stack>
             </Paper>
-          </Grid>
+          </Box>
         );
       })}
-    </Grid>
+    </Box>
   );
 }

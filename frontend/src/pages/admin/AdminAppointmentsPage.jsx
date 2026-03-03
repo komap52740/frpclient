@@ -116,7 +116,7 @@ export default function AdminAppointmentsPage() {
         </Stack>
       </Paper>
 
-      <Grid container spacing={2}>
+      <Grid container spacing={2} sx={{ width: "100%", m: 0, minWidth: 0 }}>
         <Grid item xs={12} sm={6} md={3}>
           <KpiCard title="Всего заявок" value={summary?.appointments_total ?? "-"} />
         </Grid>

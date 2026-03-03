@@ -98,6 +98,10 @@ export function createAppTheme(mode = "light") {
           ":root": {
             colorScheme: mode,
           },
+          "html, body": {
+            maxWidth: "100%",
+            overflowX: "hidden",
+          },
           "*": {
             WebkitFontSmoothing: "antialiased",
             MozOsxFontSmoothing: "grayscale",
@@ -132,6 +136,16 @@ export function createAppTheme(mode = "light") {
           },
           "#root": {
             minHeight: "100vh",
+            maxWidth: "100%",
+            overflowX: "hidden",
+          },
+          img: {
+            display: "block",
+            maxWidth: "100%",
+            height: "auto",
+          },
+          ".MuiContainer-root, .MuiPaper-root, .MuiCard-root": {
+            minWidth: 0,
           },
         },
       },
@@ -146,6 +160,7 @@ export function createAppTheme(mode = "light") {
             paddingInline: 20,
             transition: "all 220ms cubic-bezier(0.22, 1, 0.36, 1)",
             fontWeight: 750,
+            maxWidth: "100%",
           },
           containedPrimary: {
             boxShadow: appTokens.shadows.soft,
@@ -165,6 +180,7 @@ export function createAppTheme(mode = "light") {
             backgroundColor: colors.bgElevated,
             backgroundImage: "none",
             backdropFilter: "blur(18px) saturate(145%)",
+            overflow: "hidden",
           },
         },
       },
@@ -176,6 +192,7 @@ export function createAppTheme(mode = "light") {
             boxShadow: appTokens.shadows.card,
             backgroundColor: isDark ? alpha("#0f172a", 0.8) : "rgba(255,255,255,0.88)",
             backdropFilter: "blur(16px) saturate(138%)",
+            overflow: "hidden",
           },
         },
       },
@@ -230,6 +247,11 @@ export function createAppTheme(mode = "light") {
           root: {
             borderRadius: appTokens.radius.pill,
             fontWeight: 700,
+            maxWidth: "100%",
+          },
+          label: {
+            overflow: "hidden",
+            textOverflow: "ellipsis",
           },
         },
       },

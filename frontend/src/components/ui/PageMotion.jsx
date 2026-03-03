@@ -12,10 +12,12 @@ export default function PageMotion({ children }) {
       sx={{
         animation: reducedMotion ? "none" : "frpPageEnter 320ms cubic-bezier(0.16, 1, 0.3, 1)",
         transformOrigin: "top center",
+        width: "100%",
+        minWidth: 0,
+        overflowX: "clip",
       }}
     >
       {children}
     </Box>
   );
 }
-
