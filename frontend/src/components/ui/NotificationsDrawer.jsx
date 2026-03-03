@@ -75,10 +75,10 @@ export default function NotificationsDrawer({
     >
       <Box sx={{ p: 1.5 }}>
         <Stack
-          direction={{ xs: "column", sm: "row" }}
-          alignItems={{ xs: "stretch", sm: "center" }}
-          justifyContent="space-between"
-          spacing={{ xs: 1, sm: 0 }}
+          direction="row"
+          alignItems="center"
+          flexWrap="wrap"
+          gap={0.9}
           sx={{
             mb: 1,
             p: 1,
@@ -92,7 +92,13 @@ export default function NotificationsDrawer({
             zIndex: 2,
           }}
         >
-          <Stack direction="row" spacing={0.8} alignItems="center" justifyContent="space-between">
+          <Stack
+            direction="row"
+            spacing={0.8}
+            alignItems="center"
+            justifyContent="space-between"
+            sx={{ minWidth: 0, flex: "1 1 190px", flexWrap: "wrap", rowGap: 0.6 }}
+          >
             <Typography variant="h3">Уведомления</Typography>
             <Chip
               size="small"
@@ -101,13 +107,22 @@ export default function NotificationsDrawer({
               variant={unreadCount ? "filled" : "outlined"}
             />
           </Stack>
-          <Stack direction="row" spacing={1} sx={{ width: { xs: "100%", sm: "auto" } }}>
+          <Stack
+            direction="row"
+            spacing={0.8}
+            sx={{
+              width: { xs: "100%", sm: "auto" },
+              flexWrap: "wrap",
+              justifyContent: { xs: "stretch", sm: "flex-end" },
+              ml: { sm: "auto" },
+            }}
+          >
             <Button
               size="small"
               variant="outlined"
               onClick={onRefresh}
               disabled={loading}
-              sx={{ flex: { xs: 1, sm: "unset" }, whiteSpace: "nowrap" }}
+              sx={{ flex: { xs: "1 1 0", sm: "0 1 auto" }, whiteSpace: "nowrap", minWidth: 0 }}
             >
               Обновить
             </Button>
@@ -116,7 +131,7 @@ export default function NotificationsDrawer({
               variant="text"
               onClick={onMarkAllRead}
               disabled={loading || !items.length}
-              sx={{ flex: { xs: 1, sm: "unset" }, whiteSpace: "nowrap" }}
+              sx={{ flex: { xs: "1 1 0", sm: "0 1 auto" }, whiteSpace: "nowrap", minWidth: 0 }}
             >
               Прочитать все
             </Button>

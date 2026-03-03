@@ -339,12 +339,14 @@ export default function ChatPanel({
         ]
       : [`rudesktop://${encodedId}`, `rustdesk://${encodedId}`];
 
-    uriCandidates.forEach((uri, index) => {
+    const [primaryUri, ...fallbackUris] = uriCandidates;
+    window.location.href = primaryUri;
+    fallbackUris.forEach((uri, index) => {
       window.setTimeout(() => {
         if (!document.hidden) {
           window.location.href = uri;
         }
-      }, 450 * index);
+      }, 450 * (index + 1));
     });
   };
 
@@ -727,6 +729,7 @@ export default function ChatPanel({
               label="Сообщение"
               multiline
               minRows={isMobile ? 2.3 : 2}
+              maxRows={isMobile ? 6 : 8}
               value={text}
               onChange={(event) => setText(event.target.value)}
               onKeyDown={(event) => {

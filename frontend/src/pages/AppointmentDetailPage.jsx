@@ -207,6 +207,14 @@ function validatePaymentFile(file) {
   return "";
 }
 
+function validatePaymentRequisitesNote(value) {
+  const note = (value || "").trim();
+  if (note.length < 3) {
+    return "Укажите, по каким реквизитам оплатили (минимум 3 символа)";
+  }
+  return "";
+}
+
 function getLatestEventId(eventItems = []) {
   return eventItems.reduce(
     (maxId, event) => (typeof event.id === "number" && event.id > maxId ? event.id : maxId),
@@ -311,8 +319,10 @@ export default function AppointmentDetailPage() {
 
   const [price, setPrice] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("bank_transfer");
+  const [paymentRequisitesNote, setPaymentRequisitesNote] = useState("");
   const [paymentProofFile, setPaymentProofFile] = useState(null);
   const [paymentFileError, setPaymentFileError] = useState("");
+  const [paymentRequisitesError, setPaymentRequisitesError] = useState("");
 
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewComment, setReviewComment] = useState("");
@@ -393,6 +403,8 @@ export default function AppointmentDetailPage() {
       if (!preserveDrafts && nextDetail) {
         setPrice(nextDetail.total_price || "");
         setManualStatus(nextDetail.status);
+        setPaymentRequisitesNote(nextDetail.payment_requisites_note || "");
+        setPaymentRequisitesError("");
       }
       setError("");
     } catch {
@@ -756,12 +768,14 @@ export default function AppointmentDetailPage() {
           `rustdesk://${encodedId}`,
         ];
 
-    uriCandidates.forEach((uri, index) => {
+    const [primaryUri, ...fallbackUris] = uriCandidates;
+    window.location.href = primaryUri;
+    fallbackUris.forEach((uri, index) => {
       window.setTimeout(() => {
         if (!document.hidden) {
           window.location.href = uri;
         }
-      }, 550 * index);
+      }, 550 * (index + 1));
     });
 
     window.setTimeout(() => {
@@ -769,7 +783,7 @@ export default function AppointmentDetailPage() {
         window.open(RU_DESKTOP_DOWNLOAD_URL, "_blank", "noopener,noreferrer");
         setError("Не удалось открыть RuDesktop автоматически. Установите/переустановите клиент и попробуйте снова.");
       }
-    }, 550 * uriCandidates.length + 700);
+    }, 550 * (fallbackUris.length + 1) + 700);
   };
 
   if (!appointment) {
@@ -880,9 +894,8 @@ export default function AppointmentDetailPage() {
   const rustdeskId = (appointment.rustdesk_id || "").trim();
   const rustdeskPassword = (appointment.rustdesk_password || "").trim();
   const clientProfilePath = !isClient && appointment.client ? `/clients/${appointment.client}/profile` : "";
-  const ruDesktopConnectAllowedStatuses = ["PAID", "IN_PROGRESS"];
   const hasRuDesktopCredentials = Boolean(rustdeskId) && ["master", "admin"].includes(user.role);
-  const canLaunchRuDesktop = hasRuDesktopCredentials && ruDesktopConnectAllowedStatuses.includes(appointment.status);
+  const canLaunchRuDesktop = hasRuDesktopCredentials;
   const sidebarLinks = [
     {
       id: "rustdesk_download",
@@ -1137,6 +1150,27 @@ export default function AppointmentDetailPage() {
     setPaymentFileError(selected ? validatePaymentFile(selected) : "");
   };
 
+  const onPaymentRequisitesChange = (event) => {
+    const nextValue = event.target.value;
+    setPaymentRequisitesNote(nextValue);
+    if (paymentRequisitesError) {
+      setPaymentRequisitesError(validatePaymentRequisitesNote(nextValue));
+    }
+  };
+
+  const markPaidManually = async () => {
+    const noteError = validatePaymentRequisitesNote(paymentRequisitesNote);
+    setPaymentRequisitesError(noteError);
+    if (noteError) {
+      setError(noteError);
+      setToast({ open: true, severity: "warning", message: noteError });
+      return;
+    }
+    await runAction(() =>
+      appointmentsApi.markPaid(id, paymentMethod, (paymentRequisitesNote || "").trim())
+    );
+  };
+
   const triggerPaymentFilePicker = () => {
     paymentFileInputRef.current?.click();
   };
@@ -1163,9 +1197,11 @@ export default function AppointmentDetailPage() {
       await appointmentsApi.uploadPaymentProof(id, formData);
 
       let autoMarkedPaid = false;
-      if (appointment?.status === "AWAITING_PAYMENT") {
+      const requisitesError = validatePaymentRequisitesNote(paymentRequisitesNote);
+      setPaymentRequisitesError(requisitesError);
+      if (appointment?.status === "AWAITING_PAYMENT" && !requisitesError) {
         try {
-          await appointmentsApi.markPaid(id, paymentMethod);
+          await appointmentsApi.markPaid(id, paymentMethod, (paymentRequisitesNote || "").trim());
           autoMarkedPaid = true;
         } catch (markError) {
           setToast({
@@ -1174,6 +1210,12 @@ export default function AppointmentDetailPage() {
             message: markError?.response?.data?.detail || "Чек загружен. Нажмите «Я оплатил», если статус не изменился автоматически.",
           });
         }
+      } else if (appointment?.status === "AWAITING_PAYMENT" && requisitesError) {
+        setToast({
+          open: true,
+          severity: "warning",
+          message: "Чек загружен. Укажите реквизиты оплаты и нажмите «Я оплатил».",
+        });
       }
 
       await loadData({ preserveDrafts: true, silent: true });
@@ -1573,6 +1615,11 @@ export default function AppointmentDetailPage() {
                             <a href={appointment.payment_proof_url} target="_blank" rel="noreferrer">Чек/скрин оплаты</a>
                           </Typography>
                         ) : null}
+                        {appointment.payment_requisites_note ? (
+                          <Typography variant="body2">
+                            <b>Оплата по реквизитам:</b> {normalizeRuText(appointment.payment_requisites_note)}
+                          </Typography>
+                        ) : null}
                       </Stack>
                     )}
                   </Paper>
@@ -1612,7 +1659,14 @@ export default function AppointmentDetailPage() {
                       </Button>
                     </Stack>
                   ) : (
-                    <PrimaryCTA status={appointment.status} role={user.role} onAction={handlePrimaryAction} />
+                    <Stack spacing={1}>
+                      {showMasterConfirmPayment && appointment.payment_requisites_note ? (
+                        <Alert severity="info">
+                          Клиент оплатил по реквизитам: <b>{normalizeRuText(appointment.payment_requisites_note)}</b>
+                        </Alert>
+                      ) : null}
+                      <PrimaryCTA status={appointment.status} role={user.role} onAction={handlePrimaryAction} />
+                    </Stack>
                   )}
                 </Stack>
               </Paper>
@@ -1643,6 +1697,11 @@ export default function AppointmentDetailPage() {
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
                   Проверьте чек и подтвердите оплату. Если не получается — напишите клиенту в чат.
                 </Typography>
+                {appointment.payment_requisites_note ? (
+                  <Alert severity="info" sx={{ mb: 1 }}>
+                    Клиент оплатил по реквизитам: <b>{normalizeRuText(appointment.payment_requisites_note)}</b>
+                  </Alert>
+                ) : null}
                 <Button variant="outlined" onClick={() => handlePrimaryAction("confirm_payment")}>Подтвердить оплату</Button>
               </Paper>
             ) : null}
@@ -1812,6 +1871,13 @@ export default function AppointmentDetailPage() {
                     <MenuItem value="bank_transfer">{getPaymentMethodLabel("bank_transfer")}</MenuItem>
                     <MenuItem value="crypto">{getPaymentMethodLabel("crypto")}</MenuItem>
                   </TextField>
+                  <TextField
+                    label="По каким реквизитам оплатили"
+                    value={paymentRequisitesNote}
+                    onChange={onPaymentRequisitesChange}
+                    error={Boolean(paymentRequisitesError)}
+                    helperText={paymentRequisitesError || "Это увидят мастер и админ для ручной проверки оплаты."}
+                  />
 
                   <Button variant="contained" size="large" onClick={uploadPaymentProof} disabled={!canUploadPaymentProof}>
                     {uploadingProof ? "Загружаем чек..." : appointment.status === "AWAITING_PAYMENT" ? "Загрузить чек и продолжить" : "Отправить новый чек"}
@@ -1823,7 +1889,7 @@ export default function AppointmentDetailPage() {
                       <Typography variant="caption" color="text.secondary">
                         После загрузки статус обычно меняется автоматически за 1-2 минуты.
                       </Typography>
-                      <Button size="small" variant="text" onClick={() => runAction(() => appointmentsApi.markPaid(id, paymentMethod))}>
+                      <Button size="small" variant="text" onClick={markPaidManually}>
                         Не обновилось? Нажать «Я оплатил»
                       </Button>
                     </Stack>
@@ -1904,9 +1970,16 @@ export default function AppointmentDetailPage() {
                 <Typography variant="h3" sx={{ mb: 1 }}>Управление заявкой (админ)</Typography>
                 <Stack spacing={1}>
                   {showAdminPaymentConfirm ? (
-                    <Button variant="outlined" onClick={() => handlePrimaryAction("confirm_payment_admin")}>
-                      Подтвердить оплату
-                    </Button>
+                    <Stack spacing={1}>
+                      {appointment.payment_requisites_note ? (
+                        <Alert severity="info">
+                          Клиент оплатил по реквизитам: <b>{normalizeRuText(appointment.payment_requisites_note)}</b>
+                        </Alert>
+                      ) : null}
+                      <Button variant="outlined" onClick={() => handlePrimaryAction("confirm_payment_admin")}>
+                        Подтвердить оплату
+                      </Button>
+                    </Stack>
                   ) : null}
                   <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
                     <TextField select label="Сменить статус" value={manualStatus} onChange={(event) => setManualStatus(event.target.value)}>
@@ -2169,9 +2242,7 @@ export default function AppointmentDetailPage() {
                       </Stack>
                       {hasRuDesktopCredentials ? (
                         <Typography variant="caption" color="text.secondary">
-                          {canLaunchRuDesktop
-                            ? "Кнопка запускает RuDesktop, а в буфер копируется только пароль."
-                            : "Подключение станет доступно после подтверждения оплаты и перехода заявки в работу."}
+                          Кнопка запускает RuDesktop, а в буфер копируется только пароль.
                         </Typography>
                       ) : null}
                       {isClient ? (
@@ -2469,6 +2540,13 @@ export default function AppointmentDetailPage() {
               <MenuItem value="bank_transfer">{getPaymentMethodLabel("bank_transfer")}</MenuItem>
               <MenuItem value="crypto">{getPaymentMethodLabel("crypto")}</MenuItem>
             </TextField>
+            <TextField
+              label="По каким реквизитам оплатили"
+              value={paymentRequisitesNote}
+              onChange={onPaymentRequisitesChange}
+              error={Boolean(paymentRequisitesError)}
+              helperText={paymentRequisitesError || "Это увидят мастер и админ для ручной проверки оплаты."}
+            />
 
             <Box
               sx={paymentDropZoneSx}
@@ -2529,7 +2607,7 @@ export default function AppointmentDetailPage() {
             {uploadingProof ? <LinearProgress sx={{ borderRadius: 1 }} /> : null}
 
             {isAwaitingPayment ? (
-              <Button size="small" variant="text" onClick={() => runAction(() => appointmentsApi.markPaid(id, paymentMethod))}>
+              <Button size="small" variant="text" onClick={markPaidManually}>
                 Не обновилось? Нажать «Я оплатил»
               </Button>
             ) : null}
@@ -2625,6 +2703,13 @@ export default function AppointmentDetailPage() {
               <MenuItem value="bank_transfer">{getPaymentMethodLabel("bank_transfer")}</MenuItem>
               <MenuItem value="crypto">{getPaymentMethodLabel("crypto")}</MenuItem>
             </TextField>
+            <TextField
+              label="По каким реквизитам оплатили"
+              value={paymentRequisitesNote}
+              onChange={onPaymentRequisitesChange}
+              error={Boolean(paymentRequisitesError)}
+              helperText={paymentRequisitesError || "Это увидят мастер и админ для ручной проверки оплаты."}
+            />
 
             <Box
               component="label"
@@ -2666,7 +2751,7 @@ export default function AppointmentDetailPage() {
             </Button>
 
             {isAwaitingPayment ? (
-              <Button size="small" variant="text" onClick={() => runAction(() => appointmentsApi.markPaid(id, paymentMethod))}>
+              <Button size="small" variant="text" onClick={markPaidManually}>
                 Не обновилось? Нажать «Я оплатил»
               </Button>
             ) : null}
