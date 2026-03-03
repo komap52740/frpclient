@@ -36,6 +36,29 @@ export function AuthProvider({ children }) {
   }, [loadMe]);
 
   useEffect(() => {
+    // Handles the first-login race: token is already stored but user payload
+    // has not been fully loaded yet.
+    if (loading || !getAccessToken()) {
+      return;
+    }
+    if (user && user.role) {
+      return;
+    }
+
+    let active = true;
+    setLoading(true);
+    loadMe().finally(() => {
+      if (active) {
+        setLoading(false);
+      }
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [loading, user, loadMe]);
+
+  useEffect(() => {
     const onBanned = (event) => {
       const message = event?.detail?.message || "Ваш аккаунт заблокирован администратором.";
       setUser((prev) => {
