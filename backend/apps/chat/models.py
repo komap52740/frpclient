@@ -27,8 +27,8 @@ def validate_quick_reply_media(value):
     allowed = {".jpg", ".jpeg", ".png", ".webp", ".mp4", ".mov", ".webm", ".m4v"}
     if ext not in allowed:
         raise ValidationError("Медиа шаблона: только фото (jpg/png/webp) или видео (mp4/mov/webm)")
-    if value.size > 25 * 1024 * 1024:
-        raise ValidationError("Максимальный размер медиа шаблона 25MB")
+    if value.size > 100 * 1024 * 1024:
+        raise ValidationError("Максимальный размер медиа шаблона 100MB")
 
 
 class Message(TimeStampedModel):
