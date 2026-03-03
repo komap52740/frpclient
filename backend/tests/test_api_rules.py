@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from unittest.mock import patch
 
@@ -87,7 +87,7 @@ def test_take_appointment_locking(client_user, master_user, master_user_2):
 
 
 @pytest.mark.django_db
-def test_take_appointment_requires_master_quality_approval(client_user):
+def test_take_appointment_for_active_master_without_quality_gate(client_user):
     master_pending = User.objects.create_user(
         username="master_pending_quality",
         password="x",
@@ -105,12 +105,13 @@ def test_take_appointment_requires_master_quality_approval(client_user):
     )
 
     response = auth_as(master_pending).post(f"/api/appointments/{appointment.id}/take/")
-    assert response.status_code == 403
-    assert "допущен" in str(response.data.get("detail", "")).lower()
+    assert response.status_code == 200
+    appointment.refresh_from_db()
+    assert appointment.assigned_master_id == master_pending.id
 
 
 @pytest.mark.django_db
-def test_take_appointment_rejects_trainee_master(client_user):
+def test_take_appointment_allows_non_senior_levels(client_user):
     master_trainee = User.objects.create_user(
         username="master_trainee",
         password="x",
@@ -129,8 +130,9 @@ def test_take_appointment_rejects_trainee_master(client_user):
     )
 
     response = auth_as(master_trainee).post(f"/api/appointments/{appointment.id}/take/")
-    assert response.status_code == 403
-    assert "уровень" in str(response.data.get("detail", "")).lower()
+    assert response.status_code == 200
+    appointment.refresh_from_db()
+    assert appointment.assigned_master_id == master_trainee.id
 
 
 @pytest.mark.django_db
@@ -146,21 +148,19 @@ def test_admin_can_update_master_quality(admin_user):
     response = auth_as(admin_user).post(
         f"/api/admin/masters/{master.id}/quality/",
         {
-            "master_level": "senior",
-            "master_specializations": "Samsung FRP, Xiaomi",
-            "master_quality_comment": "Подтвержден для сервисных центров",
-            "master_quality_approved": True,
+            "master_tier": "senior",
         },
         format="json",
     )
     assert response.status_code == 200
+    assert response.data["master_tier"] == "senior"
     assert response.data["master_level"] == "senior"
+    assert response.data["master_specializations"] == ""
     assert response.data["master_quality_approved"] is True
-    assert "Samsung" in response.data["master_specializations"]
 
 
 @pytest.mark.django_db
-def test_notify_new_appointment_targets_only_quality_approved_masters(client_user):
+def test_notify_new_appointment_targets_active_masters_with_telegram(client_user):
     master_allowed = User.objects.create_user(
         username="master_allowed",
         password="x",
@@ -199,9 +199,10 @@ def test_notify_new_appointment_targets_only_quality_approved_masters(client_use
     with patch("apps.accounts.notifications.send_telegram_message", return_value=True) as telegram_mock:
         sent = notify_masters_about_new_appointment(appointment)
 
-    assert sent == 1
-    telegram_mock.assert_called_once()
-    assert telegram_mock.call_args[0][0] == master_allowed.telegram_id
+    assert sent == 3
+    assert telegram_mock.call_count == 3
+    recipient_ids = {call.args[0] for call in telegram_mock.call_args_list}
+    assert recipient_ids == {master_allowed.telegram_id, 22222222, 33333333}
 
 
 @pytest.mark.django_db
@@ -658,21 +659,32 @@ def test_client_can_repeat_appointment(client_user):
 
 
 @pytest.mark.django_db
-def test_register_flow(api_client):
+def test_register_flow(api_client, monkeypatch, settings):
+    settings.EMAIL_HOST = "mail.unlocktool.ru"
+    settings.DEFAULT_FROM_EMAIL = "no-reply@example.com"
+
+    def fake_send_mail(subject, message, from_email, recipient_list, fail_silently=False):
+        return 1
+
+    monkeypatch.setattr("apps.accounts.views.send_mail", fake_send_mail)
+
     payload = {
         "username": "new_client",
+        "email": "new_client@example.com",
         "password": "safe-pass-123",
         "password_confirm": "safe-pass-123",
     }
     response = api_client.post("/api/auth/register/", payload, format="json")
-    assert response.status_code == 200
-    assert response.data["user"]["username"] == payload["username"]
-    assert response.data["user"]["role"] == RoleChoices.CLIENT
-    assert "access" in response.data
+    assert response.status_code == 201
+    assert response.data["verification_sent"] is True
+
+    created = User.objects.get(username=payload["username"])
+    assert created.role == RoleChoices.CLIENT
+    assert created.is_active is False
+    assert created.is_email_verified is False
 
     duplicate = api_client.post("/api/auth/register/", payload, format="json")
     assert duplicate.status_code == 400
-
 
 @pytest.mark.django_db
 def test_banned_client_is_blocked_from_functional_api_but_can_read_me(client_user):
@@ -941,16 +953,16 @@ def test_admin_can_review_wholesale_request(admin_user, client_user):
 
     response = auth_as(admin_user).post(
         f"/api/admin/wholesale-requests/{client_user.id}/review/",
-        {"decision": "approve", "discount_percent": 20, "review_comment": "Подтвержден сервисный центр"},
+        {"decision": "approve", "review_comment": "Подтвержден сервисный центр"},
         format="json",
     )
     assert response.status_code == 200
     assert response.data["wholesale_status"] == WholesaleStatusChoices.APPROVED
-    assert response.data["wholesale_discount_percent"] == 20
+    assert "wholesale_discount_percent" not in response.data
 
     client_user.refresh_from_db()
     assert client_user.wholesale_status == WholesaleStatusChoices.APPROVED
-    assert client_user.wholesale_discount_percent == 20
+    assert client_user.wholesale_discount_percent == 0
 
 
 @pytest.mark.django_db

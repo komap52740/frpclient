@@ -66,7 +66,6 @@ class MeSerializer(serializers.ModelSerializer):
             "master_quality_comment",
             "is_service_center",
             "wholesale_status",
-            "wholesale_discount_percent",
             "wholesale_company_name",
             "wholesale_comment",
             "wholesale_service_details",
@@ -159,6 +158,7 @@ class PasswordLoginSerializer(serializers.Serializer):
 
 class RegisterSerializer(serializers.Serializer):
     username = serializers.CharField(max_length=150)
+    email = serializers.EmailField(max_length=254)
     password = serializers.CharField(max_length=255, trim_whitespace=False)
     password_confirm = serializers.CharField(max_length=255, trim_whitespace=False)
 
@@ -170,12 +170,25 @@ class RegisterSerializer(serializers.Serializer):
             raise serializers.ValidationError("Пользователь с таким ником уже существует.")
         return username
 
+    def validate_email(self, value: str) -> str:
+        email = (value or "").strip().lower()
+        if User.objects.filter(email__iexact=email).exists():
+            raise serializers.ValidationError("Пользователь с таким email уже существует.")
+        return email
+
     def validate(self, attrs):
         if attrs["password"] != attrs["password_confirm"]:
             raise serializers.ValidationError({"password_confirm": "Пароли не совпадают."})
         if len(attrs["password"]) < 8:
             raise serializers.ValidationError({"password": "Пароль должен содержать минимум 8 символов."})
         return attrs
+
+
+class ResendVerificationSerializer(serializers.Serializer):
+    email = serializers.EmailField(max_length=254)
+
+    def validate_email(self, value: str) -> str:
+        return (value or "").strip().lower()
 
 
 class BootstrapAdminSerializer(serializers.Serializer):
@@ -212,7 +225,6 @@ class WholesaleRequestSerializer(serializers.Serializer):
 class WholesaleStatusSerializer(serializers.Serializer):
     is_service_center = serializers.BooleanField()
     wholesale_status = serializers.ChoiceField(choices=WholesaleStatusChoices.choices)
-    wholesale_discount_percent = serializers.IntegerField(min_value=0, max_value=100)
     wholesale_company_name = serializers.CharField(allow_blank=True)
     wholesale_comment = serializers.CharField(allow_blank=True)
     wholesale_service_details = serializers.CharField(allow_blank=True)
@@ -247,7 +259,6 @@ class ClientProfileDetailSerializer(serializers.ModelSerializer):
             "banned_at",
             "is_service_center",
             "wholesale_status",
-            "wholesale_discount_percent",
             "wholesale_company_name",
             "wholesale_comment",
             "wholesale_service_details",

@@ -4,6 +4,7 @@ from django.conf import settings
 from django.contrib.auth.models import AbstractUser, UserManager
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.utils import timezone
 
 from apps.common.models import TimeStampedModel
 
@@ -54,6 +55,8 @@ class User(AbstractUser, TimeStampedModel):
     telegram_id = models.BigIntegerField(unique=True, null=True, blank=True)
     telegram_username = models.CharField(max_length=255, blank=True)
     telegram_photo_url = models.URLField(blank=True)
+    is_email_verified = models.BooleanField(default=False, db_index=True)
+    email_verified_at = models.DateTimeField(null=True, blank=True)
     profile_photo = models.FileField(
         upload_to="profile_photos/",
         null=True,
@@ -193,6 +196,28 @@ class SiteSettings(TimeStampedModel):
             },
         )
         return obj
+
+
+class EmailVerificationToken(TimeStampedModel):
+    user = models.ForeignKey(
+        "accounts.User",
+        related_name="email_verification_tokens",
+        on_delete=models.CASCADE,
+    )
+    token = models.CharField(max_length=96, unique=True, db_index=True)
+    expires_at = models.DateTimeField(db_index=True)
+    used_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ("-id",)
+        indexes = [
+            models.Index(fields=("user", "used_at")),
+            models.Index(fields=("expires_at",)),
+        ]
+
+    @property
+    def is_expired(self) -> bool:
+        return self.expires_at <= timezone.now()
 
 
 class MasterStats(TimeStampedModel):

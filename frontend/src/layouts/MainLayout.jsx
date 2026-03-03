@@ -1,4 +1,4 @@
-﻿import DarkModeRoundedIcon from "@mui/icons-material/DarkModeRounded";
+import DarkModeRoundedIcon from "@mui/icons-material/DarkModeRounded";
 import LightModeRoundedIcon from "@mui/icons-material/LightModeRounded";
 import LogoutRoundedIcon from "@mui/icons-material/LogoutRounded";
 import MenuRoundedIcon from "@mui/icons-material/MenuRounded";
@@ -34,34 +34,34 @@ import { useThemeMode } from "../theme/ThemeModeContext";
 function buildMenu(role) {
   if (role === "client") {
     return [
-      { label: "Р“Р»Р°РІРЅР°СЏ", to: "/client/home" },
-      { label: "РќРѕРІР°СЏ Р·Р°СЏРІРєР°", to: "/client/create" },
-      { label: "РњРѕРё Р·Р°СЏРІРєРё", to: "/client/my" },
-      { label: "РџСЂРѕС„РёР»СЊ", to: "/client/profile" },
+      { label: "Главная", to: "/client/home" },
+      { label: "Новая заявка", to: "/client/create" },
+      { label: "Мои заявки", to: "/client/my" },
+      { label: "Профиль", to: "/client/profile" },
     ];
   }
 
   if (role === "master") {
     return [
-      { label: "РќРѕРІС‹Рµ Р·Р°СЏРІРєРё", to: "/master/new" },
-      { label: "РђРєС‚РёРІРЅС‹Рµ", to: "/master/active" },
+      { label: "Новые заявки", to: "/master/new" },
+      { label: "Активные", to: "/master/active" },
       { label: "Клиенты", to: "/master/clients" },
-      { label: "Р‘С‹СЃС‚СЂС‹Рµ РѕС‚РІРµС‚С‹", to: "/master/quick-replies" },
-      { label: "РћС‚Р·С‹РІС‹", to: "/master/reviews" },
-      { label: "РџСЂРѕС„РёР»СЊ", to: "/master/profile" },
+      { label: "Быстрые ответы", to: "/master/quick-replies" },
+      { label: "Отзывы", to: "/master/reviews" },
+      { label: "Профиль", to: "/master/profile" },
     ];
   }
 
   if (role === "admin") {
     return [
-      { label: "РЎРёСЃС‚РµРјР°", to: "/admin/system" },
-      { label: "РџСЂРѕС„РёР»СЊ", to: "/admin/profile" },
-      { label: "Р—Р°СЏРІРєРё", to: "/admin/appointments" },
-      { label: "РџСЂР°РІРёР»Р°", to: "/admin/rules" },
-      { label: "РћС‚Р·С‹РІС‹", to: "/admin/reviews" },
-      { label: "РџРѕР»СЊР·РѕРІР°С‚РµР»Рё", to: "/admin/users" },
-      { label: "РљР»РёРµРЅС‚С‹", to: "/admin/clients" },
-      { label: "РњР°СЃС‚РµСЂР°", to: "/admin/masters" },
+      { label: "Система", to: "/admin/system" },
+      { label: "Профиль", to: "/admin/profile" },
+      { label: "Заявки", to: "/admin/appointments" },
+      { label: "Правила", to: "/admin/rules" },
+      { label: "Отзывы", to: "/admin/reviews" },
+      { label: "Пользователи", to: "/admin/users" },
+      { label: "Клиенты", to: "/admin/clients" },
+      { label: "Мастера", to: "/admin/masters" },
     ];
   }
 
@@ -69,10 +69,10 @@ function buildMenu(role) {
 }
 
 function getRoleLabel(role) {
-  if (role === "client") return "РљР»РёРµРЅС‚";
-  if (role === "master") return "РњР°СЃС‚РµСЂ";
-  if (role === "admin") return "РђРґРјРёРЅ";
-  return "РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ";
+  if (role === "client") return "Клиент";
+  if (role === "master") return "Мастер";
+  if (role === "admin") return "Админ";
+  return "Пользователь";
 }
 
 function buildWholesaleBadge(user) {
@@ -83,21 +83,21 @@ function buildWholesaleBadge(user) {
   const status = user.wholesale_status || "none";
   if (status === "approved") {
     return {
-      label: "РћРїС‚РѕРІС‹Р№ СЃРµСЂРІРёСЃ",
+      label: "Оптовый сервис",
       color: "success",
       variant: "filled",
     };
   }
   if (status === "pending") {
     return {
-      label: "РћРїС‚: РЅР° РїСЂРѕРІРµСЂРєРµ",
+      label: "Опт: на проверке",
       color: "warning",
       variant: "outlined",
     };
   }
   if (status === "rejected") {
     return {
-      label: "РћРїС‚: РѕС‚РєР»РѕРЅРµРЅРѕ",
+      label: "Опт: отклонено",
       color: "error",
       variant: "outlined",
     };
@@ -108,49 +108,49 @@ function buildWholesaleBadge(user) {
 function resolveRouteContext(role, pathname) {
   if (pathname.startsWith("/appointments/")) {
     return {
-      title: "РљР°СЂС‚РѕС‡РєР° Р·Р°СЏРІРєРё",
-      subtitle: "РЎС‚Р°С‚СѓСЃ, С‡Р°С‚, РѕРїР»Р°С‚Р° Рё СЃРѕР±С‹С‚РёСЏ РІ РѕРґРЅРѕРј РѕРєРЅРµ",
+      title: "Карточка заявки",
+      subtitle: "Статус, чат, оплата и события в одном окне",
     };
   }
 
   if (role === "client") {
-    if (pathname.startsWith("/client/home")) return { title: "Р“Р»Р°РІРЅР°СЏ", subtitle: "Р‘С‹СЃС‚СЂС‹Рµ РґРµР№СЃС‚РІРёСЏ Рё Р°РєС‚СѓР°Р»СЊРЅС‹Рµ СЃС‚Р°С‚СѓСЃС‹" };
-    if (pathname.startsWith("/client/create")) return { title: "РќРѕРІР°СЏ Р·Р°СЏРІРєР°", subtitle: "РњРёРЅРёРјСѓРј РїРѕР»РµР№, РјР°РєСЃРёРјСѓРј СЃРєРѕСЂРѕСЃС‚Рё" };
-    if (pathname.startsWith("/client/my")) return { title: "РњРѕРё Р·Р°СЏРІРєРё", subtitle: "РљРѕРЅС‚СЂРѕР»СЊ Р·Р°РєР°Р·РѕРІ Р±РµР· Р»РёС€РЅРµРіРѕ С€СѓРјР°" };
-    if (pathname.startsWith("/client/profile")) return { title: "РџСЂРѕС„РёР»СЊ", subtitle: "РќР°СЃС‚СЂРѕР№РєРё Р°РєРєР°СѓРЅС‚Р° Рё Р±РµР·РѕРїР°СЃРЅРѕСЃС‚СЊ" };
+    if (pathname.startsWith("/client/home")) return { title: "Главная", subtitle: "Быстрые действия и актуальные статусы" };
+    if (pathname.startsWith("/client/create")) return { title: "Новая заявка", subtitle: "Минимум полей, максимум скорости" };
+    if (pathname.startsWith("/client/my")) return { title: "Мои заявки", subtitle: "Контроль заказов без лишнего шума" };
+    if (pathname.startsWith("/client/profile")) return { title: "Профиль", subtitle: "Настройки аккаунта и безопасность" };
   }
 
   if (role === "master") {
-    if (pathname.startsWith("/master/new")) return { title: "РќРѕРІС‹Рµ Р·Р°СЏРІРєРё", subtitle: "Р’С‹Р±РµСЂРёС‚Рµ СЃР»РµРґСѓСЋС‰СѓСЋ Р·Р°РґР°С‡Сѓ" };
-    if (pathname.startsWith("/master/active")) return { title: "РђРєС‚РёРІРЅС‹Рµ Р·Р°СЏРІРєРё", subtitle: "Р¤РѕРєСѓСЃ РЅР° С‚РµРєСѓС‰РёС… СЂР°Р±РѕС‚Р°С…" };
+    if (pathname.startsWith("/master/new")) return { title: "Новые заявки", subtitle: "Выберите следующую задачу" };
+    if (pathname.startsWith("/master/active")) return { title: "Активные заявки", subtitle: "Фокус на текущих работах" };
     if (pathname.startsWith("/master/clients")) return { title: "Клиенты", subtitle: "Профили клиентов и оптовые пометки" };
-    if (pathname.startsWith("/master/quick-replies")) return { title: "Р‘С‹СЃС‚СЂС‹Рµ РѕС‚РІРµС‚С‹", subtitle: "Р›РёС‡РЅС‹Рµ С€Р°Р±Р»РѕРЅС‹ СЃ С„РѕС‚Рѕ Рё РІРёРґРµРѕ" };
-    if (pathname.startsWith("/master/reviews")) return { title: "РћС‚Р·С‹РІС‹", subtitle: "РћС†РµРЅРєР° РєР°С‡РµСЃС‚РІР° РІР°С€РµР№ СЂР°Р±РѕС‚С‹" };
-    if (pathname.startsWith("/master/profile")) return { title: "РџСЂРѕС„РёР»СЊ", subtitle: "РџСѓР±Р»РёС‡РЅС‹Рµ РґР°РЅРЅС‹Рµ РјР°СЃС‚РµСЂР°" };
+    if (pathname.startsWith("/master/quick-replies")) return { title: "Быстрые ответы", subtitle: "Личные шаблоны с фото и видео" };
+    if (pathname.startsWith("/master/reviews")) return { title: "Отзывы", subtitle: "Оценка качества вашей работы" };
+    if (pathname.startsWith("/master/profile")) return { title: "Профиль", subtitle: "Публичные данные мастера" };
   }
 
   if (role === "admin") {
-    if (pathname.startsWith("/admin/system")) return { title: "РЎРёСЃС‚РµРјР°", subtitle: "РЎРѕСЃС‚РѕСЏРЅРёРµ РїР»Р°С‚С„РѕСЂРјС‹ Рё РєР»СЋС‡РµРІС‹Рµ РјРµС‚СЂРёРєРё" };
-    if (pathname.startsWith("/admin/profile")) return { title: "РџСЂРѕС„РёР»СЊ", subtitle: "РџСѓР±Р»РёС‡РЅС‹Рµ РґР°РЅРЅС‹Рµ Р°РґРјРёРЅРёСЃС‚СЂР°С‚РѕСЂР°" };
-    if (pathname.startsWith("/admin/appointments")) return { title: "Р—Р°СЏРІРєРё", subtitle: "РћРїРµСЂР°С†РёРѕРЅРЅС‹Р№ РєРѕРЅС‚СЂРѕР»СЊ Р·Р°РєР°Р·РѕРІ" };
-    if (pathname.startsWith("/admin/users")) return { title: "РџРѕР»СЊР·РѕРІР°С‚РµР»Рё", subtitle: "РЈРїСЂР°РІР»РµРЅРёРµ РґРѕСЃС‚СѓРїР°РјРё Рё СЂРѕР»СЏРјРё" };
-    if (pathname.startsWith("/admin/rules")) return { title: "РџСЂР°РІРёР»Р°", subtitle: "РђРІС‚РѕРјР°С‚РёР·Р°С†РёСЏ С‚СЂРёРіРіРµСЂРѕРІ Рё СѓРІРµРґРѕРјР»РµРЅРёР№" };
-    if (pathname.startsWith("/admin/reviews")) return { title: "РћС‚Р·С‹РІС‹", subtitle: "РљРѕРЅС‚СЂРѕР»СЊ РєР°С‡РµСЃС‚РІР° СЃРµСЂРІРёСЃР°" };
-    if (pathname.startsWith("/admin/masters")) return { title: "РњР°СЃС‚РµСЂР°", subtitle: "РљРІР°Р»РёС„РёРєР°С†РёСЏ Рё РґРѕСЃС‚СѓРї Рє Р·Р°СЏРІРєР°Рј" };
+    if (pathname.startsWith("/admin/system")) return { title: "Система", subtitle: "Состояние платформы и ключевые метрики" };
+    if (pathname.startsWith("/admin/profile")) return { title: "Профиль", subtitle: "Публичные данные администратора" };
+    if (pathname.startsWith("/admin/appointments")) return { title: "Заявки", subtitle: "Операционный контроль заказов" };
+    if (pathname.startsWith("/admin/users")) return { title: "Пользователи", subtitle: "Управление доступами и ролями" };
+    if (pathname.startsWith("/admin/rules")) return { title: "Правила", subtitle: "Автоматизация триггеров и уведомлений" };
+    if (pathname.startsWith("/admin/reviews")) return { title: "Отзывы", subtitle: "Контроль качества сервиса" };
+    if (pathname.startsWith("/admin/masters")) return { title: "Мастера", subtitle: "Квалификация и доступ к заявкам" };
   }
 
-  return { title: "FRP Client", subtitle: "Р Р°Р±РѕС‡РµРµ РїСЂРѕСЃС‚СЂР°РЅСЃС‚РІРѕ" };
+  return { title: "FRP Client", subtitle: "Рабочее пространство" };
 }
 
 function resolveQuickAction(role, pathname) {
   if (role === "client" && !pathname.startsWith("/client/create")) {
-    return { label: "РќРѕРІР°СЏ Р·Р°СЏРІРєР°", to: "/client/create" };
+    return { label: "Новая заявка", to: "/client/create" };
   }
   if (role === "master" && !pathname.startsWith("/master/new")) {
-    return { label: "РќРѕРІС‹Рµ Р·Р°СЏРІРєРё", to: "/master/new" };
+    return { label: "Новые заявки", to: "/master/new" };
   }
   if (role === "admin" && !pathname.startsWith("/admin/system")) {
-    return { label: "РЎРёСЃС‚РµРјР°", to: "/admin/system" };
+    return { label: "Система", to: "/admin/system" };
   }
   return null;
 }
@@ -413,9 +413,9 @@ export default function MainLayout({ children }) {
         }}
       >
         <Stack sx={{ p: 2 }} spacing={0.7}>
-          <Typography variant="h3">РќР°РІРёРіР°С†РёСЏ</Typography>
+          <Typography variant="h3">Навигация</Typography>
           <Typography variant="caption" color="text.secondary">
-            {user?.username || "РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ"} В· {roleLabel}
+            {user?.username || "Пользователь"} · {roleLabel}
           </Typography>
           {wholesaleBadge ? (
             <Chip
@@ -449,7 +449,7 @@ export default function MainLayout({ children }) {
             </ListItemButton>
           ))}
           <ListItemButton onClick={onLogout} sx={{ borderRadius: 2 }}>
-            <ListItemText primary="Р’С‹Р№С‚Рё" />
+            <ListItemText primary="Выйти" />
           </ListItemButton>
         </List>
       </Drawer>

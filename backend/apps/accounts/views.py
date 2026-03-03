@@ -1,8 +1,18 @@
 from __future__ import annotations
 
+import json
+import logging
+from datetime import timedelta
+from urllib.error import HTTPError, URLError
+from urllib.parse import urlencode
+from urllib.request import Request, urlopen
+
 from django.conf import settings
 from django.contrib.auth import authenticate
+from django.core.mail import send_mail
 from django.db.models import Q
+from django.db import transaction
+from django.http import HttpResponseRedirect
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.utils.crypto import get_random_string
@@ -12,7 +22,7 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenRefreshView
 
-from .models import MasterLevelChoices, RoleChoices, SiteSettings, User, WholesaleStatusChoices
+from .models import EmailVerificationToken, RoleChoices, SiteSettings, User, WholesaleStatusChoices
 from .permissions import IsAuthenticatedAndNotBanned
 from .services import recalculate_master_stats
 from apps.platform.services import create_notification, emit_event
@@ -22,13 +32,319 @@ from .serializers import (
     BootstrapAdminSerializer,
     MeSerializer,
     PasswordLoginSerializer,
-    ProfileUpdateSerializer,
     RegisterSerializer,
+    ProfileUpdateSerializer,
+    ResendVerificationSerializer,
     TelegramAuthSerializer,
     WholesaleRequestSerializer,
     WholesaleStatusSerializer,
     ClientProfileDetailSerializer,
 )
+
+logger = logging.getLogger(__name__)
+
+
+def _oauth_cookie_name(provider: str) -> str:
+    return f"oauth_state_{provider}"
+
+
+def _frontend_base_url(request) -> str:
+    configured = (settings.OAUTH_FRONTEND_URL or "").strip()
+    if configured:
+        return configured.rstrip("/")
+    return request.build_absolute_uri("/").rstrip("/")
+
+
+def _oauth_login_url(request) -> str:
+    base_url = _frontend_base_url(request)
+    if base_url.endswith("/login"):
+        return base_url
+    return f"{base_url}/login"
+
+
+def _oauth_redirect_uri(request, provider: str) -> str:
+    if provider == "google" and settings.GOOGLE_OAUTH_REDIRECT_URI:
+        return settings.GOOGLE_OAUTH_REDIRECT_URI
+    if provider == "yandex" and settings.YANDEX_OAUTH_REDIRECT_URI:
+        return settings.YANDEX_OAUTH_REDIRECT_URI
+    return f"{_frontend_base_url(request)}/api/auth/oauth/{provider}/callback/"
+
+
+def _oauth_config(provider: str, request):
+    if provider == "google":
+        client_id = settings.GOOGLE_OAUTH_CLIENT_ID
+        client_secret = settings.GOOGLE_OAUTH_CLIENT_SECRET
+    elif provider == "yandex":
+        client_id = settings.YANDEX_OAUTH_CLIENT_ID
+        client_secret = settings.YANDEX_OAUTH_CLIENT_SECRET
+    else:
+        return None
+
+    if not client_id or not client_secret:
+        return None
+
+    return {
+        "client_id": client_id,
+        "client_secret": client_secret,
+        "redirect_uri": _oauth_redirect_uri(request, provider),
+    }
+
+
+def _sanitize_username_seed(value: str) -> str:
+    raw = (value or "").strip()
+    if not raw:
+        return ""
+    normalized = "".join(char if char.isalnum() or char in "._-" else "_" for char in raw)
+    normalized = normalized.strip("._-")
+    return normalized[:120]
+
+
+def _build_unique_username(seed: str) -> str:
+    base = _sanitize_username_seed(seed) or f"user_{get_random_string(6).lower()}"
+    username = base
+    index = 1
+    while User.objects.filter(username=username).exists():
+        suffix = f"_{index}"
+        username = f"{base[: max(1, 150 - len(suffix))]}{suffix}"
+        index += 1
+    return username
+
+
+def _fetch_json(url: str, *, method: str = "GET", form_data: dict | None = None, headers: dict | None = None) -> dict:
+    request_headers = dict(headers or {})
+    payload = None
+    if form_data is not None:
+        payload = urlencode(form_data).encode("utf-8")
+        request_headers.setdefault("Content-Type", "application/x-www-form-urlencoded")
+
+    req = Request(url=url, data=payload, headers=request_headers, method=method)
+    try:
+        with urlopen(req, timeout=15) as response:
+            body = response.read().decode("utf-8")
+            return json.loads(body) if body else {}
+    except HTTPError as exc:
+        details = exc.read().decode("utf-8", "ignore")
+        logger.warning("OAuth HTTPError %s for %s: %s", exc.code, url, details[:400])
+        raise ValueError("oauth_http_error") from exc
+    except (URLError, TimeoutError, ValueError) as exc:
+        logger.warning("OAuth request failed for %s: %s", url, exc)
+        raise ValueError("oauth_request_failed") from exc
+
+
+def _google_authorize_url(config: dict, state: str) -> str:
+    params = {
+        "client_id": config["client_id"],
+        "redirect_uri": config["redirect_uri"],
+        "response_type": "code",
+        "scope": "openid email profile",
+        "state": state,
+        "prompt": "select_account",
+    }
+    return f"https://accounts.google.com/o/oauth2/v2/auth?{urlencode(params)}"
+
+
+def _yandex_authorize_url(config: dict, state: str) -> str:
+    params = {
+        "client_id": config["client_id"],
+        "redirect_uri": config["redirect_uri"],
+        "response_type": "code",
+        "state": state,
+        "force_confirm": "yes",
+    }
+    return f"https://oauth.yandex.ru/authorize?{urlencode(params)}"
+
+
+def _load_google_profile(config: dict, code: str) -> dict:
+    token_data = _fetch_json(
+        "https://oauth2.googleapis.com/token",
+        method="POST",
+        form_data={
+            "code": code,
+            "client_id": config["client_id"],
+            "client_secret": config["client_secret"],
+            "redirect_uri": config["redirect_uri"],
+            "grant_type": "authorization_code",
+        },
+    )
+    access_token = token_data.get("access_token")
+    if not access_token:
+        raise ValueError("oauth_missing_access_token")
+    return _fetch_json(
+        "https://openidconnect.googleapis.com/v1/userinfo",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+
+def _load_yandex_profile(config: dict, code: str) -> dict:
+    token_data = _fetch_json(
+        "https://oauth.yandex.ru/token",
+        method="POST",
+        form_data={
+            "grant_type": "authorization_code",
+            "code": code,
+            "client_id": config["client_id"],
+            "client_secret": config["client_secret"],
+        },
+    )
+    access_token = token_data.get("access_token")
+    if not access_token:
+        raise ValueError("oauth_missing_access_token")
+    return _fetch_json(
+        "https://login.yandex.ru/info?format=json",
+        headers={"Authorization": f"OAuth {access_token}"},
+    )
+
+
+def _normalize_oauth_profile(provider: str, raw_profile: dict) -> dict:
+    if provider == "google":
+        external_id = str(raw_profile.get("sub") or "").strip()
+        email = (raw_profile.get("email") or "").strip().lower()
+        email_verified = raw_profile.get("email_verified")
+        if email and email_verified is False:
+            email = ""
+        first_name = (raw_profile.get("given_name") or "").strip()
+        last_name = (raw_profile.get("family_name") or "").strip()
+        username_seed = (email.split("@", 1)[0] if email else "") or raw_profile.get("name") or f"google_{external_id[-10:]}"
+        return {
+            "external_id": external_id,
+            "email": email,
+            "username_seed": str(username_seed),
+            "first_name": first_name,
+            "last_name": last_name,
+        }
+
+    external_id = str(raw_profile.get("id") or "").strip()
+    email = (raw_profile.get("default_email") or "").strip().lower()
+    login = (raw_profile.get("login") or "").strip()
+    first_name = (raw_profile.get("first_name") or "").strip()
+    last_name = (raw_profile.get("last_name") or "").strip()
+    username_seed = login or (email.split("@", 1)[0] if email else "") or f"yandex_{external_id[-10:]}"
+    return {
+        "external_id": external_id,
+        "email": email,
+        "username_seed": str(username_seed),
+        "first_name": first_name,
+        "last_name": last_name,
+    }
+
+
+def _get_or_create_oauth_user(provider: str, profile: dict) -> User:
+    email = profile.get("email") or ""
+    username_seed = profile.get("username_seed") or ""
+
+    user = None
+    if email:
+        user = User.objects.filter(email__iexact=email).first()
+    if not user and username_seed:
+        user = User.objects.filter(username=username_seed).first()
+
+    if not user:
+        username = _build_unique_username(username_seed or f"{provider}_{profile.get('external_id', '')}")
+        user = User.objects.create_user(
+            username=username,
+            password=get_random_string(32),
+            role=RoleChoices.CLIENT,
+            email=email,
+            first_name=profile.get("first_name", ""),
+            last_name=profile.get("last_name", ""),
+        )
+    else:
+        updated = False
+        if email and user.email != email:
+            user.email = email
+            updated = True
+        if profile.get("first_name") and user.first_name != profile["first_name"]:
+            user.first_name = profile["first_name"]
+            updated = True
+        if profile.get("last_name") and user.last_name != profile["last_name"]:
+            user.last_name = profile["last_name"]
+            updated = True
+        if updated:
+            user.save(update_fields=["email", "first_name", "last_name", "updated_at"])
+
+    user.last_login = timezone.now()
+    user.save(update_fields=["last_login", "updated_at"])
+    return user
+
+
+def _oauth_redirect_with_error(request, message: str, provider: str = "") -> HttpResponseRedirect:
+    params = {"oauth_error": message}
+    if provider:
+        params["oauth_provider"] = provider
+    return HttpResponseRedirect(f"{_oauth_login_url(request)}#{urlencode(params)}")
+
+
+def _oauth_success_response(request, user: User, provider: str) -> HttpResponseRedirect:
+    refresh = RefreshToken.for_user(user)
+    access = str(refresh.access_token)
+    redirect = HttpResponseRedirect(
+        f"{_oauth_login_url(request)}#{urlencode({'oauth_access': access, 'oauth_provider': provider})}"
+    )
+    redirect.set_cookie(
+        key=settings.REFRESH_COOKIE_NAME,
+        value=str(refresh),
+        httponly=True,
+        secure=settings.REFRESH_COOKIE_SECURE,
+        samesite=settings.REFRESH_COOKIE_SAMESITE,
+        max_age=int(refresh.lifetime.total_seconds()),
+    )
+    return redirect
+
+
+def _email_verify_url(request) -> str:
+    configured = (settings.EMAIL_VERIFICATION_URL or "").strip()
+    if configured:
+        return configured
+    return request.build_absolute_uri("/api/auth/verify-email/")
+
+
+def _email_verify_link(request, token: str) -> str:
+    base_url = _email_verify_url(request)
+    delimiter = "&" if "?" in base_url else "?"
+    return f"{base_url}{delimiter}{urlencode({'token': token})}"
+
+
+def _email_verify_redirect(request, *, verified: bool = False, error_message: str = "") -> HttpResponseRedirect:
+    params = {"email_verified": "1"} if verified else {"email_error": error_message or "Не удалось подтвердить email."}
+    return HttpResponseRedirect(f"{_oauth_login_url(request)}#{urlencode(params)}")
+
+
+def _expire_active_email_tokens(user: User) -> None:
+    EmailVerificationToken.objects.filter(user=user, used_at__isnull=True).update(used_at=timezone.now())
+
+
+def _create_email_verification_token(user: User) -> EmailVerificationToken:
+    _expire_active_email_tokens(user)
+    ttl_hours = max(int(getattr(settings, "EMAIL_VERIFICATION_TTL_HOURS", 24)), 1)
+    return EmailVerificationToken.objects.create(
+        user=user,
+        token=get_random_string(64),
+        expires_at=timezone.now() + timedelta(hours=ttl_hours),
+    )
+
+
+def _send_email_verification_message(request, user: User, verification_token: EmailVerificationToken) -> bool:
+    if not settings.EMAIL_HOST:
+        return False
+
+    verify_link = _email_verify_link(request, verification_token.token)
+    ttl_hours = max(int(getattr(settings, "EMAIL_VERIFICATION_TTL_HOURS", 24)), 1)
+    subject = "Подтверждение email в FRP Client"
+    message = (
+        "Вы зарегистрировались в FRP Client.\n\n"
+        "Подтвердите email по ссылке:\n"
+        f"{verify_link}\n\n"
+        f"Ссылка действует {ttl_hours} ч.\n"
+        "Если это были не вы, просто проигнорируйте письмо."
+    )
+    delivered = send_mail(
+        subject=subject,
+        message=message,
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        recipient_list=[user.email],
+        fail_silently=False,
+    )
+    return bool(delivered)
 
 
 def admin_accounts_count() -> int:
@@ -109,6 +425,17 @@ class PasswordLoginView(APIView):
         serializer.is_valid(raise_exception=True)
         username = serializer.validated_data["username"]
         password = serializer.validated_data["password"]
+        candidate = User.objects.filter(username=username).first()
+        if (
+            candidate
+            and not candidate.is_active
+            and bool((candidate.email or "").strip())
+            and not candidate.is_email_verified
+        ):
+            return Response(
+                {"detail": "Email не подтвержден. Проверьте почту и перейдите по ссылке подтверждения."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
         user = authenticate(request=request, username=username, password=password)
         if not user:
             return Response({"detail": "Неверный логин или пароль."}, status=status.HTTP_401_UNAUTHORIZED)
@@ -126,16 +453,185 @@ class RegisterView(APIView):
     def post(self, request):
         serializer = RegisterSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        data = serializer.validated_data
+        payload = serializer.validated_data
 
-        user = User.objects.create_user(
-            username=data["username"],
-            password=data["password"],
-            role=RoleChoices.CLIENT,
+        with transaction.atomic():
+            user = User.objects.create_user(
+                username=payload["username"],
+                email=payload["email"],
+                password=payload["password"],
+                role=RoleChoices.CLIENT,
+                is_active=False,
+                is_email_verified=False,
+            )
+            verification_token = _create_email_verification_token(user)
+
+        delivered = False
+        try:
+            delivered = _send_email_verification_message(request, user, verification_token)
+        except Exception as exc:  # pragma: no cover - network dependent
+            logger.warning("Email verification send failed for user=%s: %s", user.id, exc)
+
+        message = (
+            "Аккаунт создан. Проверьте почту и подтвердите email."
+            if delivered
+            else "Аккаунт создан, но письмо не отправлено. Нажмите «Отправить письмо повторно» на странице входа."
         )
-        user.last_login = timezone.now()
-        user.save(update_fields=["last_login", "updated_at"])
-        return build_auth_response(user)
+        return Response(
+            {
+                "detail": message,
+                "email": user.email,
+                "verification_sent": delivered,
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class RegisterResendVerificationView(APIView):
+    permission_classes = (permissions.AllowAny,)
+
+    def post(self, request):
+        serializer = ResendVerificationSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        email = serializer.validated_data["email"]
+
+        user = User.objects.filter(email__iexact=email, role=RoleChoices.CLIENT).first()
+        if not user or user.is_email_verified:
+            return Response(
+                {"detail": "Если аккаунт с таким email существует, письмо отправлено."},
+                status=status.HTTP_200_OK,
+            )
+
+        verification_token = _create_email_verification_token(user)
+        delivered = False
+        try:
+            delivered = _send_email_verification_message(request, user, verification_token)
+        except Exception as exc:  # pragma: no cover - network dependent
+            logger.warning("Resend verification failed for user=%s: %s", user.id, exc)
+
+        if delivered:
+            return Response(
+                {"detail": "Письмо подтверждения отправлено повторно."},
+                status=status.HTTP_200_OK,
+            )
+        return Response(
+            {"detail": "Не удалось отправить письмо. Проверьте SMTP-настройки сервера."},
+            status=status.HTTP_503_SERVICE_UNAVAILABLE,
+        )
+
+
+class EmailVerifyView(APIView):
+    permission_classes = (permissions.AllowAny,)
+
+    def get(self, request):
+        token = (request.GET.get("token") or "").strip()
+        if not token:
+            return _email_verify_redirect(request, error_message="Ссылка подтверждения недействительна.")
+
+        verification = EmailVerificationToken.objects.select_related("user").filter(token=token).first()
+        if not verification:
+            return _email_verify_redirect(request, error_message="Ссылка подтверждения недействительна.")
+
+        if verification.used_at is not None:
+            if verification.user.is_email_verified:
+                return _email_verify_redirect(request, verified=True)
+            return _email_verify_redirect(request, error_message="Ссылка подтверждения уже использована.")
+
+        if verification.is_expired:
+            return _email_verify_redirect(request, error_message="Срок действия ссылки истек.")
+
+        user = verification.user
+        now = timezone.now()
+        with transaction.atomic():
+            verification.used_at = now
+            verification.save(update_fields=["used_at", "updated_at"])
+            user.is_active = True
+            user.is_email_verified = True
+            user.email_verified_at = now
+            user.save(update_fields=["is_active", "is_email_verified", "email_verified_at", "updated_at"])
+            EmailVerificationToken.objects.filter(user=user, used_at__isnull=True).exclude(id=verification.id).update(used_at=now)
+
+        return _email_verify_redirect(request, verified=True)
+
+
+class OAuthStartView(APIView):
+    permission_classes = (permissions.AllowAny,)
+
+    def get(self, request, provider: str):
+        normalized_provider = (provider or "").lower()
+        config = _oauth_config(normalized_provider, request)
+        if not config:
+            return Response({"detail": "OAuth для выбранного провайдера не настроен."}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+
+        state = get_random_string(40)
+        if normalized_provider == "google":
+            auth_url = _google_authorize_url(config, state)
+        elif normalized_provider == "yandex":
+            auth_url = _yandex_authorize_url(config, state)
+        else:
+            return Response({"detail": "Неизвестный OAuth-провайдер."}, status=status.HTTP_404_NOT_FOUND)
+
+        response = Response({"provider": normalized_provider, "auth_url": auth_url}, status=status.HTTP_200_OK)
+        response.set_cookie(
+            key=_oauth_cookie_name(normalized_provider),
+            value=state,
+            httponly=True,
+            secure=settings.REFRESH_COOKIE_SECURE,
+            samesite=settings.REFRESH_COOKIE_SAMESITE,
+            max_age=600,
+        )
+        return response
+
+
+class OAuthCallbackView(APIView):
+    permission_classes = (permissions.AllowAny,)
+
+    def get(self, request, provider: str):
+        normalized_provider = (provider or "").lower()
+        if normalized_provider not in {"google", "yandex"}:
+            return _oauth_redirect_with_error(request, "Неизвестный OAuth-провайдер.")
+
+        oauth_error = (request.GET.get("error_description") or request.GET.get("error") or "").strip()
+        if oauth_error:
+            response = _oauth_redirect_with_error(request, oauth_error, normalized_provider)
+            response.delete_cookie(_oauth_cookie_name(normalized_provider))
+            return response
+
+        received_state = (request.GET.get("state") or "").strip()
+        expected_state = request.COOKIES.get(_oauth_cookie_name(normalized_provider), "")
+        if not received_state or not expected_state or received_state != expected_state:
+            response = _oauth_redirect_with_error(request, "OAuth-сессия недействительна. Повторите вход.", normalized_provider)
+            response.delete_cookie(_oauth_cookie_name(normalized_provider))
+            return response
+
+        code = (request.GET.get("code") or "").strip()
+        if not code:
+            response = _oauth_redirect_with_error(request, "OAuth-код не получен.", normalized_provider)
+            response.delete_cookie(_oauth_cookie_name(normalized_provider))
+            return response
+
+        config = _oauth_config(normalized_provider, request)
+        if not config:
+            response = _oauth_redirect_with_error(request, "OAuth для выбранного провайдера не настроен.", normalized_provider)
+            response.delete_cookie(_oauth_cookie_name(normalized_provider))
+            return response
+
+        try:
+            if normalized_provider == "google":
+                raw_profile = _load_google_profile(config, code)
+            else:
+                raw_profile = _load_yandex_profile(config, code)
+            profile = _normalize_oauth_profile(normalized_provider, raw_profile)
+            user = _get_or_create_oauth_user(normalized_provider, profile)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("OAuth callback failed for provider=%s: %s", normalized_provider, exc)
+            response = _oauth_redirect_with_error(request, "Не удалось выполнить вход. Попробуйте снова.", normalized_provider)
+            response.delete_cookie(_oauth_cookie_name(normalized_provider))
+            return response
+
+        response = _oauth_success_response(request, user, normalized_provider)
+        response.delete_cookie(_oauth_cookie_name(normalized_provider))
+        return response
 
 
 class AuthLogoutView(APIView):
@@ -284,7 +780,6 @@ def serialize_wholesale_status(user: User, request=None) -> dict:
         {
             "is_service_center": user.is_service_center,
             "wholesale_status": user.wholesale_status,
-            "wholesale_discount_percent": user.wholesale_discount_percent,
             "wholesale_company_name": user.wholesale_company_name,
             "wholesale_comment": user.wholesale_comment,
             "wholesale_service_details": user.wholesale_service_details,
@@ -412,7 +907,7 @@ class WholesaleRequestView(APIView):
                     user=admin,
                     type="system",
                     title="Новая оптовая заявка",
-                    message=f"Клиент @{user.username} запросил оптовую скидку",
+                    message=f"Клиент @{user.username} запросил оптовый статус",
                     payload={"client_id": user.id},
                 )
 
@@ -465,11 +960,7 @@ class DashboardSummaryView(APIView):
 
         if user.role == RoleChoices.MASTER:
             master_stats = recalculate_master_stats(user)
-            can_take_new = (
-                user.is_master_active
-                and user.master_quality_approved
-                and user.master_level != MasterLevelChoices.TRAINEE
-            )
+            can_take_new = user.is_master_active
             new_available_queryset = Appointment.objects.filter(
                 status=AppointmentStatusChoices.NEW,
                 assigned_master__isnull=True,

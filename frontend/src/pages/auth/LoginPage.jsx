@@ -22,17 +22,24 @@ function getApiErrorMessage(error, fallback) {
 }
 
 export default function LoginPage() {
-  const { loginWithTelegram, loginWithPassword, registerWithPassword } = useAuth();
+  const { loginWithTelegram, loginWithPassword, loginWithAccessToken } = useAuth();
   const navigate = useNavigate();
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const [setupLoading, setSetupLoading] = useState(true);
   const [requiresSetup, setRequiresSetup] = useState(false);
   const [authMode, setAuthMode] = useState("password");
 
   const [passwordForm, setPasswordForm] = useState({ username: "", password: "" });
-  const [registerForm, setRegisterForm] = useState({ username: "", password: "", passwordConfirm: "" });
+  const [registerForm, setRegisterForm] = useState({
+    username: "",
+    email: "",
+    password: "",
+    passwordConfirm: "",
+  });
+  const [resendEmail, setResendEmail] = useState("");
   const [setupForm, setSetupForm] = useState({
     username: "",
     password: "",
@@ -56,6 +63,60 @@ export default function LoginPage() {
 
     loadBootstrapStatus();
   }, []);
+
+  useEffect(() => {
+    if (requiresSetup) {
+      return;
+    }
+
+    const hashValue = (window.location.hash || "").replace(/^#/, "");
+    if (!hashValue) {
+      return;
+    }
+
+    const params = new URLSearchParams(hashValue);
+    const oauthAccess = params.get("oauth_access");
+    const oauthError = params.get("oauth_error");
+    const emailVerified = params.get("email_verified");
+    const emailError = params.get("email_error");
+
+    if (!oauthAccess && !oauthError && !emailVerified && !emailError) {
+      return;
+    }
+
+    window.history.replaceState({}, document.title, `${window.location.pathname}${window.location.search}`);
+
+    if (emailVerified) {
+      setSuccess("Email успешно подтвержден. Теперь можно войти по логину и паролю.");
+      setAuthMode("password");
+    }
+
+    if (emailError) {
+      setError(emailError);
+    }
+
+    if (oauthError) {
+      setError(oauthError);
+      return;
+    }
+
+    if (!oauthAccess) {
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+    loginWithAccessToken(oauthAccess)
+      .then(() => {
+        navigate("/", { replace: true });
+      })
+      .catch((err) => {
+        setError(getApiErrorMessage(err, "Не удалось завершить OAuth-вход"));
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  }, [loginWithAccessToken, navigate, requiresSetup]);
 
   useEffect(() => {
     if (requiresSetup || authMode !== "telegram" || !BOT_USERNAME) {
@@ -103,6 +164,7 @@ export default function LoginPage() {
     event.preventDefault();
     setLoading(true);
     setError("");
+    setSuccess("");
     try {
       await loginWithPassword(passwordForm);
       navigate("/", { replace: true });
@@ -113,19 +175,60 @@ export default function LoginPage() {
     }
   };
 
+  const startOAuthLogin = async (provider) => {
+    setLoading(true);
+    setError("");
+    setSuccess("");
+    try {
+      const response = await authApi.oauthStart(provider);
+      if (!response?.auth_url) {
+        throw new Error("OAuth URL is missing");
+      }
+      window.location.assign(response.auth_url);
+    } catch (err) {
+      setError(getApiErrorMessage(err, "Не удалось начать OAuth-вход"));
+      setLoading(false);
+    }
+  };
+
   const submitRegister = async (event) => {
     event.preventDefault();
     setLoading(true);
     setError("");
+    setSuccess("");
     try {
-      await registerWithPassword({
-        username: registerForm.username,
+      const payload = {
+        username: registerForm.username.trim(),
+        email: registerForm.email.trim().toLowerCase(),
         password: registerForm.password,
         password_confirm: registerForm.passwordConfirm,
-      });
-      navigate("/", { replace: true });
+      };
+      const response = await authApi.register(payload);
+      setSuccess(response?.detail || "Аккаунт создан. Проверьте email и подтвердите регистрацию.");
+      setResendEmail(payload.email);
+      setAuthMode("password");
+      setRegisterForm({ username: "", email: "", password: "", passwordConfirm: "" });
     } catch (err) {
-      setError(getApiErrorMessage(err, "Ошибка регистрации"));
+      setError(getApiErrorMessage(err, "Не удалось зарегистрироваться"));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const resendVerification = async () => {
+    const email = resendEmail.trim().toLowerCase();
+    if (!email) {
+      setError("Укажите email для повторной отправки.");
+      return;
+    }
+    setLoading(true);
+    setError("");
+    setSuccess("");
+    try {
+      const response = await authApi.resendVerification({ email });
+      setSuccess(response?.detail || "Письмо подтверждения отправлено.");
+    } catch (err) {
+      setError(getApiErrorMessage(err, "Не удалось отправить письмо повторно"));
     } finally {
       setLoading(false);
     }
@@ -179,6 +282,7 @@ export default function LoginPage() {
             <Typography variant="h5">{requiresSetup ? "Первичная настройка" : "Вход в систему"}</Typography>
 
             {error && <Alert severity="error">{error}</Alert>}
+            {success && <Alert severity="success">{success}</Alert>}
 
             {requiresSetup ? (
               <Box component="form" onSubmit={submitBootstrap}>
@@ -221,44 +325,63 @@ export default function LoginPage() {
               </Box>
             ) : (
               <>
-                <Tabs value={authMode} onChange={(_, value) => setAuthMode(value)}>
+                <Tabs
+                  value={authMode}
+                  onChange={(_, value) => setAuthMode(value)}
+                  variant="scrollable"
+                  allowScrollButtonsMobile
+                >
+                  <Tab value="oauth" label="Google / Яндекс" />
+                  <Tab value="register" label="Регистрация по email" />
                   <Tab value="password" label="Логин и пароль" />
-                  <Tab value="register" label="Регистрация" />
                   <Tab value="telegram" label="Telegram" />
                 </Tabs>
+                <Stack direction="row" justifyContent="flex-end">
+                  {authMode === "register" ? (
+                    <Button size="small" onClick={() => setAuthMode("password")}>
+                      Уже есть аккаунт? Войти
+                    </Button>
+                  ) : (
+                    <Button size="small" onClick={() => setAuthMode("register")}>
+                      Нет аккаунта? Регистрация
+                    </Button>
+                  )}
+                </Stack>
 
-                {authMode === "password" ? (
-                  <Box component="form" onSubmit={submitPassword}>
-                    <Stack spacing={1.5}>
-                      <TextField
-                        required
-                        label="Логин"
-                        value={passwordForm.username}
-                        onChange={(e) => setPasswordForm((prev) => ({ ...prev, username: e.target.value }))}
-                      />
-                      <TextField
-                        required
-                        type="password"
-                        label="Пароль"
-                        value={passwordForm.password}
-                        onChange={(e) => setPasswordForm((prev) => ({ ...prev, password: e.target.value }))}
-                      />
-                      <Button type="submit" variant="contained" disabled={loading}>
-                        {loading ? "Выполняется..." : "Войти"}
-                      </Button>
-                    </Stack>
-                  </Box>
+                {authMode === "oauth" ? (
+                  <Stack spacing={1.5}>
+                    <Typography variant="body2" color="text.secondary">
+                      Быстрый вход через аккаунт Google или Яндекс.
+                    </Typography>
+                    <Button variant="contained" disabled={loading} onClick={() => startOAuthLogin("google")}>
+                      Войти через Google
+                    </Button>
+                    <Button variant="outlined" disabled={loading} onClick={() => startOAuthLogin("yandex")}>
+                      Войти через Яндекс
+                    </Button>
+                  </Stack>
                 ) : authMode === "register" ? (
                   <Box component="form" onSubmit={submitRegister}>
                     <Stack spacing={1.5}>
                       <Typography variant="body2" color="text.secondary">
-                        Зарегистрируйтесь по нику и паролю. Роль по умолчанию — клиент.
+                        После регистрации придет письмо со ссылкой подтверждения.
                       </Typography>
                       <TextField
                         required
                         label="Ник"
                         value={registerForm.username}
                         onChange={(e) => setRegisterForm((prev) => ({ ...prev, username: e.target.value }))}
+                      />
+                      <TextField
+                        required
+                        type="email"
+                        label="Email"
+                        value={registerForm.email}
+                        onChange={(e) => {
+                          const nextEmail = e.target.value;
+                          setRegisterForm((prev) => ({ ...prev, email: nextEmail }));
+                          setResendEmail(nextEmail);
+                        }}
                       />
                       <TextField
                         required
@@ -277,6 +400,40 @@ export default function LoginPage() {
                       <Button type="submit" variant="contained" disabled={loading}>
                         {loading ? "Выполняется..." : "Зарегистрироваться"}
                       </Button>
+                    </Stack>
+                  </Box>
+                ) : authMode === "password" ? (
+                  <Box component="form" onSubmit={submitPassword}>
+                    <Stack spacing={1.5}>
+                      <TextField
+                        required
+                        label="Логин"
+                        value={passwordForm.username}
+                        onChange={(e) => setPasswordForm((prev) => ({ ...prev, username: e.target.value }))}
+                      />
+                      <TextField
+                        required
+                        type="password"
+                        label="Пароль"
+                        value={passwordForm.password}
+                        onChange={(e) => setPasswordForm((prev) => ({ ...prev, password: e.target.value }))}
+                      />
+                      <Button type="submit" variant="contained" disabled={loading}>
+                        {loading ? "Выполняется..." : "Войти"}
+                      </Button>
+                      <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+                        <TextField
+                          size="small"
+                          type="email"
+                          label="Email для письма подтверждения"
+                          value={resendEmail}
+                          onChange={(e) => setResendEmail(e.target.value)}
+                          fullWidth
+                        />
+                        <Button variant="outlined" onClick={resendVerification} disabled={loading}>
+                          Отправить письмо повторно
+                        </Button>
+                      </Stack>
                     </Stack>
                   </Box>
                 ) : (

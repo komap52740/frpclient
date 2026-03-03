@@ -117,20 +117,18 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
-  const registerWithPassword = useCallback(async (payload) => {
-    const data = await authApi.register(payload);
-    setAccessToken(data.access);
-    if (data.user) {
-      setUser(data.user);
-    }
-
+  const loginWithAccessToken = useCallback(async (accessToken) => {
+    setAccessToken(accessToken);
     try {
       const me = await authApi.getMe();
       setUser(me.user);
       setPaymentSettings(me.payment_settings);
       return me.user;
     } catch {
-      return data.user || null;
+      clearTokens();
+      setUser(null);
+      setPaymentSettings(null);
+      throw new Error("Не удалось завершить OAuth-вход.");
     }
   }, []);
 
@@ -152,11 +150,11 @@ export function AuthProvider({ children }) {
       loading,
       loginWithTelegram,
       loginWithPassword,
-      registerWithPassword,
+      loginWithAccessToken,
       logout,
       reloadMe: loadMe,
     }),
-    [user, paymentSettings, loading, loginWithTelegram, loginWithPassword, registerWithPassword, logout, loadMe]
+    [user, paymentSettings, loading, loginWithTelegram, loginWithPassword, loginWithAccessToken, logout, loadMe]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

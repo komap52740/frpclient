@@ -61,7 +61,9 @@ api.interceptors.response.use(
     const bypassRefresh =
       requestUrl.includes("/auth/login/") ||
       requestUrl.includes("/auth/register/") ||
+      requestUrl.includes("/auth/register/resend-verification/") ||
       requestUrl.includes("/auth/telegram/") ||
+      requestUrl.includes("/auth/oauth/") ||
       requestUrl.includes("/auth/logout/") ||
       requestUrl.includes("/auth/bootstrap-admin/") ||
       requestUrl.includes("/auth/bootstrap-status/") ||
@@ -114,8 +116,16 @@ export const authApi = {
     const response = await api.post("/auth/register/", payload);
     return response.data;
   },
+  async resendVerification(payload) {
+    const response = await api.post("/auth/register/resend-verification/", payload);
+    return response.data;
+  },
   async telegramAuth(payload) {
     const response = await api.post("/auth/telegram/", payload);
+    return response.data;
+  },
+  async oauthStart(provider) {
+    const response = await api.get(`/auth/oauth/${provider}/start/`);
     return response.data;
   },
   async logout() {
@@ -274,6 +284,9 @@ export const adminApi = {
   },
   reviewWholesale(userId, payload) {
     return api.post(`/admin/wholesale-requests/${userId}/review/`, payload);
+  },
+  sendClientEmail(payload) {
+    return api.post("/admin/clients/send-email/", payload);
   },
   users(params = {}) {
     return api.get("/admin/users/all/", { params });

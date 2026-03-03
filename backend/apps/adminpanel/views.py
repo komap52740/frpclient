@@ -1,9 +1,10 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import io
 import time
 
 from django.conf import settings
+from django.core.mail import get_connection, send_mail
 from django.core.management import call_command
 from django.db import connection
 from django.shortcuts import get_object_or_404
@@ -24,6 +25,7 @@ from apps.platform.services import create_notification, emit_event
 
 from .filters import AdminAppointmentFilter
 from .serializers import (
+    AdminSendClientEmailSerializer,
     AdminMasterQualitySerializer,
     AdminSystemActionSerializer,
     AdminSystemSettingsSerializer,
@@ -269,14 +271,14 @@ class AdminUserRoleUpdateView(APIView):
     def post(self, request, user_id: int):
         user = get_object_or_404(User, id=user_id)
         if user.is_superuser and not request.user.is_superuser:
-            return Response({"detail": "РР·РјРµРЅРµРЅРёРµ СЃСѓРїРµСЂРїРѕР»СЊР·РѕРІР°С‚РµР»СЏ Р·Р°РїСЂРµС‰РµРЅРѕ."}, status=status.HTTP_403_FORBIDDEN)
+            return Response({"detail": "Изменение суперпользователя запрещено."}, status=status.HTTP_403_FORBIDDEN)
 
         serializer = AdminUserRoleSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
         new_role = serializer.validated_data["role"]
         if request.user.id == user.id and not request.user.is_superuser and new_role != RoleChoices.ADMIN:
-            return Response({"detail": "РќРµР»СЊР·СЏ СЃРЅСЏС‚СЊ СЃ СЃРµР±СЏ СЂРѕР»СЊ Р°РґРјРёРЅРёСЃС‚СЂР°С‚РѕСЂР°."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"detail": "Нельзя снять с себя роль администратора."}, status=status.HTTP_400_BAD_REQUEST)
 
         user.role = new_role
         update_fields = ["role", "updated_at"]
@@ -452,5 +454,76 @@ class AdminSystemRunActionView(APIView):
             status=status.HTTP_200_OK if success else status.HTTP_400_BAD_REQUEST,
         )
 
+
+class AdminSendClientEmailView(APIView):
+    permission_classes = (IsAuthenticatedAndNotBanned, IsAdminRole)
+
+    def post(self, request):
+        serializer = AdminSendClientEmailSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        if not settings.EMAIL_HOST:
+            return Response(
+                {"detail": "SMTP не настроен. Заполните EMAIL_* переменные в backend/.env."},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        subject = data["subject"].strip()
+        message = data["message"].strip()
+        send_to_all = data.get("send_to_all", False)
+        user_ids = data.get("user_ids") or []
+
+        if not subject or not message:
+            return Response(
+                {"detail": "Тема и текст письма обязательны."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        queryset = User.objects.filter(role=RoleChoices.CLIENT)
+        if not send_to_all:
+            queryset = queryset.filter(id__in=user_ids)
+
+        targets = list(queryset.only("id", "username", "email"))
+        recipients = [user for user in targets if (user.email or "").strip()]
+        skipped_without_email = [user.id for user in targets if not (user.email or "").strip()]
+
+        if not recipients:
+            return Response(
+                {"detail": "Нет клиентов с заполненным email для отправки."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        sent_count = 0
+        failed = []
+        connection = get_connection(fail_silently=False)
+        with connection:
+            for user in recipients:
+                try:
+                    delivered = send_mail(
+                        subject=subject,
+                        message=message,
+                        from_email=settings.DEFAULT_FROM_EMAIL,
+                        recipient_list=[user.email],
+                        fail_silently=False,
+                        connection=connection,
+                    )
+                    if delivered:
+                        sent_count += 1
+                    else:
+                        failed.append({"user_id": user.id, "username": user.username, "error": "delivery_failed"})
+                except Exception as exc:  # pragma: no cover - network dependent
+                    failed.append({"user_id": user.id, "username": user.username, "error": str(exc)[:300]})
+
+        return Response(
+            {
+                "requested_total": len(targets),
+                "with_email_total": len(recipients),
+                "sent_count": sent_count,
+                "skipped_without_email": skipped_without_email,
+                "failed": failed,
+            },
+            status=status.HTTP_200_OK,
+        )
 
 
