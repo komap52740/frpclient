@@ -3,6 +3,7 @@ from __future__ import annotations
 from django.conf import settings
 from django.contrib.auth import authenticate
 from django.db.models import Q
+from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.utils.crypto import get_random_string
 from rest_framework import permissions, status
@@ -25,6 +26,7 @@ from .serializers import (
     TelegramAuthSerializer,
     WholesaleRequestSerializer,
     WholesaleStatusSerializer,
+    ClientProfileDetailSerializer,
 )
 
 
@@ -221,6 +223,26 @@ class MeView(APIView):
             },
         }
         return Response(payload, status=status.HTTP_200_OK)
+
+
+class ClientProfileDetailView(APIView):
+    permission_classes = (IsAuthenticatedAndNotBanned,)
+
+    def get(self, request, user_id: int):
+        if not (
+            request.user.is_superuser
+            or request.user.role == RoleChoices.ADMIN
+            or request.user.role == RoleChoices.MASTER
+        ):
+            return Response({"detail": "Недостаточно прав"}, status=status.HTTP_403_FORBIDDEN)
+
+        client_user = get_object_or_404(
+            User.objects.select_related("client_stats"),
+            id=user_id,
+            role=RoleChoices.CLIENT,
+        )
+        serializer = ClientProfileDetailSerializer(client_user, context={"request": request})
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 def serialize_wholesale_status(user: User, request=None) -> dict:

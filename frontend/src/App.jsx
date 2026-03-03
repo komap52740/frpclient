@@ -45,6 +45,7 @@ const AdminRulesPage = lazyWithRetry(() => import("./pages/admin/AdminRulesPage"
 const AdminReviewsPage = lazyWithRetry(() => import("./pages/admin/AdminReviewsPage"));
 const AppointmentDetailPage = lazyWithRetry(() => import("./pages/AppointmentDetailPage"));
 const BannedPage = lazyWithRetry(() => import("./pages/BannedPage"));
+const ClientProfileDetailPage = lazyWithRetry(() => import("./pages/ClientProfileDetailPage"));
 const LoginPage = lazyWithRetry(() => import("./pages/auth/LoginPage"));
 const ClientHomePage = lazyWithRetry(() => import("./pages/client/ClientHomePage"));
 const ClientProfilePage = lazyWithRetry(() => import("./pages/client/ClientProfilePage"));
@@ -256,6 +257,14 @@ function AuthenticatedLayout() {
           />
 
           <Route path="/appointments/:id" element={<AppointmentDetailPage />} />
+          <Route
+            path="/clients/:clientId/profile"
+            element={(
+              <ProtectedRoute roles={["master", "admin"]}>
+                <ClientProfileDetailPage />
+              </ProtectedRoute>
+            )}
+          />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </MainLayout>

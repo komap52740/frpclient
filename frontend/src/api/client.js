@@ -138,6 +138,10 @@ export const authApi = {
     const response = await api.get("/dashboard/");
     return response.data;
   },
+  async clientProfile(userId) {
+    const response = await api.get(`/clients/${userId}/profile/`);
+    return response.data;
+  },
 };
 
 export const appointmentsApi = {

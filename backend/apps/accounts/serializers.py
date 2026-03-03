@@ -6,6 +6,8 @@ from django.conf import settings
 from django.utils import timezone
 from rest_framework import serializers
 
+from apps.appointments.models import Appointment, AppointmentStatusChoices
+
 from .models import ClientStats, MasterStats, SiteSettings, User, WholesaleStatusChoices
 from .telegram import verify_telegram_login
 
@@ -214,3 +216,79 @@ class WholesaleStatusSerializer(serializers.Serializer):
     wholesale_requested_at = serializers.DateTimeField(allow_null=True)
     wholesale_reviewed_at = serializers.DateTimeField(allow_null=True)
     wholesale_review_comment = serializers.CharField(allow_blank=True)
+
+
+class ClientProfileDetailSerializer(serializers.ModelSerializer):
+    client_stats = ClientStatsSerializer(read_only=True)
+    wholesale_service_photo_1_url = serializers.SerializerMethodField()
+    wholesale_service_photo_2_url = serializers.SerializerMethodField()
+    appointments_total = serializers.SerializerMethodField()
+    appointments_active = serializers.SerializerMethodField()
+    appointments_completed = serializers.SerializerMethodField()
+    last_appointment_at = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = (
+            "id",
+            "username",
+            "first_name",
+            "last_name",
+            "telegram_username",
+            "is_banned",
+            "ban_reason",
+            "banned_at",
+            "is_service_center",
+            "wholesale_status",
+            "wholesale_discount_percent",
+            "wholesale_company_name",
+            "wholesale_comment",
+            "wholesale_service_details",
+            "wholesale_service_photo_1_url",
+            "wholesale_service_photo_2_url",
+            "wholesale_requested_at",
+            "wholesale_reviewed_at",
+            "wholesale_review_comment",
+            "created_at",
+            "client_stats",
+            "appointments_total",
+            "appointments_active",
+            "appointments_completed",
+            "last_appointment_at",
+        )
+
+    def _build_file_url(self, obj: User, field_name: str):
+        file_field = getattr(obj, field_name, None)
+        if not file_field or not getattr(file_field, "url", None):
+            return None
+        request = self.context.get("request")
+        return request.build_absolute_uri(file_field.url) if request else file_field.url
+
+    def get_wholesale_service_photo_1_url(self, obj: User):
+        return self._build_file_url(obj, "wholesale_service_photo_1")
+
+    def get_wholesale_service_photo_2_url(self, obj: User):
+        return self._build_file_url(obj, "wholesale_service_photo_2")
+
+    def _queryset(self, obj: User):
+        return Appointment.objects.filter(client_id=obj.id)
+
+    def get_appointments_total(self, obj: User) -> int:
+        return self._queryset(obj).count()
+
+    def get_appointments_active(self, obj: User) -> int:
+        active_statuses = (
+            AppointmentStatusChoices.NEW,
+            AppointmentStatusChoices.IN_REVIEW,
+            AppointmentStatusChoices.AWAITING_PAYMENT,
+            AppointmentStatusChoices.PAYMENT_PROOF_UPLOADED,
+            AppointmentStatusChoices.PAID,
+            AppointmentStatusChoices.IN_PROGRESS,
+        )
+        return self._queryset(obj).filter(status__in=active_statuses).count()
+
+    def get_appointments_completed(self, obj: User) -> int:
+        return self._queryset(obj).filter(status=AppointmentStatusChoices.COMPLETED).count()
+
+    def get_last_appointment_at(self, obj: User):
+        return self._queryset(obj).order_by("-updated_at").values_list("updated_at", flat=True).first()

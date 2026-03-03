@@ -15,6 +15,7 @@
   Typography,
 } from "@mui/material";
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 import { adminApi } from "../../api/client";
 
@@ -39,6 +40,7 @@ function WholesaleStatusChip({ status, discountPercent = 0 }) {
 }
 
 export default function AdminClientsPage() {
+  const navigate = useNavigate();
   const [rows, setRows] = useState([]);
   const [error, setError] = useState("");
   const [reasonById, setReasonById] = useState({});
@@ -151,6 +153,7 @@ export default function AdminClientsPage() {
             <TableRow>
               <TableCell>ID</TableCell>
               <TableCell>Логин</TableCell>
+              <TableCell>Профиль</TableCell>
               <TableCell>Блокировка</TableCell>
               <TableCell>Причина бана</TableCell>
               <TableCell>Опт-статус</TableCell>
@@ -171,6 +174,11 @@ export default function AdminClientsPage() {
                 <TableRow key={row.id} hover>
                   <TableCell>{row.id}</TableCell>
                   <TableCell>{row.username}</TableCell>
+                  <TableCell>
+                    <Button size="small" variant="outlined" onClick={() => navigate(`/clients/${row.id}/profile`)}>
+                      Открыть
+                    </Button>
+                  </TableCell>
                   <TableCell>{row.is_banned ? "Забанен" : "Активен"}</TableCell>
                   <TableCell>
                     <TextField

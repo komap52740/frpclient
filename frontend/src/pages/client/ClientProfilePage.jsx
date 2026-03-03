@@ -17,13 +17,6 @@ import { useAuth } from "../../auth/AuthContext";
 
 dayjs.locale("ru");
 
-function resolveRiskLabel(level) {
-  if (level === "critical") return "Критический";
-  if (level === "high") return "Высокий";
-  if (level === "medium") return "Средний";
-  return "Низкий";
-}
-
 function resolveLevelLabel(level) {
   if (level === "pro") return "Pro";
   if (level === "advanced") return "Продвинутый";
@@ -96,7 +89,6 @@ export default function ClientProfilePage() {
     return username.slice(0, 2).toUpperCase();
   }, [user?.username]);
 
-  const riskLabel = resolveRiskLabel(stats.risk_level);
   const levelLabel = resolveLevelLabel(stats.level);
   const wholesaleLabel = resolveWholesaleLabel(user?.wholesale_status);
   const isWholesaleApproved = user?.wholesale_status === "approved";
@@ -210,7 +202,6 @@ export default function ClientProfilePage() {
                 fontWeight: 760,
               }}
             />
-            <Chip size="small" label={`Риск: ${riskLabel}`} variant="outlined" />
             <Chip
               size="small"
               icon={<StorefrontRoundedIcon />}

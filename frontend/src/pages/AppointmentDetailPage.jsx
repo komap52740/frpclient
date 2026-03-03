@@ -791,6 +791,7 @@ export default function AppointmentDetailPage() {
   const sidebarTimelineEvents = isClient ? visibleTimelineEvents.slice(0, isClientCompact ? 2 : 4) : visibleTimelineEvents;
   const rustdeskId = (appointment.rustdesk_id || "").trim();
   const rustdeskPassword = (appointment.rustdesk_password || "").trim();
+  const clientProfilePath = !isClient && appointment.client ? `/clients/${appointment.client}/profile` : "";
   const ruDesktopConnectAllowedStatuses = ["PAID", "IN_PROGRESS"];
   const hasRuDesktopCredentials = Boolean(rustdeskId) && ["master", "admin"].includes(user.role);
   const canLaunchRuDesktop = hasRuDesktopCredentials && ruDesktopConnectAllowedStatuses.includes(appointment.status);
@@ -1421,6 +1422,17 @@ export default function AppointmentDetailPage() {
                         ) : null}
                         <Typography variant="body2"><b>Есть ПК:</b> {appointment.has_pc ? "Да" : "Нет"}</Typography>
                         <Typography variant="body2"><b>Клиент:</b> {normalizeRuText(appointment.client_username) || appointment.client}</Typography>
+                        {clientProfilePath ? (
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            startIcon={<ShieldRoundedIcon fontSize="small" />}
+                            onClick={() => navigate(clientProfilePath)}
+                            sx={{ alignSelf: "flex-start" }}
+                          >
+                            Профиль клиента
+                          </Button>
+                        ) : null}
                         {appointment.is_wholesale_request ? (
                           <Chip
                             size="small"
@@ -1924,6 +1936,17 @@ export default function AppointmentDetailPage() {
                   <Stack spacing={0.7}>
                     <Typography variant="body2"><b>Мастер:</b> {normalizeRuText(appointment.master_username) || "Пока не назначен"}</Typography>
                     <Typography variant="body2"><b>Риск клиента:</b> {appointment.client_risk_level || "—"} {appointment.client_risk_score != null ? `(${appointment.client_risk_score})` : ""}</Typography>
+                    {clientProfilePath ? (
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        startIcon={<ShieldRoundedIcon fontSize="small" />}
+                        onClick={() => navigate(clientProfilePath)}
+                        sx={{ alignSelf: "flex-start" }}
+                      >
+                        Открыть полный профиль клиента
+                      </Button>
+                    ) : null}
                     {appointment.is_wholesale_request ? (
                       <Typography variant="body2"><b>Клиент:</b> Оптовый</Typography>
                     ) : null}
