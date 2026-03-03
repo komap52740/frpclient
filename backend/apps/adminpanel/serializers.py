@@ -119,3 +119,20 @@ class AdminSystemActionSerializer(serializers.Serializer):
     )
 
     action = serializers.ChoiceField(choices=ACTION_CHOICES)
+
+class AdminSendClientEmailSerializer(serializers.Serializer):
+    subject = serializers.CharField(max_length=255)
+    message = serializers.CharField(max_length=10000)
+    user_ids = serializers.ListField(
+        child=serializers.IntegerField(min_value=1),
+        required=False,
+        allow_empty=True,
+    )
+    send_to_all = serializers.BooleanField(required=False, default=False)
+
+    def validate(self, attrs):
+        send_to_all = attrs.get("send_to_all", False)
+        user_ids = attrs.get("user_ids") or []
+        if not send_to_all and not user_ids:
+            raise serializers.ValidationError("Select users or set send_to_all=true.")
+        return attrs
