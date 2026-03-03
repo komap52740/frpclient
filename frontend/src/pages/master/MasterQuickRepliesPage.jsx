@@ -43,23 +43,28 @@ function isValidCommand(command) {
 }
 
 function extractApiError(err, fallback) {
+  const statusCode = Number(err?.response?.status || 0);
+  const statusFallback = (() => {
+    if (statusCode === 400) return "Проверьте поля шаблона и попробуйте снова.";
+    if (statusCode === 401) return "Сессия истекла. Обновите страницу и войдите снова.";
+    if (statusCode === 403) return "Недостаточно прав. Быстрые ответы доступны только мастеру.";
+    if (statusCode === 404) return "Сервис шаблонов не найден. Обновите страницу.";
+    if (statusCode === 409) return "Такой шаблон уже существует.";
+    if (statusCode === 413) return "Файл слишком большой. Для фото/видео шаблона максимум 25 МБ.";
+    if (statusCode === 415) return "Недопустимый формат файла. Загрузите фото или видео.";
+    if (statusCode >= 500) return "Сервер временно недоступен. Повторите через 5-10 секунд.";
+    return fallback;
+  })();
   const data = err?.response?.data;
-  if (!data) return fallback;
+  if (!data) return statusFallback;
 
   if (typeof data === "string") {
-    const statusCode = Number(err?.response?.status || 0);
     const trimmed = data.trim();
     const looksLikeHtml = trimmed.startsWith("<!DOCTYPE") || trimmed.startsWith("<html") || trimmed.startsWith("<");
     if (looksLikeHtml) {
-      if (statusCode === 413) {
-        return "Файл слишком большой. Для фото/видео шаблона максимум 25 МБ.";
-      }
-      if (statusCode === 502 || statusCode === 503 || statusCode === 504) {
-        return "Сервис временно недоступен. Повторите через 5-10 секунд.";
-      }
-      return fallback;
+      return statusFallback;
     }
-    return normalizeRuText(trimmed || fallback);
+    return normalizeRuText(trimmed || statusFallback);
   }
 
   if (typeof data.detail === "string" && data.detail.trim()) {
@@ -69,19 +74,36 @@ function extractApiError(err, fallback) {
     return normalizeRuText(data.non_field_errors[0]);
   }
 
+  const collectStrings = (value, acc = []) => {
+    if (!value) return acc;
+    if (typeof value === "string") {
+      if (value.trim()) acc.push(value.trim());
+      return acc;
+    }
+    if (Array.isArray(value)) {
+      value.forEach((item) => collectStrings(item, acc));
+      return acc;
+    }
+    if (typeof value === "object") {
+      Object.values(value).forEach((item) => collectStrings(item, acc));
+      return acc;
+    }
+    return acc;
+  };
+
   const fieldOrder = ["command", "title", "text", "media_file", "remove_media"];
   for (const field of fieldOrder) {
-    const value = data[field];
-    if (typeof value === "string" && value.trim()) return normalizeRuText(value);
-    if (Array.isArray(value) && typeof value[0] === "string") return normalizeRuText(value[0]);
+    const values = collectStrings(data[field]);
+    if (values.length) return normalizeRuText(values[0]);
   }
 
-  for (const value of Object.values(data)) {
-    if (typeof value === "string" && value.trim()) return normalizeRuText(value);
-    if (Array.isArray(value) && typeof value[0] === "string") return normalizeRuText(value[0]);
+  const allValues = collectStrings(data);
+  if (allValues.length) {
+    const [firstValue] = allValues;
+    return normalizeRuText(firstValue);
   }
 
-  return fallback;
+  return statusFallback;
 }
 
 function inferMediaKind(fileName = "") {

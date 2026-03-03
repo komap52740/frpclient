@@ -272,6 +272,10 @@ export default function MainLayout({ children }) {
               <Typography
                 sx={{
                   fontWeight: 800,
+                  color: (themeValue) =>
+                    themeValue.palette.mode === "dark"
+                      ? "rgba(236, 242, 252, 0.98)"
+                      : "rgba(18, 33, 55, 0.96)",
                   letterSpacing: "-0.02em",
                   whiteSpace: "nowrap",
                   overflow: "hidden",
@@ -283,9 +287,13 @@ export default function MainLayout({ children }) {
             </Stack>
             <Typography
               variant="caption"
-              color="text.secondary"
+              color="inherit"
               sx={{
                 display: { xs: "none", md: "block" },
+                color: (themeValue) =>
+                  themeValue.palette.mode === "dark"
+                    ? "rgba(181, 198, 222, 0.92)"
+                    : "rgba(60, 79, 108, 0.9)",
                 whiteSpace: "nowrap",
                 overflow: "hidden",
                 textOverflow: "ellipsis",
@@ -299,7 +307,7 @@ export default function MainLayout({ children }) {
             <Button
               component={RouterLink}
               to={quickAction.to}
-              variant="contained"
+              variant="outlined"
               size="small"
               sx={{
                 height: { xs: 36, md: 38 },
@@ -309,8 +317,25 @@ export default function MainLayout({ children }) {
                 fontWeight: 800,
                 letterSpacing: "-0.01em",
                 textTransform: "none",
+                borderWidth: 1,
+                borderColor: (themeValue) => alpha(themeValue.palette.primary.main, 0.42),
+                color: (themeValue) =>
+                  themeValue.palette.mode === "dark"
+                    ? alpha(themeValue.palette.primary.light, 0.96)
+                    : alpha(themeValue.palette.primary.dark, 0.88),
+                bgcolor: (themeValue) =>
+                  themeValue.palette.mode === "dark"
+                    ? alpha(themeValue.palette.primary.main, 0.16)
+                    : alpha(themeValue.palette.primary.main, 0.08),
                 boxShadow: "none",
-                "&:hover": { boxShadow: "none" },
+                "&:hover": {
+                  boxShadow: "none",
+                  borderColor: (themeValue) => alpha(themeValue.palette.primary.main, 0.6),
+                  bgcolor: (themeValue) =>
+                    themeValue.palette.mode === "dark"
+                      ? alpha(themeValue.palette.primary.main, 0.22)
+                      : alpha(themeValue.palette.primary.main, 0.14),
+                },
               }}
             >
               {quickAction.label}
@@ -335,6 +360,19 @@ export default function MainLayout({ children }) {
                 sx={{
                   ...chipControlSx,
                   display: { xs: "none", md: "inline-flex" },
+                  ...(wholesaleBadge.color === "success"
+                    ? {
+                        bgcolor: (themeValue) =>
+                          themeValue.palette.mode === "dark"
+                            ? alpha(themeValue.palette.success.main, 0.2)
+                            : alpha(themeValue.palette.success.main, 0.12),
+                        color: (themeValue) =>
+                          themeValue.palette.mode === "dark"
+                            ? alpha(themeValue.palette.success.light, 0.96)
+                            : alpha(themeValue.palette.success.dark, 0.95),
+                        borderColor: (themeValue) => alpha(themeValue.palette.success.main, 0.45),
+                      }
+                    : {}),
                 }}
               />
             ) : null}
