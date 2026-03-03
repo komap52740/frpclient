@@ -690,7 +690,7 @@ export default function AppointmentDetailPage() {
   }
 
   const isClient = user.role === "client";
-  const isClientMinimal = isClient;
+  const isClientMinimal = isClient && clientCompactView;
   const isMasterAssigned = user.role === "master" && appointment.assigned_master === user.id;
 
   const showClientPaymentActions =
@@ -709,6 +709,10 @@ export default function AppointmentDetailPage() {
   const showMasterStart = isMasterAssigned && appointment.status === "PAID";
   const showMasterComplete = isMasterAssigned && appointment.status === "IN_PROGRESS";
   const showMasterReviewClient = isMasterAssigned && appointment.status === "COMPLETED";
+  const showMasterActionPanel =
+    user.role === "master" &&
+    (showMasterTake || showMasterReviewAndPrice || showMasterConfirmPayment || showMasterStart || showMasterComplete);
+  const showLegacyMasterCards = false;
 
   const showAdminControls = user.role === "admin";
   const showAdminPaymentConfirm = showAdminControls && appointment.status === "PAYMENT_PROOF_UPLOADED";
@@ -1152,7 +1156,7 @@ export default function AppointmentDetailPage() {
                 label={statusUi.label}
                 sx={{ bgcolor: statusUi.bg, color: statusUi.color, border: `1px solid ${statusUi.color}33`, fontWeight: 700 }}
               />
-              {isClient && !isClientMinimal ? (
+              {isClient ? (
                 <Button
                   size="small"
                   variant={clientCompactView ? "outlined" : "text"}
@@ -1214,7 +1218,7 @@ export default function AppointmentDetailPage() {
                 </Button>
               </Stack>
             </Paper>
-          ) : !isClient ? (
+          ) : !isClient && !showMasterActionPanel ? (
             <PrimaryCTA status={appointment.status} role={user.role} onAction={handlePrimaryAction} />
           ) : null}
 
@@ -1443,7 +1447,45 @@ export default function AppointmentDetailPage() {
               </Fade>
             ) : null}
 
-            {showMasterReviewAndPrice ? (
+            {showMasterActionPanel ? (
+              <Paper sx={{ p: 2.2, borderRadius: 3 }}>
+                <Stack spacing={1.1}>
+                  <Typography variant="h3">Панель действий мастера</Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    {showMasterTake
+                      ? "Возьмите заявку, чтобы закрепить ее за собой и начать работу."
+                      : showMasterReviewAndPrice
+                        ? "Назначьте цену. После этого клиент сразу увидит шаг оплаты."
+                        : showMasterConfirmPayment
+                          ? "Проверьте чек и подтвердите оплату клиента."
+                          : showMasterStart
+                            ? "Оплата подтверждена. Можно запускать работу."
+                            : "Работа в процессе. После завершения закройте заявку."}
+                  </Typography>
+                  {showMasterReviewAndPrice ? (
+                    <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+                      <TextField
+                        label="Цена (руб.)"
+                        type="number"
+                        value={price}
+                        onChange={(event) => setPrice(event.target.value)}
+                        helperText="Обычно занимает 1-2 минуты"
+                      />
+                      <Button variant="contained" onClick={() => handlePrimaryAction("set_price")}>
+                        Назначить цену
+                      </Button>
+                      <Button color="warning" variant="outlined" onClick={() => runAction(() => appointmentsApi.decline(id))}>
+                        Отклонить
+                      </Button>
+                    </Stack>
+                  ) : (
+                    <PrimaryCTA status={appointment.status} role={user.role} onAction={handlePrimaryAction} />
+                  )}
+                </Stack>
+              </Paper>
+            ) : null}
+
+            {showMasterReviewAndPrice && showLegacyMasterCards ? (
               <Paper sx={{ p: 2.2 }}>
                 <Typography variant="h3" sx={{ mb: 1 }}>Панель действий мастера</Typography>
                 <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
@@ -1462,7 +1504,7 @@ export default function AppointmentDetailPage() {
               </Paper>
             ) : null}
 
-            {showMasterConfirmPayment ? (
+            {showMasterConfirmPayment && showLegacyMasterCards ? (
               <Paper sx={{ p: 2.2 }}>
                 <Typography variant="h3" sx={{ mb: 1 }}>Оплата клиента</Typography>
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
@@ -1472,21 +1514,21 @@ export default function AppointmentDetailPage() {
               </Paper>
             ) : null}
 
-            {showMasterStart ? (
+            {showMasterStart && showLegacyMasterCards ? (
               <Paper sx={{ p: 2.2 }}>
                 <Typography variant="h3" sx={{ mb: 1 }}>Запуск работы</Typography>
                 <Button variant="outlined" onClick={() => handlePrimaryAction("start_work")}>Начать работу</Button>
               </Paper>
             ) : null}
 
-            {showMasterComplete ? (
+            {showMasterComplete && showLegacyMasterCards ? (
               <Paper sx={{ p: 2.2 }}>
                 <Typography variant="h3" sx={{ mb: 1 }}>Завершение</Typography>
                 <Button variant="outlined" color="success" onClick={() => handlePrimaryAction("complete_work")}>Завершить работу</Button>
               </Paper>
             ) : null}
 
-            {showMasterTake ? (
+            {showMasterTake && showLegacyMasterCards ? (
               <Paper sx={{ p: 2.2 }}>
                 <Typography variant="h3" sx={{ mb: 1 }}>Новая заявка</Typography>
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>

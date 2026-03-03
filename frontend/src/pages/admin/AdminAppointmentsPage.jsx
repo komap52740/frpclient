@@ -170,20 +170,52 @@ export default function AdminAppointmentsPage() {
             </TableRow>
           </TableHead>
           <TableBody>
-            {visibleRows.map((row) => (
-              <TableRow key={row.id}>
-                <TableCell>{row.id}</TableCell>
-                <TableCell>{row.client_username || row.client}</TableCell>
-                <TableCell>{row.master_username || row.assigned_master || "-"}</TableCell>
-                <TableCell><StatusChip status={row.status} /></TableCell>
-                <TableCell>{row.total_price ? `${row.total_price} ₽` : "-"}</TableCell>
-                <TableCell>
-                  <Button component={RouterLink} to={`/appointments/${row.id}`} size="small">
-                    Открыть
-                  </Button>
+            {visibleRows.length ? (
+              visibleRows.map((row) => (
+                <TableRow
+                  key={row.id}
+                  sx={
+                    isUrgent(row)
+                      ? {
+                          bgcolor: "rgba(239,68,68,0.04)",
+                          "& td": { borderBottomColor: "rgba(239,68,68,0.26)" },
+                        }
+                      : undefined
+                  }
+                >
+                  <TableCell>{row.id}</TableCell>
+                  <TableCell>{row.client_username || row.client}</TableCell>
+                  <TableCell>{row.master_username || row.assigned_master || "-"}</TableCell>
+                  <TableCell>
+                    <Stack direction="row" spacing={0.6} alignItems="center" flexWrap="wrap" useFlexGap>
+                      <StatusChip status={row.status} />
+                      {(row.unread_count || 0) > 0 ? (
+                        <Chip size="small" color="primary" variant="outlined" label={`Сообщения: ${row.unread_count}`} />
+                      ) : null}
+                      {row.sla_breached ? (
+                        <Chip size="small" color="error" variant="filled" label="SLA риск" />
+                      ) : null}
+                    </Stack>
+                  </TableCell>
+                  <TableCell>{row.total_price ? `${row.total_price} ₽` : "-"}</TableCell>
+                  <TableCell>
+                    <Button component={RouterLink} to={`/appointments/${row.id}`} size="small">
+                      Открыть
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))
+            ) : (
+              <TableRow>
+                <TableCell colSpan={6}>
+                  <Typography variant="body2" color="text.secondary">
+                    {viewMode === "urgent"
+                      ? "Срочных заявок сейчас нет."
+                      : "Заявки по выбранному фильтру не найдены."}
+                  </Typography>
                 </TableCell>
               </TableRow>
-            ))}
+            )}
           </TableBody>
         </Table>
       </Paper>
