@@ -1,5 +1,6 @@
-﻿import { Alert, Box, Button, CircularProgress, Paper, Stack, Tab, Tabs, TextField, Typography } from "@mui/material";
-import { useEffect, useState } from "react";
+import { Alert, Box, Button, Chip, CircularProgress, Paper, Stack, Tab, Tabs, TextField, Typography } from "@mui/material";
+import { alpha } from "@mui/material/styles";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { authApi } from "../../api/client";
@@ -14,6 +15,17 @@ function getApiErrorMessage(error, fallback) {
   }
   if (Array.isArray(data?.non_field_errors) && typeof data.non_field_errors[0] === "string") {
     return data.non_field_errors[0];
+  }
+  if (data && typeof data === "object") {
+    for (const key of Object.keys(data)) {
+      const value = data[key];
+      if (typeof value === "string" && value) {
+        return value;
+      }
+      if (Array.isArray(value) && typeof value[0] === "string" && value[0]) {
+        return value[0];
+      }
+    }
   }
   if (typeof data === "string" && data) {
     return data;
@@ -39,7 +51,6 @@ export default function LoginPage() {
     password: "",
     passwordConfirm: "",
   });
-  const [resendEmail, setResendEmail] = useState("");
   const [setupForm, setSetupForm] = useState({
     username: "",
     password: "",
@@ -47,6 +58,19 @@ export default function LoginPage() {
     first_name: "",
     last_name: "",
   });
+
+  const modeSubtitle = useMemo(() => {
+    if (authMode === "oauth") {
+      return "Один клик через Google или Яндекс.";
+    }
+    if (authMode === "register") {
+      return "Создайте клиентский аккаунт. Подтверждение придет на email.";
+    }
+    if (authMode === "telegram") {
+      return "Авторизация через Telegram-виджет.";
+    }
+    return "Вход по логину и паролю.";
+  }, [authMode]);
 
   useEffect(() => {
     const loadBootstrapStatus = async () => {
@@ -87,7 +111,7 @@ export default function LoginPage() {
     window.history.replaceState({}, document.title, `${window.location.pathname}${window.location.search}`);
 
     if (emailVerified) {
-      setSuccess("Email успешно подтвержден. Теперь можно войти по логину и паролю.");
+      setSuccess("Email успешно подтвержден. Теперь можно войти.");
       setAuthMode("password");
     }
 
@@ -205,30 +229,10 @@ export default function LoginPage() {
       };
       const response = await authApi.register(payload);
       setSuccess(response?.detail || "Аккаунт создан. Проверьте email и подтвердите регистрацию.");
-      setResendEmail(payload.email);
       setAuthMode("password");
       setRegisterForm({ username: "", email: "", password: "", passwordConfirm: "" });
     } catch (err) {
       setError(getApiErrorMessage(err, "Не удалось зарегистрироваться"));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const resendVerification = async () => {
-    const email = resendEmail.trim().toLowerCase();
-    if (!email) {
-      setError("Укажите email для повторной отправки.");
-      return;
-    }
-    setLoading(true);
-    setError("");
-    setSuccess("");
-    try {
-      const response = await authApi.resendVerification({ email });
-      setSuccess(response?.detail || "Письмо подтверждения отправлено.");
-    } catch (err) {
-      setError(getApiErrorMessage(err, "Не удалось отправить письмо повторно"));
     } finally {
       setLoading(false);
     }
@@ -260,26 +264,136 @@ export default function LoginPage() {
     }
   };
 
+  if (setupLoading) {
+    return (
+      <Box
+        sx={{
+          minHeight: "100vh",
+          display: "grid",
+          placeItems: "center",
+          background:
+            "radial-gradient(75% 60% at 0% 0%, rgba(42, 92, 255, 0.30) 0%, rgba(11, 17, 36, 0.95) 56%, #070c1b 100%)",
+        }}
+      >
+        <Stack spacing={2} alignItems="center">
+          <CircularProgress size={32} />
+          <Typography color="rgba(255,255,255,0.88)">Проверка состояния системы...</Typography>
+        </Stack>
+      </Box>
+    );
+  }
+
   return (
     <Box
       sx={{
         minHeight: "100vh",
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-        px: 2,
-        background: "radial-gradient(circle at top, #e0f4f2 0%, #f8f6f2 60%)",
+        px: { xs: 1.5, md: 3.5 },
+        py: { xs: 2, md: 3.5 },
+        background:
+          "radial-gradient(75% 60% at 0% 0%, rgba(42, 92, 255, 0.28) 0%, rgba(12, 18, 38, 0.94) 56%, #070c1b 100%)",
       }}
     >
-      <Paper sx={{ p: 4, width: "100%", maxWidth: 520 }}>
-        {setupLoading ? (
-          <Stack spacing={2} alignItems="center">
-            <CircularProgress size={28} />
-            <Typography>Проверка состояния системы...</Typography>
+      <Box
+        sx={{
+          width: "100%",
+          maxWidth: 1100,
+          mx: "auto",
+          display: "grid",
+          gap: { xs: 2, md: 3 },
+          gridTemplateColumns: { xs: "1fr", md: "1.05fr 1fr" },
+        }}
+      >
+        <Paper
+          elevation={0}
+          sx={{
+            position: "relative",
+            overflow: "hidden",
+            borderRadius: 5,
+            minHeight: { xs: 220, md: "100%" },
+            p: { xs: 2.5, md: 4.5 },
+            border: "1px solid rgba(123, 162, 255, 0.25)",
+            background:
+              "linear-gradient(155deg, rgba(15,26,53,0.90) 0%, rgba(8,16,36,0.95) 55%, rgba(8,13,28,0.98) 100%)",
+            boxShadow: "0 34px 70px rgba(0,0,0,0.42)",
+            "&::before": {
+              content: "\"\"",
+              position: "absolute",
+              top: -90,
+              right: -70,
+              width: 230,
+              height: 230,
+              borderRadius: "50%",
+              background: "radial-gradient(circle, rgba(84,154,255,0.34) 0%, rgba(84,154,255,0) 72%)",
+            },
+          }}
+        >
+          <Stack spacing={2.2} sx={{ position: "relative", zIndex: 1 }}>
+            <Chip
+              label="FRP Client Platform"
+              sx={{
+                alignSelf: "flex-start",
+                color: "rgba(201,228,255,0.95)",
+                bgcolor: "rgba(91,151,255,0.17)",
+                border: "1px solid rgba(130,183,255,0.4)",
+                fontWeight: 700,
+                letterSpacing: 0.2,
+              }}
+            />
+            <Typography
+              sx={{
+                fontSize: { xs: 32, md: 42 },
+                lineHeight: 1.08,
+                fontWeight: 800,
+                letterSpacing: -0.5,
+                color: "#f4f8ff",
+                maxWidth: 580,
+              }}
+            >
+              Профессиональный кабинет
+              <Box component="span" sx={{ color: "#7ec1ff" }}>
+                {" "}
+                для удаленной разблокировки
+              </Box>
+            </Typography>
+            <Typography sx={{ color: "rgba(204,223,255,0.80)", fontSize: { xs: 14, md: 16 }, maxWidth: 560 }}>
+              Без лишнего шума: вход в 1 шаг, прозрачный статус работ и быстрый диалог с мастером.
+            </Typography>
+            <Stack direction="row" flexWrap="wrap" gap={1}>
+              {["Google / Яндекс / Telegram", "Безопасный вход", "Мобильный формат 2026"].map((label) => (
+                <Chip
+                  key={label}
+                  label={label}
+                  sx={{
+                    borderRadius: 2.4,
+                    color: "rgba(222,235,255,0.95)",
+                    border: "1px solid rgba(137,176,255,0.38)",
+                    bgcolor: "rgba(19,36,69,0.76)",
+                  }}
+                />
+              ))}
+            </Stack>
           </Stack>
-        ) : (
-          <Stack spacing={2}>
-            <Typography variant="h5">{requiresSetup ? "Первичная настройка" : "Вход в систему"}</Typography>
+        </Paper>
+
+        <Paper
+          elevation={0}
+          sx={{
+            borderRadius: 5,
+            p: { xs: 2.5, md: 3.4 },
+            border: "1px solid rgba(132,172,255,0.3)",
+            background:
+              "linear-gradient(170deg, rgba(27,39,69,0.95) 0%, rgba(18,29,56,0.94) 55%, rgba(15,24,45,0.95) 100%)",
+            boxShadow: "0 26px 60px rgba(0,0,0,0.44)",
+            backdropFilter: "blur(8px)",
+          }}
+        >
+          <Stack spacing={2.1}>
+            <Typography variant="h4" sx={{ fontWeight: 800, fontSize: { xs: 34, md: 38 }, color: "#f7fbff" }}>
+              {requiresSetup ? "Первичная настройка" : "Вход в систему"}
+            </Typography>
+            <Typography sx={{ color: "rgba(210,225,248,0.76)", fontSize: 14 }}>
+              {requiresSetup ? "Создайте первого администратора для запуска платформы." : modeSubtitle}
+            </Typography>
 
             {error && <Alert severity="error">{error}</Alert>}
             {success && <Alert severity="success">{success}</Alert>}
@@ -318,54 +432,92 @@ export default function LoginPage() {
                     value={setupForm.last_name}
                     onChange={(e) => setSetupForm((prev) => ({ ...prev, last_name: e.target.value }))}
                   />
-                  <Button type="submit" variant="contained" disabled={loading}>
+                  <Button
+                    type="submit"
+                    variant="contained"
+                    disabled={loading}
+                    sx={{
+                      mt: 0.5,
+                      borderRadius: 2.2,
+                      py: 1.3,
+                      textTransform: "none",
+                      fontWeight: 700,
+                      boxShadow: "0 12px 32px rgba(88,157,255,0.36)",
+                    }}
+                  >
                     {loading ? "Выполняется..." : "Создать администратора и войти"}
                   </Button>
                 </Stack>
               </Box>
             ) : (
               <>
-                <Tabs
-                  value={authMode}
-                  onChange={(_, value) => setAuthMode(value)}
-                  variant="scrollable"
-                  allowScrollButtonsMobile
+                <Box
+                  sx={{
+                    borderRadius: 2.8,
+                    p: 0.6,
+                    border: "1px solid rgba(120,164,255,0.28)",
+                    bgcolor: "rgba(12,20,40,0.64)",
+                  }}
                 >
-                  <Tab value="oauth" label="Google / Яндекс" />
-                  <Tab value="register" label="Регистрация по email" />
-                  <Tab value="password" label="Логин и пароль" />
-                  <Tab value="telegram" label="Telegram" />
-                </Tabs>
-                <Stack direction="row" justifyContent="flex-end">
-                  {authMode === "register" ? (
-                    <Button size="small" onClick={() => setAuthMode("password")}>
-                      Уже есть аккаунт? Войти
-                    </Button>
-                  ) : (
-                    <Button size="small" onClick={() => setAuthMode("register")}>
-                      Нет аккаунта? Регистрация
-                    </Button>
-                  )}
-                </Stack>
+                  <Tabs
+                    value={authMode}
+                    onChange={(_, value) => setAuthMode(value)}
+                    variant="fullWidth"
+                    sx={{
+                      minHeight: 44,
+                      "& .MuiTabs-indicator": {
+                        height: "100%",
+                        borderRadius: 2,
+                        bgcolor: "rgba(99,162,255,0.22)",
+                        border: "1px solid rgba(139,188,255,0.46)",
+                      },
+                    }}
+                  >
+                    <Tab sx={{ zIndex: 1, minHeight: 44, textTransform: "none", fontWeight: 700 }} value="oauth" label="Google / Яндекс" />
+                    <Tab sx={{ zIndex: 1, minHeight: 44, textTransform: "none", fontWeight: 700 }} value="register" label="Регистрация" />
+                    <Tab sx={{ zIndex: 1, minHeight: 44, textTransform: "none", fontWeight: 700 }} value="password" label="Логин" />
+                    <Tab sx={{ zIndex: 1, minHeight: 44, textTransform: "none", fontWeight: 700 }} value="telegram" label="Telegram" />
+                  </Tabs>
+                </Box>
 
                 {authMode === "oauth" ? (
-                  <Stack spacing={1.5}>
-                    <Typography variant="body2" color="text.secondary">
-                      Быстрый вход через аккаунт Google или Яндекс.
-                    </Typography>
-                    <Button variant="contained" disabled={loading} onClick={() => startOAuthLogin("google")}>
+                  <Stack spacing={1.4}>
+                    <Button
+                      variant="contained"
+                      disabled={loading}
+                      onClick={() => startOAuthLogin("google")}
+                      sx={{
+                        borderRadius: 2.2,
+                        py: 1.25,
+                        textTransform: "none",
+                        fontWeight: 700,
+                        letterSpacing: 0.2,
+                        background: "linear-gradient(135deg, #66a9ff 0%, #3a7fff 100%)",
+                        boxShadow: "0 10px 30px rgba(62,133,255,0.34)",
+                      }}
+                    >
                       Войти через Google
                     </Button>
-                    <Button variant="outlined" disabled={loading} onClick={() => startOAuthLogin("yandex")}>
+                    <Button
+                      variant="outlined"
+                      disabled={loading}
+                      onClick={() => startOAuthLogin("yandex")}
+                      sx={{
+                        borderRadius: 2.2,
+                        py: 1.2,
+                        textTransform: "none",
+                        fontWeight: 700,
+                        borderColor: "rgba(123,169,255,0.62)",
+                        color: "#a8d1ff",
+                        "&:hover": { borderColor: "rgba(145,186,255,0.88)" },
+                      }}
+                    >
                       Войти через Яндекс
                     </Button>
                   </Stack>
                 ) : authMode === "register" ? (
                   <Box component="form" onSubmit={submitRegister}>
                     <Stack spacing={1.5}>
-                      <Typography variant="body2" color="text.secondary">
-                        После регистрации придет письмо со ссылкой подтверждения.
-                      </Typography>
                       <TextField
                         required
                         label="Ник"
@@ -377,11 +529,7 @@ export default function LoginPage() {
                         type="email"
                         label="Email"
                         value={registerForm.email}
-                        onChange={(e) => {
-                          const nextEmail = e.target.value;
-                          setRegisterForm((prev) => ({ ...prev, email: nextEmail }));
-                          setResendEmail(nextEmail);
-                        }}
+                        onChange={(e) => setRegisterForm((prev) => ({ ...prev, email: e.target.value }))}
                       />
                       <TextField
                         required
@@ -397,7 +545,19 @@ export default function LoginPage() {
                         value={registerForm.passwordConfirm}
                         onChange={(e) => setRegisterForm((prev) => ({ ...prev, passwordConfirm: e.target.value }))}
                       />
-                      <Button type="submit" variant="contained" disabled={loading}>
+                      <Button
+                        type="submit"
+                        variant="contained"
+                        disabled={loading}
+                        sx={{
+                          borderRadius: 2.2,
+                          py: 1.25,
+                          textTransform: "none",
+                          fontWeight: 700,
+                          background: "linear-gradient(135deg, #66a9ff 0%, #3a7fff 100%)",
+                          boxShadow: "0 10px 30px rgba(62,133,255,0.34)",
+                        }}
+                      >
                         {loading ? "Выполняется..." : "Зарегистрироваться"}
                       </Button>
                     </Stack>
@@ -418,41 +578,46 @@ export default function LoginPage() {
                         value={passwordForm.password}
                         onChange={(e) => setPasswordForm((prev) => ({ ...prev, password: e.target.value }))}
                       />
-                      <Button type="submit" variant="contained" disabled={loading}>
+                      <Button
+                        type="submit"
+                        variant="contained"
+                        disabled={loading}
+                        sx={{
+                          borderRadius: 2.2,
+                          py: 1.25,
+                          textTransform: "none",
+                          fontWeight: 700,
+                          background: "linear-gradient(135deg, #66a9ff 0%, #3a7fff 100%)",
+                          boxShadow: "0 10px 30px rgba(62,133,255,0.34)",
+                        }}
+                      >
                         {loading ? "Выполняется..." : "Войти"}
                       </Button>
-                      <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
-                        <TextField
-                          size="small"
-                          type="email"
-                          label="Email для письма подтверждения"
-                          value={resendEmail}
-                          onChange={(e) => setResendEmail(e.target.value)}
-                          fullWidth
-                        />
-                        <Button variant="outlined" onClick={resendVerification} disabled={loading}>
-                          Отправить письмо повторно
-                        </Button>
-                      </Stack>
                     </Stack>
                   </Box>
                 ) : (
                   <Stack spacing={1.5}>
-                    <Typography variant="body2" color="text.secondary">
-                      Авторизуйтесь через Telegram‑виджет.
-                    </Typography>
                     {!BOT_USERNAME ? (
                       <Alert severity="warning">Не задано значение `VITE_TELEGRAM_BOT_USERNAME`.</Alert>
                     ) : (
-                      <Box id="telegram-login-container" sx={{ minHeight: 48 }} />
+                      <Box
+                        id="telegram-login-container"
+                        sx={{
+                          minHeight: 48,
+                          p: 1.2,
+                          borderRadius: 2,
+                          border: `1px solid ${alpha("#86bdff", 0.45)}`,
+                          bgcolor: alpha("#0e2042", 0.46),
+                        }}
+                      />
                     )}
                   </Stack>
                 )}
               </>
             )}
           </Stack>
-        )}
-      </Paper>
+        </Paper>
+      </Box>
     </Box>
   );
 }
