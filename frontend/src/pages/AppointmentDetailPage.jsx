@@ -889,11 +889,6 @@ export default function AppointmentDetailPage() {
       label: "Скачать RuDesktop",
       href: RU_DESKTOP_DOWNLOAD_URL,
     },
-    {
-      id: "rustdesk_guide",
-      label: "Инструкция по RuDesktop",
-      href: RU_DESKTOP_HELP_URL,
-    },
     ...(appointment.photo_lock_screen_url
       ? [
           {
