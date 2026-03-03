@@ -87,11 +87,6 @@ class AdminWholesaleReviewSerializer(serializers.Serializer):
     discount_percent = serializers.IntegerField(min_value=0, max_value=100, required=False)
     review_comment = serializers.CharField(max_length=255, required=False, allow_blank=True)
 
-    def validate(self, attrs):
-        if attrs["decision"] == "approve" and attrs.get("discount_percent") is None:
-            raise serializers.ValidationError({"discount_percent": "Укажите размер скидки при одобрении"})
-        return attrs
-
 
 class AdminSystemSettingsSerializer(serializers.ModelSerializer):
     class Meta:

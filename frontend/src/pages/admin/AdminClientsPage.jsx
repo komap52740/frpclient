@@ -103,7 +103,12 @@ export default function AdminClientsPage() {
       await adminApi.reviewWholesale(id, payload);
       await load();
     } catch (e) {
-      setError(e?.response?.data?.detail || "Не удалось обработать оптовую заявку");
+      const data = e?.response?.data;
+      const detail =
+        data?.detail ||
+        (Array.isArray(data?.non_field_errors) ? data.non_field_errors[0] : null) ||
+        (Array.isArray(data?.discount_percent) ? data.discount_percent[0] : null);
+      setError(detail || "Не удалось обработать оптовую заявку");
     } finally {
       setSavingId(0);
     }
