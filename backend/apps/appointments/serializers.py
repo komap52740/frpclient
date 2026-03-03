@@ -140,6 +140,23 @@ class AppointmentCreateSerializer(serializers.ModelSerializer):
     wholesale_service_photo_2 = serializers.FileField(write_only=True, required=False, allow_null=True)
 
     def validate(self, attrs):
+        wholesale_payload_detected = any(
+            (
+                bool(attrs.get("is_wholesale_request")),
+                bool(attrs.get("is_service_center")),
+                bool((attrs.get("wholesale_company_name") or "").strip()),
+                bool((attrs.get("wholesale_comment") or "").strip()),
+                bool((attrs.get("wholesale_service_details") or "").strip()),
+                bool(attrs.get("wholesale_service_photo_1")),
+                bool(attrs.get("wholesale_service_photo_2")),
+            )
+        )
+        if wholesale_payload_detected:
+            raise serializers.ValidationError(
+                "Оптовый статус отправляется отдельным запросом в профиле клиента. "
+                "Эта форма создает только заявку на разблокировку."
+            )
+
         rustdesk_id = (attrs.get("rustdesk_id") or "").strip()
         rustdesk_password = (attrs.get("rustdesk_password") or "").strip()
         contact_phone = (attrs.get("contact_phone") or "").strip()

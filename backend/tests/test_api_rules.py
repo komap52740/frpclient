@@ -750,7 +750,7 @@ def test_create_appointment_calls_master_telegram_notifications(client_user):
 
 
 @pytest.mark.django_db
-def test_create_appointment_ignores_wholesale_fields_from_payload(client_user):
+def test_create_appointment_rejects_wholesale_fields_from_payload(client_user):
     service_photo = SimpleUploadedFile("service1.jpg", b"photo-data", content_type="image/jpeg")
     payload = {
         "brand": "Samsung",
@@ -769,13 +769,14 @@ def test_create_appointment_ignores_wholesale_fields_from_payload(client_user):
     }
 
     response = auth_as(client_user).post("/api/appointments/", payload, format="multipart")
-    assert response.status_code == 201
-    assert response.data["is_wholesale_request"] is False
+    assert response.status_code == 400
+    assert "оптов" in str(response.data).lower()
 
     client_user.refresh_from_db()
     assert client_user.is_service_center is False
     assert client_user.wholesale_status == WholesaleStatusChoices.NONE
     assert client_user.wholesale_company_name == ""
+    assert Appointment.objects.count() == 0
 
 
 @pytest.mark.django_db
