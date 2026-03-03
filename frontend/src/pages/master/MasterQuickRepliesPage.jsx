@@ -19,6 +19,7 @@ import "dayjs/locale/ru";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { chatApi } from "../../api/client";
+import { normalizeRuText } from "../../utils/text";
 
 dayjs.locale("ru");
 
@@ -46,22 +47,22 @@ function extractApiError(err, fallback) {
   if (!data) return fallback;
 
   if (typeof data.detail === "string" && data.detail.trim()) {
-    return data.detail;
+    return normalizeRuText(data.detail);
   }
   if (typeof data.non_field_errors?.[0] === "string") {
-    return data.non_field_errors[0];
+    return normalizeRuText(data.non_field_errors[0]);
   }
 
   const fieldOrder = ["command", "title", "text", "media_file", "remove_media"];
   for (const field of fieldOrder) {
     const value = data[field];
-    if (typeof value === "string" && value.trim()) return value;
-    if (Array.isArray(value) && typeof value[0] === "string") return value[0];
+    if (typeof value === "string" && value.trim()) return normalizeRuText(value);
+    if (Array.isArray(value) && typeof value[0] === "string") return normalizeRuText(value[0]);
   }
 
   for (const value of Object.values(data)) {
-    if (typeof value === "string" && value.trim()) return value;
-    if (Array.isArray(value) && typeof value[0] === "string") return value[0];
+    if (typeof value === "string" && value.trim()) return normalizeRuText(value);
+    if (Array.isArray(value) && typeof value[0] === "string") return normalizeRuText(value[0]);
   }
 
   return fallback;
