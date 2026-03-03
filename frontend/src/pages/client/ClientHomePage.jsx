@@ -23,7 +23,7 @@ import { useTheme } from "@mui/material/styles";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import dayjs from "dayjs";
 import "dayjs/locale/ru";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link as RouterLink, useNavigate } from "react-router-dom";
 
 import { appointmentsApi, authApi } from "../../api/client";
@@ -133,6 +133,14 @@ function formatEtaMinutes(minutes) {
   return `~${Math.ceil(minutes / 60)} ч`;
 }
 
+function snapshotValue(value) {
+  try {
+    return JSON.stringify(value ?? null);
+  } catch {
+    return String(value ?? "");
+  }
+}
+
 function resolveScenario(appointment) {
   if (!appointment) {
     return {
@@ -228,8 +236,27 @@ export default function ClientHomePage() {
   const [focusMode, setFocusMode] = useState("attention");
   const [checklistExpanded, setChecklistExpanded] = useState(false);
   const [checklistState, setChecklistState] = useState(() => loadChecklistState());
-  const [tipIndex, setTipIndex] = useState(0);
   const [showSecondaryBlocks, setShowSecondaryBlocks] = useState(() => !isMobile);
+  const summarySnapshotRef = useRef("");
+  const itemsSnapshotRef = useRef("");
+
+  const applySummaryIfChanged = useCallback((nextSummary) => {
+    const nextSnapshot = snapshotValue(nextSummary);
+    if (nextSnapshot === summarySnapshotRef.current) {
+      return;
+    }
+    summarySnapshotRef.current = nextSnapshot;
+    setSummary(nextSummary);
+  }, []);
+
+  const applyItemsIfChanged = useCallback((nextItems) => {
+    const nextSnapshot = snapshotValue(nextItems);
+    if (nextSnapshot === itemsSnapshotRef.current) {
+      return;
+    }
+    itemsSnapshotRef.current = nextSnapshot;
+    setItems(nextItems);
+  }, []);
 
   const loadData = useCallback(async ({ silent = false, withLoading = true } = {}) => {
     if (withLoading) {
@@ -240,8 +267,8 @@ export default function ClientHomePage() {
         authApi.dashboardSummary(),
         appointmentsApi.my(),
       ]);
-      setSummary(summaryData.counts || {});
-      setItems(appointmentsResponse.data || []);
+      applySummaryIfChanged(summaryData.counts || {});
+      applyItemsIfChanged(appointmentsResponse.data || []);
       setError("");
     } catch {
       if (!silent) {
@@ -252,7 +279,7 @@ export default function ClientHomePage() {
         setLoading(false);
       }
     }
-  }, []);
+  }, [applyItemsIfChanged, applySummaryIfChanged]);
 
   useEffect(() => {
     loadData();
@@ -272,21 +299,8 @@ export default function ClientHomePage() {
 
   const prioritizedAppointment = useMemo(() => pickPriorityAppointment(items), [items]);
   const scenario = useMemo(() => resolveScenario(prioritizedAppointment), [prioritizedAppointment]);
-  const activeTip = scenario.tips?.[tipIndex] || "";
-
-  useEffect(() => {
-    setTipIndex(0);
-  }, [scenario.title]);
-
-  useEffect(() => {
-    if (!scenario.tips || scenario.tips.length <= 1) {
-      return undefined;
-    }
-    const timer = setInterval(() => {
-      setTipIndex((prev) => (prev + 1) % scenario.tips.length);
-    }, 5500);
-    return () => clearInterval(timer);
-  }, [scenario.tips]);
+  // Keep a stable tip to avoid layout jumps on the client home screen.
+  const activeTip = scenario.tips?.[0] || "";
 
   const checklistProgress = useMemo(() => {
     const done = CHECKLIST_ITEMS.filter((item) => checklistState[item.key]).length;
@@ -428,7 +442,9 @@ export default function ClientHomePage() {
                       icon={false}
                       sx={{
                         display: { xs: "none", sm: "flex" },
+                        alignItems: "center",
                         py: 0.5,
+                        minHeight: 44,
                         borderRadius: 2,
                         border: `1px solid ${scenario.tone}33`,
                         bgcolor: `${scenario.tone}10`,
