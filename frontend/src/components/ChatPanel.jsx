@@ -1,4 +1,5 @@
 import AttachFileIcon from "@mui/icons-material/AttachFile";
+import ComputerRoundedIcon from "@mui/icons-material/ComputerRounded";
 import ContentCopyRoundedIcon from "@mui/icons-material/ContentCopyRounded";
 import LinkRoundedIcon from "@mui/icons-material/LinkRounded";
 import SendIcon from "@mui/icons-material/Send";
@@ -59,7 +60,6 @@ function mapSystemEvents(systemEvents = []) {
       text: event.title || event.event_type || "Системное событие",
     }));
 }
-
 function validateAttachment(file) {
   if (!file) return "";
 
@@ -113,8 +113,11 @@ export default function ChatPanel({
   currentUser,
   systemEvents = [],
   initialView = "messages",
-  minimalClient = false,
   downloadLinks = [],
+  ruDesktop = null,
+  canEditRuDesktop = false,
+  onSaveRuDesktop = null,
+  ruDesktopSaving = false,
 }) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
@@ -129,11 +132,14 @@ export default function ChatPanel({
 
   const [chatView, setChatView] = useState(initialView === "links" ? "links" : "messages");
   const [newIncomingCount, setNewIncomingCount] = useState(0);
+  const [ruDesktopForm, setRuDesktopForm] = useState({ rustdesk_id: "", rustdesk_password: "" });
+  const [ruDesktopError, setRuDesktopError] = useState("");
+  const [ruDesktopSuccess, setRuDesktopSuccess] = useState("");
 
   const threadRef = useRef(null);
 
-  const isMinimalClientMode = minimalClient && currentUser.role === "client";
-  const isSplitClientLayout = isMinimalClientMode && !isMobile;
+  const isClientRole = currentUser.role === "client";
+  const isSplitClientLayout = isClientRole && !isMobile;
 
   const safeDownloadLinks = useMemo(
     () => (downloadLinks || []).filter((item) => item?.href && item?.label),
@@ -295,6 +301,82 @@ export default function ChatPanel({
     }
   };
 
+  const copyText = async (text, errorText = "Не удалось скопировать") => {
+    try {
+      if (!text) return;
+      await navigator.clipboard.writeText(text);
+    } catch {
+      setError(errorText);
+    }
+  };
+
+  const hasRuDesktopCard = Boolean(
+    ruDesktop?.id || ruDesktop?.password || ruDesktop?.downloadUrl || ruDesktop?.helpUrl
+  );
+  const ruDesktopId = String(ruDesktop?.id || "").trim();
+  const ruDesktopPassword = String(ruDesktop?.password || "").trim();
+
+  useEffect(() => {
+    setRuDesktopForm({
+      rustdesk_id: ruDesktopId,
+      rustdesk_password: ruDesktopPassword,
+    });
+  }, [ruDesktopId, ruDesktopPassword]);
+
+  const openRuDesktopApp = () => {
+    if (!ruDesktopId) {
+      setError("Логин/ID RuDesktop не указан");
+      return;
+    }
+    const encodedId = encodeURIComponent(ruDesktopId);
+    const encodedPassword = encodeURIComponent(ruDesktopPassword);
+    const uriCandidates = ruDesktopPassword
+      ? [
+          `rudesktop://${encodedId}?password=${encodedPassword}`,
+          `rudesktop://${encodedId}`,
+          `rustdesk://${encodedId}?password=${encodedPassword}`,
+          `rustdesk://${encodedId}`,
+        ]
+      : [`rudesktop://${encodedId}`, `rustdesk://${encodedId}`];
+
+    uriCandidates.forEach((uri, index) => {
+      window.setTimeout(() => {
+        if (!document.hidden) {
+          window.location.href = uri;
+        }
+      }, 450 * index);
+    });
+  };
+
+  const saveRuDesktopInline = async () => {
+    const payload = {
+      rustdesk_id: String(ruDesktopForm.rustdesk_id || "").trim(),
+      rustdesk_password: String(ruDesktopForm.rustdesk_password || "").trim(),
+    };
+    if (!payload.rustdesk_id && !payload.rustdesk_password) {
+      setRuDesktopError("Укажите логин/ID и/или пароль RuDesktop");
+      setRuDesktopSuccess("");
+      return;
+    }
+    if (typeof onSaveRuDesktop !== "function") {
+      setRuDesktopError("Сохранение RuDesktop сейчас недоступно");
+      setRuDesktopSuccess("");
+      return;
+    }
+    try {
+      await onSaveRuDesktop(payload);
+      setRuDesktopError("");
+      setRuDesktopSuccess("Данные RuDesktop сохранены");
+    } catch (saveError) {
+      const detail =
+        saveError?.response?.data?.detail ||
+        saveError?.message ||
+        "Не удалось сохранить данные RuDesktop";
+      setRuDesktopError(detail);
+      setRuDesktopSuccess("");
+    }
+  };
+
   const linksPanel = (
     <Paper
       variant="outlined"
@@ -370,6 +452,99 @@ export default function ChatPanel({
       )}
     </Paper>
   );
+
+  const ruDesktopPanel = hasRuDesktopCard ? (
+    <Paper
+      variant="outlined"
+      sx={{
+        p: 1,
+        borderRadius: 1.3,
+        borderColor: "divider",
+        bgcolor: isDark ? alpha("#0f172a", 0.62) : alpha("#f8fbff", 0.9),
+      }}
+    >
+      <Stack spacing={0.7}>
+        <Typography variant="caption" color="text.secondary">
+          RuDesktop доступ
+        </Typography>
+        <Typography variant="body2" sx={{ overflowWrap: "anywhere" }}>
+          <b>Логин/ID:</b> {ruDesktopId || "не указан"}
+        </Typography>
+        <Typography variant="body2" sx={{ overflowWrap: "anywhere" }}>
+          <b>Пароль:</b> {ruDesktopPassword || "не указан"}
+        </Typography>
+      </Stack>
+    </Paper>
+  ) : null;
+
+  const ruDesktopInputPanel =
+    canEditRuDesktop ? (
+      <Paper
+        variant="outlined"
+        sx={{
+          p: 1,
+          borderRadius: 1.3,
+          borderColor: "divider",
+          bgcolor: isDark ? alpha("#0f172a", 0.62) : alpha("#f8fbff", 0.9),
+        }}
+      >
+        <Stack spacing={0.8}>
+          <Stack direction="row" spacing={0.7} alignItems="center">
+            <ComputerRoundedIcon fontSize="small" color="primary" />
+            <Typography variant="caption" color="text.secondary">
+              Быстрый ввод RuDesktop
+            </Typography>
+          </Stack>
+          {ruDesktopError ? (
+            <Alert severity="error" sx={{ py: 0, "& .MuiAlert-message": { py: 0.25 } }}>
+              {ruDesktopError}
+            </Alert>
+          ) : null}
+          {ruDesktopSuccess ? (
+            <Alert severity="success" sx={{ py: 0, "& .MuiAlert-message": { py: 0.25 } }}>
+              {ruDesktopSuccess}
+            </Alert>
+          ) : null}
+          <TextField
+            size="small"
+            label="Логин/ID"
+            value={ruDesktopForm.rustdesk_id}
+            onChange={(event) => {
+              setRuDesktopForm((prev) => ({
+                ...prev,
+                rustdesk_id: event.target.value.replace(/[^\d\s-]/g, ""),
+              }));
+              setRuDesktopError("");
+              setRuDesktopSuccess("");
+            }}
+            autoComplete="off"
+          />
+          <TextField
+            size="small"
+            label="Пароль"
+            value={ruDesktopForm.rustdesk_password}
+            onChange={(event) => {
+              setRuDesktopForm((prev) => ({
+                ...prev,
+                rustdesk_password: event.target.value,
+              }));
+              setRuDesktopError("");
+              setRuDesktopSuccess("");
+            }}
+            autoComplete="off"
+          />
+          <Button
+            size="small"
+            variant="contained"
+            onClick={saveRuDesktopInline}
+            disabled={ruDesktopSaving}
+            sx={{ alignSelf: "flex-start", borderRadius: 1.1 }}
+          >
+            {ruDesktopSaving ? "Сохраняем..." : "Сохранить RuDesktop"}
+          </Button>
+        </Stack>
+      </Paper>
+    ) : null;
 
   return (
     <Paper
@@ -455,11 +630,14 @@ export default function ChatPanel({
                 currentUserId={currentUser.id}
                 currentUserRole={currentUser.role}
                 onDeleteMessage={onDelete}
+                onCopyFileLink={copyLink}
                 containerRef={threadRef}
                 onScroll={onThreadScroll}
               />
             </Paper>
             <Stack spacing={0.6}>
+              {ruDesktopPanel}
+              {ruDesktopInputPanel}
               {safeDownloadLinks.length ? (
                 <Paper
                   variant="outlined"
@@ -518,6 +696,7 @@ export default function ChatPanel({
               currentUserId={currentUser.id}
               currentUserRole={currentUser.role}
               onDeleteMessage={onDelete}
+              onCopyFileLink={copyLink}
               containerRef={threadRef}
               onScroll={onThreadScroll}
             />
@@ -525,6 +704,8 @@ export default function ChatPanel({
         ) : (
           linksPanel
         )}
+
+        {!isSplitClientLayout && ruDesktopInputPanel}
 
         <Paper
           elevation={0}
@@ -578,3 +759,4 @@ export default function ChatPanel({
     </Paper>
   );
 }
+

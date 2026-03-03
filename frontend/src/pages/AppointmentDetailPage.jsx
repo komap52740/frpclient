@@ -47,7 +47,7 @@ import "dayjs/locale/ru";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 
-import { adminApi, appointmentsApi, reviewsApi } from "../api/client";
+import { adminApi, appointmentsApi, chatApi, reviewsApi } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 import ChatPanel from "../components/ChatPanel";
 import PrimaryCTA from "../components/ui/PrimaryCTA";
@@ -648,6 +648,21 @@ export default function AppointmentDetailPage() {
     }
   };
 
+  const requestClientPasswordCheck = async () => {
+    const ok = await runAction(async () => {
+      const formData = new FormData();
+      formData.append(
+        "text",
+        "Пожалуйста, проверьте пароль RuDesktop. Если пароль изменился, отправьте новый пароль в чат."
+      );
+      await chatApi.sendMessage(id, formData);
+    });
+    if (ok) {
+      setSuccess("Запрос отправлен клиенту");
+      setChatPanelView("messages");
+    }
+  };
+
   const persistClientAccessData = async (payload, options = {}) => {
     const normalizedPayload = {
       rustdesk_id: (payload?.rustdesk_id || "").trim(),
@@ -1228,12 +1243,11 @@ export default function AppointmentDetailPage() {
               </Typography>
             </Box>
             <Stack direction="row" spacing={0.75} alignItems="center">
-              <Chip
-                label={statusUi.label}
-                sx={{ bgcolor: statusUi.bg, color: statusUi.color, border: `1px solid ${statusUi.color}33`, fontWeight: 700 }}
-              />
-              {isClient ? (
-                <Chip size="small" variant="outlined" label="Фокус" />
+              {!isClient ? (
+                <Chip
+                  label={statusUi.label}
+                  sx={{ bgcolor: statusUi.bg, color: statusUi.color, border: `1px solid ${statusUi.color}33`, fontWeight: 700 }}
+                />
               ) : null}
             </Stack>
           </Stack>
@@ -2129,6 +2143,16 @@ export default function AppointmentDetailPage() {
                           sx={{ alignSelf: "flex-start" }}
                         >
                           Обновить данные RuDesktop
+                        </Button>
+                      ) : null}
+                      {user.role === "master" && isMasterAssigned ? (
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          onClick={requestClientPasswordCheck}
+                          sx={{ alignSelf: "flex-start" }}
+                        >
+                          Запросить проверку пароля
                         </Button>
                       ) : null}
                     </Stack>
