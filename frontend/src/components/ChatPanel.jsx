@@ -890,15 +890,15 @@ export default function ChatPanel({
               value={text}
               onChange={(event) => setText(event.target.value)}
               onKeyDown={(event) => {
-                if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+                if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent?.isComposing) {
                   event.preventDefault();
                   onSend();
                 }
               }}
               helperText={
                 text.trim().length
-                  ? "Сообщение готово к отправке. Ctrl+Enter для быстрой отправки."
-                  : "Введите текст сообщения. Ctrl+Enter для быстрой отправки."
+                  ? "Сообщение готово к отправке. Enter — отправить, Shift+Enter — новая строка."
+                  : "Введите текст сообщения. Enter — отправить, Shift+Enter — новая строка."
               }
             />
             <Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems={{ xs: "stretch", sm: "center" }}>
