@@ -125,6 +125,7 @@ export default function LoginPage() {
   const [requiresSetup, setRequiresSetup] = useState(false);
   const [telegramWidgetError, setTelegramWidgetError] = useState("");
   const [telegramWidgetReloadKey, setTelegramWidgetReloadKey] = useState(0);
+  const telegramContainerRef = useRef(null);
   const telegramWidgetRetryRef = useRef(0);
   const loginWithTelegramRef = useRef(loginWithTelegram);
   const navigateRef = useRef(navigate);
@@ -230,10 +231,15 @@ export default function LoginPage() {
     let pollTimer = null;
     let observer = null;
 
-    const container = document.getElementById("telegram-login-container");
+    const container = telegramContainerRef.current;
     if (!container) {
-      setTelegramWidgetError("Контейнер Telegram-входа не найден.");
+      retryTimer = window.setTimeout(() => {
+        if (!isDisposed) {
+          setTelegramWidgetReloadKey((prev) => prev + 1);
+        }
+      }, 200);
       return () => {
+        window.clearTimeout(retryTimer);
         window.onTelegramAuth = null;
       };
     }
@@ -746,6 +752,7 @@ export default function LoginPage() {
                         </Typography>
                         <Box
                           id="telegram-login-container"
+                          ref={telegramContainerRef}
                           sx={{
                             minHeight: 50,
                             px: 0.85,
