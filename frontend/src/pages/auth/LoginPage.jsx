@@ -80,37 +80,31 @@ const authInputSx = {
 };
 
 const authPrimaryButtonSx = {
-  borderRadius: 1.9,
-  py: 1.2,
+  minHeight: 52,
+  borderRadius: 3,
+  py: 1.15,
   textTransform: "none",
   fontWeight: 800,
-  letterSpacing: 0.15,
-  background: "linear-gradient(135deg, #72b4ff 0%, #4e8dff 48%, #3b78e8 100%)",
+  letterSpacing: 0.1,
+  fontSize: 18,
+  background: "linear-gradient(135deg, #7fbeff 0%, #4f8dff 45%, #386de2 100%)",
   color: "#f7fcff",
-  border: "1px solid rgba(148, 196, 255, 0.48)",
-  boxShadow: "0 14px 28px rgba(50, 116, 226, 0.3)",
+  border: "1.2px solid rgba(160, 204, 255, 0.58)",
+  boxShadow: "0 16px 30px rgba(45, 111, 226, 0.34), inset 0 1px 0 rgba(255,255,255,0.22)",
+  transition: "all .2s ease",
   "&:hover": {
-    background: "linear-gradient(135deg, #82beff 0%, #5d99ff 48%, #4b84ef 100%)",
-    boxShadow: "0 16px 34px rgba(56, 125, 238, 0.36)",
+    background: "linear-gradient(135deg, #8bc4ff 0%, #5b97ff 45%, #477eef 100%)",
+    boxShadow: "0 18px 36px rgba(52, 123, 241, 0.42), inset 0 1px 0 rgba(255,255,255,0.26)",
+    transform: "translateY(-1px)",
+  },
+  "&:active": {
+    transform: "translateY(0)",
+    boxShadow: "0 8px 22px rgba(45, 111, 226, 0.28), inset 0 1px 0 rgba(255,255,255,0.18)",
   },
   "&.Mui-disabled": {
     color: "rgba(213,230,255,0.72)",
     background: "linear-gradient(135deg, rgba(91,145,222,0.62) 0%, rgba(69,116,199,0.6) 100%)",
-  },
-};
-
-const authGhostButtonSx = {
-  borderRadius: 1.9,
-  py: 1.2,
-  textTransform: "none",
-  fontWeight: 800,
-  letterSpacing: 0.12,
-  borderColor: "rgba(128, 170, 230, 0.62)",
-  color: "#d3e9ff",
-  background: "linear-gradient(150deg, rgba(22, 42, 75, 0.58) 0%, rgba(14, 28, 53, 0.64) 100%)",
-  "&:hover": {
-    borderColor: "rgba(156, 198, 255, 0.98)",
-    background: "linear-gradient(150deg, rgba(29, 51, 87, 0.78) 0%, rgba(17, 34, 63, 0.8) 100%)",
+    borderColor: "rgba(152,188,236,0.38)",
   },
 };
 
@@ -127,17 +121,25 @@ const oauthButtonBaseSx = {
   borderWidth: 1.2,
   justifyContent: "center",
   transition: "all .2s ease",
+  boxShadow: "0 8px 20px rgba(5,12,28,0.35)",
+  "& .MuiButton-startIcon": {
+    mr: 0.9,
+  },
+  "&:active": {
+    transform: "translateY(0)",
+  },
 };
 
 const oauthGoogleButtonSx = {
   ...oauthButtonBaseSx,
   color: "#1f2328",
-  borderColor: "rgba(255,255,255,0.86)",
-  background: "linear-gradient(180deg, #ffffff 0%, #f3f7ff 100%)",
+  borderColor: "rgba(255,255,255,0.92)",
+  background: "linear-gradient(180deg, #ffffff 0%, #f2f7ff 100%)",
   "&:hover": {
     borderColor: "#ffffff",
-    background: "linear-gradient(180deg, #ffffff 0%, #e9f1ff 100%)",
-    boxShadow: "0 8px 20px rgba(0,0,0,0.2)",
+    background: "linear-gradient(180deg, #ffffff 0%, #e7f0ff 100%)",
+    boxShadow: "0 14px 28px rgba(0,0,0,0.24)",
+    transform: "translateY(-1px)",
   },
   "&.Mui-disabled": {
     color: "rgba(31,35,40,0.55)",
@@ -148,12 +150,14 @@ const oauthGoogleButtonSx = {
 
 const oauthYandexButtonSx = {
   ...oauthButtonBaseSx,
-  color: "#f4f8ff",
-  borderColor: "rgba(255,70,70,0.45)",
-  background: "linear-gradient(155deg, #23181d 0%, #17121a 100%)",
+  color: "#f8fbff",
+  borderColor: "rgba(255,71,71,0.52)",
+  background: "linear-gradient(155deg, #211820 0%, #16111a 100%)",
   "&:hover": {
-    borderColor: "rgba(255,91,91,0.75)",
-    background: "linear-gradient(155deg, #2a1c21 0%, #1c151e 100%)",
+    borderColor: "rgba(255,102,102,0.84)",
+    background: "linear-gradient(155deg, #2d1f29 0%, #1f1622 100%)",
+    boxShadow: "0 14px 28px rgba(146,44,60,0.28)",
+    transform: "translateY(-1px)",
   },
   "&.Mui-disabled": {
     color: "rgba(244,248,255,0.55)",
@@ -165,11 +169,13 @@ const oauthYandexButtonSx = {
 const oauthVkButtonSx = {
   ...oauthButtonBaseSx,
   color: "#edf6ff",
-  borderColor: "rgba(122,185,255,0.66)",
-  background: "linear-gradient(135deg, #2e79ff 0%, #1d62e0 100%)",
+  borderColor: "rgba(134,191,255,0.78)",
+  background: "linear-gradient(135deg, #2f7bff 0%, #1e63e0 100%)",
   "&:hover": {
     borderColor: "rgba(153,204,255,0.95)",
-    background: "linear-gradient(135deg, #3a84ff 0%, #2a6eeb 100%)",
+    background: "linear-gradient(135deg, #3f8bff 0%, #2c70eb 100%)",
+    boxShadow: "0 14px 30px rgba(33,105,231,0.36)",
+    transform: "translateY(-1px)",
   },
   "&.Mui-disabled": {
     color: "rgba(237,246,255,0.62)",
@@ -180,13 +186,14 @@ const oauthVkButtonSx = {
 
 const oauthTelegramShellSx = {
   borderRadius: 3,
-  border: `1.2px solid ${alpha("#7ebeff", 0.66)}`,
-  background: "linear-gradient(135deg, rgba(56,156,243,0.34) 0%, rgba(30,118,217,0.34) 100%)",
+  border: `1.2px solid ${alpha("#88c5ff", 0.72)}`,
+  background: "linear-gradient(135deg, rgba(64,165,248,0.42) 0%, rgba(34,126,226,0.38) 100%)",
   minHeight: AUTH_PROVIDER_BUTTON_HEIGHT,
   px: 0.75,
   py: 0.7,
   display: "flex",
   alignItems: "center",
+  boxShadow: "0 12px 26px rgba(19,72,141,0.26)",
 };
 
 const providerBadgeSx = {
@@ -199,6 +206,7 @@ const providerBadgeSx = {
   fontSize: 12,
   fontWeight: 900,
   flexShrink: 0,
+  border: "1px solid rgba(255,255,255,0.28)",
 };
 
 export default function LoginPage() {
@@ -798,7 +806,7 @@ export default function LoginPage() {
                     onClick={() => startOAuthLogin("google")}
                     sx={oauthGoogleButtonSx}
                     startIcon={
-                      <Box sx={{ ...providerBadgeSx, color: "#1e8e3e", bgcolor: "rgba(232,245,233,0.96)" }}>
+                      <Box sx={{ ...providerBadgeSx, color: "#4285f4", bgcolor: "rgba(255,255,255,0.98)" }}>
                         G
                       </Box>
                     }
@@ -812,7 +820,7 @@ export default function LoginPage() {
                     onClick={() => startOAuthLogin("yandex")}
                     sx={oauthYandexButtonSx}
                     startIcon={
-                      <Box sx={{ ...providerBadgeSx, color: "#ff4b4b", bgcolor: "rgba(33,24,31,0.96)" }}>
+                      <Box sx={{ ...providerBadgeSx, color: "#ff3d3d", bgcolor: "rgba(255,255,255,0.96)" }}>
                         Я
                       </Box>
                     }
@@ -827,7 +835,7 @@ export default function LoginPage() {
                   onClick={() => startOAuthLogin("vk")}
                   sx={oauthVkButtonSx}
                   startIcon={
-                    <Box sx={{ ...providerBadgeSx, color: "#ffffff", bgcolor: "rgba(255,255,255,0.20)" }}>
+                    <Box sx={{ ...providerBadgeSx, color: "#ffffff", bgcolor: "rgba(17,77,173,0.8)" }}>
                       VK
                     </Box>
                   }
@@ -882,21 +890,43 @@ export default function LoginPage() {
                             sx={{
                               alignSelf: "flex-start",
                               textTransform: "none",
-                              borderRadius: 1.4,
-                              borderColor: "rgba(140,182,238,0.55)",
-                              color: "#bfddff",
+                              borderRadius: 2,
+                              minHeight: 40,
+                              px: 1.8,
+                              fontWeight: 700,
+                              borderColor: "rgba(130,183,247,0.62)",
+                              color: "#cae6ff",
+                              background: "linear-gradient(145deg, rgba(25,54,96,0.52) 0%, rgba(16,35,65,0.54) 100%)",
+                              "&:hover": {
+                                borderColor: "rgba(159,208,255,0.94)",
+                                background: "linear-gradient(145deg, rgba(33,66,114,0.72) 0%, rgba(21,44,80,0.72) 100%)",
+                              },
                             }}
                           >
                             Перезагрузить Telegram вход
                           </Button>
                           <Button
                             size="small"
-                            variant="text"
+                            variant="outlined"
                             component="a"
                             href={`https://t.me/${BOT_USERNAME}`}
                             target="_blank"
                             rel="noreferrer"
-                            sx={{ alignSelf: "flex-start", textTransform: "none", borderRadius: 1.4, color: "#8ec5ff" }}
+                            sx={{
+                              alignSelf: "flex-start",
+                              textTransform: "none",
+                              borderRadius: 2,
+                              minHeight: 40,
+                              px: 1.8,
+                              fontWeight: 700,
+                              borderColor: "rgba(89,184,255,0.62)",
+                              color: "#9fd7ff",
+                              background: "linear-gradient(145deg, rgba(12,38,69,0.3) 0%, rgba(9,29,56,0.32) 100%)",
+                              "&:hover": {
+                                borderColor: "rgba(124,205,255,0.92)",
+                                background: "linear-gradient(145deg, rgba(17,51,92,0.48) 0%, rgba(12,38,72,0.5) 100%)",
+                              },
+                            }}
                           >
                             Открыть @{BOT_USERNAME}
                           </Button>
