@@ -31,7 +31,6 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const ALLOWED_EXTENSIONS = ["jpg", "jpeg", "png", "pdf", "txt", "log", "zip", "webp", "mp4", "mov", "webm", "m4v"];
 const URL_REGEX = /\bhttps?:\/\/[^\s<>"']+/gi;
 const LINK_SOURCE_ROLES = new Set(["master", "admin"]);
-const INCOMING_SOUND_SOURCE_ROLES = new Set(["master", "admin"]);
 
 function mapSystemEvents(systemEvents = []) {
   const seen = new Set();
@@ -109,6 +108,18 @@ function buildLinkItems(messages = []) {
   return items.sort((a, b) => dayjs(b.created_at).valueOf() - dayjs(a.created_at).valueOf());
 }
 
+function shouldPlayIncomingMessageSound(message, currentUser) {
+  if (!message || message.sender === currentUser?.id) return false;
+
+  const currentRole = String(currentUser?.role || "").toLowerCase();
+  const senderRole = String(message.sender_role || "").toLowerCase();
+  if (currentRole === "client") {
+    return senderRole === "master" || senderRole === "admin";
+  }
+
+  return true;
+}
+
 export default function ChatPanel({
   appointmentId,
   currentUser,
@@ -181,11 +192,9 @@ export default function ChatPanel({
         if (response.data.length) {
           const shouldStickToBottom = isNearBottom();
           const hasForeignMessages = response.data.some((item) => item.sender !== currentUser.id);
-          const hasMasterOrAdminIncoming = response.data.some((item) => {
-            if (item.sender === currentUser.id) return false;
-            const role = String(item.sender_role || "").toLowerCase();
-            return INCOMING_SOUND_SOURCE_ROLES.has(role);
-          });
+          const hasIncomingMessagesForSound = response.data.some((item) =>
+            shouldPlayIncomingMessageSound(item, currentUser)
+          );
 
           setMessages((prev) => {
             const merged = [...prev.filter((item) => !item.is_pending), ...response.data];
@@ -196,7 +205,7 @@ export default function ChatPanel({
 
           if (afterId === 0) {
             hasLoadedInitialBatchRef.current = true;
-          } else if (hasLoadedInitialBatchRef.current && hasMasterOrAdminIncoming) {
+          } else if (hasLoadedInitialBatchRef.current && hasIncomingMessagesForSound) {
             playIncomingMessageSound();
           }
 
@@ -211,8 +220,37 @@ export default function ChatPanel({
         setError("Не удалось загрузить сообщения");
       }
     },
-    [appointmentId, currentUser.id, isNearBottom, scrollToBottom]
+    [appointmentId, currentUser.id, currentUser.role, isNearBottom, scrollToBottom]
   );
+
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+
+    const unlockAudio = () => {
+      try {
+        const AudioContextCtor = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContextCtor) return;
+        let audioCtx = sendAudioContextRef.current;
+        if (!audioCtx || audioCtx.state === "closed") {
+          audioCtx = new AudioContextCtor();
+          sendAudioContextRef.current = audioCtx;
+        }
+        if (audioCtx.state === "suspended") {
+          audioCtx.resume().catch(() => undefined);
+        }
+      } catch {
+        // Browser may still block audio. Chat behavior must remain unaffected.
+      }
+    };
+
+    window.addEventListener("pointerdown", unlockAudio, { once: true });
+    window.addEventListener("keydown", unlockAudio, { once: true });
+
+    return () => {
+      window.removeEventListener("pointerdown", unlockAudio);
+      window.removeEventListener("keydown", unlockAudio);
+    };
+  }, []);
 
   useEffect(() => {
     setMessages([]);
