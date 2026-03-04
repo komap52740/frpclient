@@ -41,6 +41,7 @@ class AdminUserSerializer(serializers.ModelSerializer):
             "is_service_center",
             "wholesale_status",
             "wholesale_company_name",
+            "wholesale_city",
             "wholesale_address",
             "wholesale_comment",
             "wholesale_service_details",

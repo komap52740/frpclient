@@ -68,6 +68,7 @@ class MeSerializer(serializers.ModelSerializer):
             "is_service_center",
             "wholesale_status",
             "wholesale_company_name",
+            "wholesale_city",
             "wholesale_address",
             "wholesale_comment",
             "wholesale_service_details",
@@ -213,6 +214,7 @@ class BootstrapAdminSerializer(serializers.Serializer):
 class WholesaleRequestSerializer(serializers.Serializer):
     is_service_center = serializers.BooleanField(default=True)
     wholesale_company_name = serializers.CharField(max_length=255, required=False, allow_blank=True)
+    wholesale_city = serializers.CharField(max_length=128, required=False, allow_blank=True)
     wholesale_address = serializers.CharField(max_length=255, required=False, allow_blank=True)
     wholesale_comment = serializers.CharField(max_length=500, required=False, allow_blank=True)
     wholesale_service_details = serializers.CharField(max_length=2000, required=False, allow_blank=True)
@@ -222,6 +224,8 @@ class WholesaleRequestSerializer(serializers.Serializer):
     def validate(self, attrs):
         if attrs.get("is_service_center") and not (attrs.get("wholesale_company_name") or "").strip():
             raise serializers.ValidationError({"wholesale_company_name": "Укажите название сервисного центра"})
+        if attrs.get("is_service_center") and not (attrs.get("wholesale_city") or "").strip():
+            raise serializers.ValidationError({"wholesale_city": "Укажите город сервисного центра"})
         if attrs.get("is_service_center") and not (attrs.get("wholesale_address") or "").strip():
             raise serializers.ValidationError({"wholesale_address": "Укажите адрес сервисного центра"})
         return attrs
@@ -231,6 +235,7 @@ class WholesaleStatusSerializer(serializers.Serializer):
     is_service_center = serializers.BooleanField()
     wholesale_status = serializers.ChoiceField(choices=WholesaleStatusChoices.choices)
     wholesale_company_name = serializers.CharField(allow_blank=True)
+    wholesale_city = serializers.CharField(allow_blank=True)
     wholesale_address = serializers.CharField(allow_blank=True)
     wholesale_comment = serializers.CharField(allow_blank=True)
     wholesale_service_details = serializers.CharField(allow_blank=True)
@@ -267,6 +272,7 @@ class ClientProfileDetailSerializer(serializers.ModelSerializer):
             "is_service_center",
             "wholesale_status",
             "wholesale_company_name",
+            "wholesale_city",
             "wholesale_address",
             "wholesale_comment",
             "wholesale_service_details",

@@ -49,6 +49,8 @@ class UserAdmin(DjangoUserAdmin):
                     "wholesale_status",
                     "wholesale_discount_percent",
                     "wholesale_company_name",
+                    "wholesale_city",
+                    "wholesale_address",
                     "wholesale_comment",
                     "wholesale_service_details",
                     "wholesale_service_photo_1",

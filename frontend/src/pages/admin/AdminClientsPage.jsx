@@ -126,6 +126,7 @@ export default function AdminClientsPage() {
       const haystack = [
         row.username,
         row.wholesale_company_name,
+        row.wholesale_city,
         row.wholesale_address,
         row.wholesale_comment,
         row.wholesale_service_details,
@@ -226,6 +227,7 @@ export default function AdminClientsPage() {
           const isSaving = savingId === row.id;
           const draft = reviewDraftById[row.id] || { review_comment: "" };
           const company = (row.wholesale_company_name || "").trim();
+          const city = (row.wholesale_city || "").trim();
           const address = (row.wholesale_address || "").trim();
 
           return (
@@ -248,7 +250,7 @@ export default function AdminClientsPage() {
                     </Stack>
                     <Typography variant="caption" color="text.secondary" sx={{ maxWidth: 560 }} noWrap>
                       {company || "Без названия сервиса"}
-                      {address ? ` • ${address}` : ""}
+                      {city || address ? ` • ${[city, address].filter(Boolean).join(", ")}` : ""}
                     </Typography>
                   </Stack>
                   <Button size="small" variant="outlined" onClick={() => navigate(`/clients/${row.id}/profile`)}>

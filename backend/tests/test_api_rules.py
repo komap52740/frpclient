@@ -952,6 +952,7 @@ def test_client_can_submit_wholesale_request(client_user):
         {
             "is_service_center": True,
             "wholesale_company_name": "FixLab",
+            "wholesale_city": "Москва",
             "wholesale_address": "РњРѕСЃРєРІР°, СѓР». РўРµСЃС‚РѕРІР°СЏ, 10",
             "wholesale_comment": "15 Р·Р°СЏРІРѕРє РІ РјРµСЃСЏС†",
             "wholesale_service_details": "РЎРµСЂРІРёСЃРЅС‹Р№ С†РµРЅС‚СЂ СЃ РїРѕС‚РѕРєРѕРј 15+ Р·Р°СЏРІРѕРє РІ РјРµСЃСЏС†, СЃРїРµС†РёР°Р»РёР·Р°С†РёСЏ Samsung Рё Xiaomi",
@@ -966,9 +967,32 @@ def test_client_can_submit_wholesale_request(client_user):
     assert client_user.is_service_center is True
     assert client_user.wholesale_status == WholesaleStatusChoices.PENDING
     assert client_user.wholesale_company_name == "FixLab"
+    assert client_user.wholesale_city == "Москва"
     assert client_user.wholesale_address == "РњРѕСЃРєРІР°, СѓР». РўРµСЃС‚РѕРІР°СЏ, 10"
     assert client_user.wholesale_service_details
     assert bool(client_user.wholesale_service_photo_1)
+
+
+@pytest.mark.django_db
+def test_client_wholesale_request_requires_service_city(client_user):
+    service_photo = SimpleUploadedFile("service.jpg", b"photo-data", content_type="image/jpeg")
+    response = auth_as(client_user).post(
+        "/api/wholesale/request/",
+        {
+            "is_service_center": True,
+            "wholesale_company_name": "FixLab",
+            "wholesale_address": "Москва, ул. Тестовая, 10",
+            "wholesale_comment": "15 заявок в месяц",
+            "wholesale_service_details": "Сервисный центр с потоком 15+ заявок в месяц, специализация Samsung и Xiaomi",
+            "wholesale_service_photo_1": service_photo,
+        },
+        format="multipart",
+    )
+
+    assert response.status_code == 400
+    payload_text = str(response.data).lower()
+    assert "wholesale_city" in payload_text
+    assert "город сервисного центра" in payload_text
 
 
 @pytest.mark.django_db
@@ -979,6 +1003,7 @@ def test_client_wholesale_request_requires_service_address(client_user):
         {
             "is_service_center": True,
             "wholesale_company_name": "FixLab",
+            "wholesale_city": "Москва",
             "wholesale_comment": "15 заявок в месяц",
             "wholesale_service_details": "Сервисный центр с потоком 15+ заявок в месяц, специализация Samsung и Xiaomi",
             "wholesale_service_photo_1": service_photo,

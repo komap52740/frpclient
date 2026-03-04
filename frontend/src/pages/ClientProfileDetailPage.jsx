@@ -331,6 +331,12 @@ export default function ClientProfileDetailPage() {
             Компания: <b>{profile.wholesale_company_name || "—"}</b>
           </Typography>
           <Typography variant="body2">
+            Город: <b>{profile.wholesale_city || "—"}</b>
+          </Typography>
+          <Typography variant="body2">
+            Адрес: <b>{profile.wholesale_address || "—"}</b>
+          </Typography>
+          <Typography variant="body2">
             Комментарий: <b>{profile.wholesale_comment || "—"}</b>
           </Typography>
           <Typography variant="body2">

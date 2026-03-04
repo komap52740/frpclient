@@ -930,6 +930,7 @@ def serialize_wholesale_status(user: User, request=None) -> dict:
             "is_service_center": user.is_service_center,
             "wholesale_status": user.wholesale_status,
             "wholesale_company_name": user.wholesale_company_name,
+            "wholesale_city": user.wholesale_city,
             "wholesale_address": user.wholesale_address,
             "wholesale_comment": user.wholesale_comment,
             "wholesale_service_details": user.wholesale_service_details,
@@ -966,6 +967,7 @@ class WholesaleRequestView(APIView):
         previous_status = user.wholesale_status
         is_service_center = bool(payload.get("is_service_center", True))
         service_name = (payload.get("wholesale_company_name") or "").strip()
+        service_city = (payload.get("wholesale_city") or "").strip()
         service_address = (payload.get("wholesale_address") or "").strip()
         comment = (payload.get("wholesale_comment") or "").strip()
         service_details = (payload.get("wholesale_service_details") or "").strip()
@@ -977,11 +979,19 @@ class WholesaleRequestView(APIView):
         update_fields = ["updated_at"]
         user.is_service_center = is_service_center
         user.wholesale_company_name = service_name
+        user.wholesale_city = service_city
         user.wholesale_address = service_address
         user.wholesale_comment = comment
         user.wholesale_service_details = service_details
         update_fields.extend(
-            ["is_service_center", "wholesale_company_name", "wholesale_address", "wholesale_comment", "wholesale_service_details"]
+            [
+                "is_service_center",
+                "wholesale_company_name",
+                "wholesale_city",
+                "wholesale_address",
+                "wholesale_comment",
+                "wholesale_service_details",
+            ]
         )
 
         if is_service_center:
@@ -1009,6 +1019,7 @@ class WholesaleRequestView(APIView):
             user.wholesale_requested_at = None
             user.wholesale_reviewed_at = None
             user.wholesale_review_comment = ""
+            user.wholesale_city = ""
             user.wholesale_address = ""
             user.wholesale_service_details = ""
             user.wholesale_service_photo_1 = None
@@ -1020,6 +1031,7 @@ class WholesaleRequestView(APIView):
                     "wholesale_requested_at",
                     "wholesale_reviewed_at",
                     "wholesale_review_comment",
+                    "wholesale_city",
                     "wholesale_address",
                     "wholesale_service_details",
                     "wholesale_service_photo_1",
@@ -1050,6 +1062,7 @@ class WholesaleRequestView(APIView):
                 actor=user,
                 payload={
                     "company": service_name,
+                    "city": service_city,
                     "address": service_address,
                     "comment": comment,
                     "has_photo_1": bool(user.wholesale_service_photo_1),
