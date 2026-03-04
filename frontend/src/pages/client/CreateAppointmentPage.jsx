@@ -69,7 +69,7 @@ function validateRustdeskPassword(raw) {
   const value = String(raw || "").trim();
   if (!value) return "";
   if (value.length < 4) {
-    return "Код доступа слишком короткий (минимум 4 символа)";
+    return "Пароль RuDesktop слишком короткий (минимум 4 символа)";
   }
   return "";
 }
@@ -196,7 +196,7 @@ export default function CreateAppointmentPage() {
             </Button>
           )}
         >
-          RuDesktop нужен для удаленного доступа к вашему ПК. ID и код можно добавить сразу или позже в карточке заявки.
+          RuDesktop нужен для удаленного доступа к вашему ПК. ID и пароль можно добавить сразу или позже в карточке заявки.
         </Alert>
       </Stack>
 
@@ -250,7 +250,7 @@ export default function CreateAppointmentPage() {
         />
 
         <TextField
-          label="Код доступа RuDesktop (опционально)"
+          label="Пароль RuDesktop (опционально)"
           type="text"
           value={form.rustdesk_password}
           onChange={(event) => updateField("rustdesk_password", event.target.value)}
@@ -274,8 +274,9 @@ export default function CreateAppointmentPage() {
         />
 
         <TextField
-          label="Описание (опционально)"
-          placeholder="Например: что уже пробовали, что сейчас на экране"
+          label="Проблема (тезисно, опционально)"
+          placeholder="Коротко по пунктам: 1) что случилось 2) что уже пробовали 3) что сейчас на экране"
+          helperText="Опишите проблему кратко и тезисно, чтобы мастер быстрее начал работу."
           multiline
           minRows={2}
           value={form.description}

@@ -10,6 +10,8 @@
   TextField,
   Typography,
 } from "@mui/material";
+import GoogleIcon from "@mui/icons-material/Google";
+import TelegramIcon from "@mui/icons-material/Telegram";
 import { alpha } from "@mui/material/styles";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -83,10 +85,12 @@ const authPrimaryButtonSx = {
   minHeight: 52,
   borderRadius: 3,
   py: 1.15,
+  px: 1.7,
   textTransform: "none",
   fontWeight: 800,
   letterSpacing: 0.1,
   fontSize: 18,
+  fontFamily: "'Sora', 'Manrope', sans-serif",
   background: "linear-gradient(135deg, #7fbeff 0%, #4f8dff 45%, #386de2 100%)",
   color: "#f7fcff",
   border: "1.2px solid rgba(160, 204, 255, 0.58)",
@@ -113,10 +117,12 @@ const AUTH_PROVIDER_BUTTON_HEIGHT = 52;
 const oauthButtonBaseSx = {
   minHeight: AUTH_PROVIDER_BUTTON_HEIGHT,
   borderRadius: 3,
+  px: 1.7,
   textTransform: "none",
   fontWeight: 800,
   letterSpacing: 0.1,
   fontSize: 18,
+  fontFamily: "'Sora', 'Manrope', sans-serif",
   lineHeight: 1.2,
   borderWidth: 1.2,
   justifyContent: "center",
@@ -197,16 +203,17 @@ const oauthTelegramShellSx = {
 };
 
 const providerBadgeSx = {
-  width: 24,
-  height: 24,
+  width: 27,
+  height: 27,
   borderRadius: "50%",
   display: "inline-flex",
   alignItems: "center",
   justifyContent: "center",
-  fontSize: 12,
+  fontSize: 13,
   fontWeight: 900,
   flexShrink: 0,
   border: "1px solid rgba(255,255,255,0.28)",
+  boxShadow: "inset 0 1px 0 rgba(255,255,255,0.4), 0 6px 14px rgba(0,0,0,0.28)",
 };
 
 export default function LoginPage() {
@@ -807,7 +814,7 @@ export default function LoginPage() {
                     sx={oauthGoogleButtonSx}
                     startIcon={
                       <Box sx={{ ...providerBadgeSx, color: "#4285f4", bgcolor: "rgba(255,255,255,0.98)" }}>
-                        G
+                        <GoogleIcon sx={{ fontSize: 19 }} />
                       </Box>
                     }
                   >
@@ -820,7 +827,16 @@ export default function LoginPage() {
                     onClick={() => startOAuthLogin("yandex")}
                     sx={oauthYandexButtonSx}
                     startIcon={
-                      <Box sx={{ ...providerBadgeSx, color: "#ff3d3d", bgcolor: "rgba(255,255,255,0.96)" }}>
+                      <Box
+                        sx={{
+                          ...providerBadgeSx,
+                          color: "#ff3d3d",
+                          bgcolor: "rgba(255,255,255,0.96)",
+                          borderColor: "rgba(255,95,95,0.46)",
+                          fontSize: 16,
+                          fontWeight: 900,
+                        }}
+                      >
                         Я
                       </Box>
                     }
@@ -835,7 +851,14 @@ export default function LoginPage() {
                   onClick={() => startOAuthLogin("vk")}
                   sx={oauthVkButtonSx}
                   startIcon={
-                    <Box sx={{ ...providerBadgeSx, color: "#ffffff", bgcolor: "rgba(17,77,173,0.8)" }}>
+                    <Box
+                      sx={{
+                        ...providerBadgeSx,
+                        color: "#ffffff",
+                        bgcolor: "rgba(17,77,173,0.9)",
+                        borderColor: "rgba(174,214,255,0.45)",
+                      }}
+                    >
                       VK
                     </Box>
                   }
@@ -883,6 +906,7 @@ export default function LoginPage() {
                           <Button
                             size="small"
                             variant="outlined"
+                            startIcon={<TelegramIcon sx={{ fontSize: 18 }} />}
                             onClick={() => {
                               telegramWidgetRetryRef.current = 0;
                               setTelegramWidgetReloadKey((prev) => prev + 1);
@@ -908,6 +932,7 @@ export default function LoginPage() {
                           <Button
                             size="small"
                             variant="outlined"
+                            startIcon={<TelegramIcon sx={{ fontSize: 18 }} />}
                             component="a"
                             href={`https://t.me/${BOT_USERNAME}`}
                             target="_blank"

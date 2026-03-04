@@ -25,7 +25,7 @@ export const LOCK_TYPE_LABELS = {
 };
 
 export const PAYMENT_METHOD_LABELS = {
-  bank_transfer: "Банковский перевод",
+  bank_transfer: "СБП",
   crypto: "Криптовалюта",
 };
 

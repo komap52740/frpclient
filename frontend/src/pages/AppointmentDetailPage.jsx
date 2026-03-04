@@ -1829,7 +1829,7 @@ export default function AppointmentDetailPage() {
                 ) : null}
 
                 <Stack spacing={0.4} sx={{ mb: 1 }}>
-                  <Typography variant="body2"><b>Банк:</b> {paymentSettings?.bank_requisites || "не указано"}</Typography>
+                  <Typography variant="body2"><b>СБП:</b> {paymentSettings?.bank_requisites || "не указано"}</Typography>
                   <Typography variant="body2"><b>Криптовалюта:</b> {paymentSettings?.crypto_requisites || "не указано"}</Typography>
                   <Typography variant="body2" color="text.secondary">
                     {paymentSettings?.instructions || "Если не получается — напишите в чат."}
@@ -2533,7 +2533,7 @@ export default function AppointmentDetailPage() {
 
             <Stack spacing={0.4}>
               <Typography variant="body2">
-                <b>Банк:</b> {paymentSettings?.bank_requisites || "не указано"}
+                <b>СБП:</b> {paymentSettings?.bank_requisites || "не указано"}
               </Typography>
               <Typography variant="body2">
                 <b>Криптовалюта:</b> {paymentSettings?.crypto_requisites || "не указано"}
@@ -2548,7 +2548,7 @@ export default function AppointmentDetailPage() {
                 startIcon={<ContentCopyRoundedIcon fontSize="small" />}
                 onClick={() => copyToClipboard(paymentSettings?.bank_requisites)}
               >
-                Банк
+                СБП
               </Button>
               <Button
                 fullWidth
@@ -2698,7 +2698,7 @@ export default function AppointmentDetailPage() {
 
             <Stack spacing={0.4}>
               <Typography variant="body2">
-                <b>Банк:</b> {paymentSettings?.bank_requisites || "не указано"}
+                <b>СБП:</b> {paymentSettings?.bank_requisites || "не указано"}
               </Typography>
               <Typography variant="body2">
                 <b>Криптовалюта:</b> {paymentSettings?.crypto_requisites || "не указано"}
@@ -2712,7 +2712,7 @@ export default function AppointmentDetailPage() {
                 startIcon={<ContentCopyRoundedIcon fontSize="small" />}
                 onClick={() => copyToClipboard(paymentSettings?.bank_requisites)}
               >
-                Скопировать банк
+                Скопировать СБП
               </Button>
               <Button
                 variant="outlined"
