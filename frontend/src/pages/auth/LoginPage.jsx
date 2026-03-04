@@ -114,6 +114,93 @@ const authGhostButtonSx = {
   },
 };
 
+const AUTH_PROVIDER_BUTTON_HEIGHT = 52;
+
+const oauthButtonBaseSx = {
+  minHeight: AUTH_PROVIDER_BUTTON_HEIGHT,
+  borderRadius: 3,
+  textTransform: "none",
+  fontWeight: 800,
+  letterSpacing: 0.1,
+  fontSize: 18,
+  lineHeight: 1.2,
+  borderWidth: 1.2,
+  justifyContent: "center",
+  transition: "all .2s ease",
+};
+
+const oauthGoogleButtonSx = {
+  ...oauthButtonBaseSx,
+  color: "#1f2328",
+  borderColor: "rgba(255,255,255,0.86)",
+  background: "linear-gradient(180deg, #ffffff 0%, #f3f7ff 100%)",
+  "&:hover": {
+    borderColor: "#ffffff",
+    background: "linear-gradient(180deg, #ffffff 0%, #e9f1ff 100%)",
+    boxShadow: "0 8px 20px rgba(0,0,0,0.2)",
+  },
+  "&.Mui-disabled": {
+    color: "rgba(31,35,40,0.55)",
+    background: "rgba(255,255,255,0.62)",
+    borderColor: "rgba(255,255,255,0.45)",
+  },
+};
+
+const oauthYandexButtonSx = {
+  ...oauthButtonBaseSx,
+  color: "#f4f8ff",
+  borderColor: "rgba(255,70,70,0.45)",
+  background: "linear-gradient(155deg, #23181d 0%, #17121a 100%)",
+  "&:hover": {
+    borderColor: "rgba(255,91,91,0.75)",
+    background: "linear-gradient(155deg, #2a1c21 0%, #1c151e 100%)",
+  },
+  "&.Mui-disabled": {
+    color: "rgba(244,248,255,0.55)",
+    background: "rgba(32,23,30,0.7)",
+    borderColor: "rgba(255,91,91,0.3)",
+  },
+};
+
+const oauthVkButtonSx = {
+  ...oauthButtonBaseSx,
+  color: "#edf6ff",
+  borderColor: "rgba(122,185,255,0.66)",
+  background: "linear-gradient(135deg, #2e79ff 0%, #1d62e0 100%)",
+  "&:hover": {
+    borderColor: "rgba(153,204,255,0.95)",
+    background: "linear-gradient(135deg, #3a84ff 0%, #2a6eeb 100%)",
+  },
+  "&.Mui-disabled": {
+    color: "rgba(237,246,255,0.62)",
+    background: "rgba(41,103,198,0.7)",
+    borderColor: "rgba(122,185,255,0.35)",
+  },
+};
+
+const oauthTelegramShellSx = {
+  borderRadius: 3,
+  border: `1.2px solid ${alpha("#7ebeff", 0.66)}`,
+  background: "linear-gradient(135deg, rgba(56,156,243,0.34) 0%, rgba(30,118,217,0.34) 100%)",
+  minHeight: AUTH_PROVIDER_BUTTON_HEIGHT,
+  px: 0.75,
+  py: 0.7,
+  display: "flex",
+  alignItems: "center",
+};
+
+const providerBadgeSx = {
+  width: 24,
+  height: 24,
+  borderRadius: "50%",
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  fontSize: 12,
+  fontWeight: 900,
+  flexShrink: 0,
+};
+
 export default function LoginPage() {
   const { loginWithTelegram, loginWithAccessToken, loginWithPassword } = useAuth();
   const navigate = useNavigate();
@@ -706,10 +793,15 @@ export default function LoginPage() {
                 <Stack direction={{ xs: "column", sm: "row" }} spacing={1.2}>
                   <Button
                     fullWidth
-                    variant="contained"
+                    variant="outlined"
                     disabled={loading}
                     onClick={() => startOAuthLogin("google")}
-                    sx={authPrimaryButtonSx}
+                    sx={oauthGoogleButtonSx}
+                    startIcon={
+                      <Box sx={{ ...providerBadgeSx, color: "#1e8e3e", bgcolor: "rgba(232,245,233,0.96)" }}>
+                        G
+                      </Box>
+                    }
                   >
                     Войти через Google
                   </Button>
@@ -718,7 +810,12 @@ export default function LoginPage() {
                     variant="outlined"
                     disabled={loading}
                     onClick={() => startOAuthLogin("yandex")}
-                    sx={authGhostButtonSx}
+                    sx={oauthYandexButtonSx}
+                    startIcon={
+                      <Box sx={{ ...providerBadgeSx, color: "#ff4b4b", bgcolor: "rgba(33,24,31,0.96)" }}>
+                        Я
+                      </Box>
+                    }
                   >
                     Войти через Яндекс
                   </Button>
@@ -728,7 +825,12 @@ export default function LoginPage() {
                   variant="outlined"
                   disabled={loading}
                   onClick={() => startOAuthLogin("vk")}
-                  sx={authGhostButtonSx}
+                  sx={oauthVkButtonSx}
+                  startIcon={
+                    <Box sx={{ ...providerBadgeSx, color: "#ffffff", bgcolor: "rgba(255,255,255,0.20)" }}>
+                      VK
+                    </Box>
+                  }
                 >
                   Войти через VK
                 </Button>
@@ -737,35 +839,34 @@ export default function LoginPage() {
                   <Alert severity="warning">Не задано значение VITE_TELEGRAM_BOT_USERNAME.</Alert>
                 ) : (
                   <Stack spacing={1}>
-                    <Paper
-                      variant="outlined"
-                      sx={{
-                        p: 1.2,
-                        borderRadius: 1.9,
-                        borderColor: alpha("#8bc2ff", 0.46),
-                        background: "linear-gradient(140deg, rgba(13, 30, 60, 0.72) 0%, rgba(8, 19, 41, 0.72) 100%)",
-                      }}
-                    >
-                      <Stack spacing={0.7}>
-                        <Typography sx={{ color: "rgba(216,232,255,0.9)", fontSize: 13.5, fontWeight: 700 }}>
-                          Telegram вход
-                        </Typography>
-                        <Box
-                          id="telegram-login-container"
-                          ref={telegramContainerRef}
-                          sx={{
-                            minHeight: 50,
-                            px: 0.85,
-                            py: 0.7,
-                            borderRadius: 1.5,
-                            border: `1px dashed ${alpha("#9cc7ff", 0.5)}`,
-                            bgcolor: alpha("#0e2042", 0.34),
-                            display: "flex",
-                            alignItems: "center",
-                          }}
-                        />
-                      </Stack>
-                    </Paper>
+                    <Box sx={oauthTelegramShellSx}>
+                      <Box
+                        id="telegram-login-container"
+                        ref={telegramContainerRef}
+                        sx={{
+                          width: "100%",
+                          minHeight: AUTH_PROVIDER_BUTTON_HEIGHT - 8,
+                          display: "flex",
+                          alignItems: "center",
+                          borderRadius: 2.2,
+                          overflow: "hidden",
+                          "& > *": {
+                            width: "100% !important",
+                            maxWidth: "100% !important",
+                          },
+                          "& iframe": {
+                            width: "100% !important",
+                            minWidth: "100% !important",
+                            maxWidth: "100% !important",
+                            minHeight: `${AUTH_PROVIDER_BUTTON_HEIGHT - 8}px !important`,
+                          },
+                          "& a": {
+                            width: "100% !important",
+                            maxWidth: "100% !important",
+                          },
+                        }}
+                      />
+                    </Box>
 
                     {telegramWidgetError ? (
                       <Stack spacing={1}>
