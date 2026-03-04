@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { keyframes } from "@mui/system";
 
 import { notificationsApi } from "../../api/client";
+import { useAuth } from "../../auth/AuthContext";
 import useAutoRefresh from "../../hooks/useAutoRefresh";
 import NotificationsDrawer from "./NotificationsDrawer";
 
@@ -14,6 +15,7 @@ const bellPulse = keyframes`
 `;
 
 export default function NotificationBell() {
+  const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -33,14 +35,25 @@ export default function NotificationBell() {
     setLoading(true);
     try {
       const response = await notificationsApi.list();
-      setItems(response.data || []);
+      const nextItems = (response.data || []).filter((item) => {
+        if (!user) return true;
+        if (user.role !== "admin" && String(item?.title || "").trim() === "Новая оптовая заявка") {
+          return false;
+        }
+        const payloadClientId = item?.payload?.client_id;
+        if (user.role === "client" && payloadClientId && Number(payloadClientId) !== Number(user.id)) {
+          return false;
+        }
+        return true;
+      });
+      setItems(nextItems);
       setError("");
     } catch {
       setError("Не удалось загрузить уведомления");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     loadUnreadCount();

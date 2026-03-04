@@ -105,15 +105,37 @@ function decodeCp1251Mojibake(value) {
   }
 }
 
+function decodeLatin1Mojibake(value) {
+  const bytes = [];
+  for (let i = 0; i < value.length; i += 1) {
+    const code = value.charCodeAt(i);
+    if (code > 0xff) {
+      return value;
+    }
+    bytes.push(code);
+  }
+
+  try {
+    return new TextDecoder("utf-8", { fatal: true }).decode(Uint8Array.from(bytes));
+  } catch {
+    return value;
+  }
+}
+
 function mojibakeScore(text) {
   if (!text) return 0;
-  const chunks = text.match(/(?:Р.|С.|Гђ.|Г‘.)/g) || [];
-  const replacement = (text.match(/пїЅ/g) || []).length;
-  return chunks.length + replacement * 2;
+  const chunks = text.match(/(?:Р.|С.|Ð.|Ñ.)/g) || [];
+  const replacement = (text.match(/�/g) || []).length;
+  const cyrillic = (text.match(/[А-Яа-яЁё]/g) || []).length;
+  const latinArtifacts = (text.match(/[ÃÂ][-ÿ]/g) || []).length;
+  return chunks.length * 2 + replacement * 8 + latinArtifacts * 3 - cyrillic * 0.08;
 }
 
 function looksLikeMojibake(text) {
-  return /(?:Р.|С.|Гђ.|Г‘.)/.test(text);
+  if (!text) return false;
+  if (text.includes("�")) return true;
+  const chunks = text.match(/(?:Р.|С.|Ð.|Ñ.)/g) || [];
+  return chunks.length >= 2;
 }
 
 export function normalizeRuText(value) {
@@ -125,14 +147,21 @@ export function normalizeRuText(value) {
     return value;
   }
 
-  const decoded = decodeCp1251Mojibake(value);
-  if (decoded === value) {
+  const decodedCp1251 = decodeCp1251Mojibake(value);
+  const decodedLatin1 = decodeLatin1Mojibake(value);
+  const variants = [value, decodedCp1251, decodedLatin1];
+  const best = variants.reduce(
+    (selected, current) => (mojibakeScore(current) < mojibakeScore(selected) ? current : selected),
+    value
+  );
+
+  if (best === value) {
     return value;
   }
 
-  if (!/[А-Яа-яЁё]/.test(decoded)) {
+  if (!/[А-Яа-яЁё]/.test(best)) {
     return value;
   }
 
-  return mojibakeScore(decoded) < mojibakeScore(value) ? decoded : value;
+  return best;
 }

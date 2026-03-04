@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 from rest_framework import generics, permissions
+from django.db.models import Q
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.accounts.permissions import IsAdminRole, IsAuthenticatedAndNotBanned
+from apps.accounts.models import RoleChoices
+from apps.appointments.models import Appointment
 
 from .models import FeatureFlag, Notification
 from .serializers import (
@@ -16,6 +19,33 @@ from .serializers import (
     RuleSerializer,
 )
 from .models import DailyMetrics, PlatformEvent, Rule
+
+
+def _notification_queryset_for_user(user):
+    queryset = Notification.objects.filter(user=user)
+
+    # Hide stale admin-only wholesale alerts for non-admin roles.
+    if user.role != RoleChoices.ADMIN:
+        queryset = queryset.exclude(title__iexact="Новая оптовая заявка")
+
+    # Additional client scoping for mixed payloads.
+    if user.role == RoleChoices.CLIENT:
+        queryset = queryset.filter(Q(payload__client_id__isnull=True) | Q(payload__client_id=user.id))
+        appointment_ids = list(
+            Appointment.objects.filter(client=user).values_list("id", flat=True)
+        )
+        queryset = queryset.filter(
+            Q(payload__appointment_id__isnull=True) | Q(payload__appointment_id__in=appointment_ids)
+        )
+    elif user.role == RoleChoices.MASTER:
+        appointment_ids = list(
+            Appointment.objects.filter(assigned_master=user).values_list("id", flat=True)
+        )
+        queryset = queryset.filter(
+            Q(payload__appointment_id__isnull=True) | Q(payload__appointment_id__in=appointment_ids)
+        )
+
+    return queryset
 
 
 class FeatureFlagListCreateView(generics.ListCreateAPIView):
@@ -37,7 +67,7 @@ class NotificationListView(generics.ListAPIView):
     serializer_class = NotificationSerializer
 
     def get_queryset(self):
-        queryset = Notification.objects.filter(user=self.request.user).order_by("-id")
+        queryset = _notification_queryset_for_user(self.request.user).order_by("-id")
         is_read = self.request.query_params.get("is_read")
         if is_read in {"0", "1"}:
             queryset = queryset.filter(is_read=is_read == "1")
@@ -58,7 +88,7 @@ class NotificationUnreadCountView(APIView):
     permission_classes = (IsAuthenticatedAndNotBanned,)
 
     def get(self, request):
-        count = Notification.objects.filter(user=request.user, is_read=False).count()
+        count = _notification_queryset_for_user(request.user).filter(is_read=False).count()
         return Response({"unread_count": count})
 
 

@@ -228,6 +228,7 @@ export default function ClientHomePage() {
   const navigate = useNavigate();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+  const isWideDesktop = useMediaQuery(theme.breakpoints.up("lg"));
   const isDark = theme.palette.mode === "dark";
   const [summary, setSummary] = useState(null);
   const [items, setItems] = useState([]);
@@ -355,6 +356,7 @@ export default function ClientHomePage() {
       <Paper
         sx={{
           p: { xs: 1.7, md: 3 },
+          minHeight: { xs: 132, sm: 146 },
           borderRadius: 1.8,
           background: isDark
             ? "linear-gradient(135deg, #10213a 0%, #143744 48%, #174b3a 100%)"
@@ -399,11 +401,11 @@ export default function ClientHomePage() {
       ) : null}
 
       <Grid container spacing={2} sx={{ minWidth: 0, alignItems: "stretch" }}>
-        <Grid item xs={12} md={7}>
+        <Grid item xs={12} lg={7}>
           <Paper
             sx={{
               p: { xs: 1.45, md: 2.25 },
-              minHeight: { md: 320 },
+              minHeight: { lg: 320 },
               borderRadius: 1.8,
               border: "1px solid",
               borderColor: isDark ? "divider" : `${scenario.tone}33`,
@@ -412,7 +414,7 @@ export default function ClientHomePage() {
                 : `linear-gradient(140deg, ${scenario.tone}12 0%, #ffffff 45%)`,
             }}
           >
-            <Stack spacing={1.25} sx={{ minHeight: { md: 272 } }}>
+            <Stack spacing={1.25} sx={{ minHeight: { lg: 272 } }}>
               <Stack direction="row" alignItems="center" spacing={1}>
                 <BoltRoundedIcon sx={{ color: scenario.tone }} />
                 <Typography variant="h6">Центр действий</Typography>
@@ -472,8 +474,8 @@ export default function ClientHomePage() {
         </Grid>
 
         {showSecondaryBlocks ? (
-          <Grid item xs={12} md={5}>
-            <Paper sx={{ p: { xs: 1.55, md: 2.25 }, minHeight: { md: 320 }, borderRadius: 1.8 }}>
+          <Grid item xs={12} lg={5}>
+            <Paper sx={{ p: { xs: 1.55, md: 2.25 }, minHeight: { lg: 320 }, borderRadius: 1.8 }}>
               <Stack spacing={1.2}>
                 <Typography variant="h6">Готовность к сессии: {checklistProgress}%</Typography>
                 <LinearProgress
@@ -508,7 +510,7 @@ export default function ClientHomePage() {
                     </Typography>
                   </AccordionSummary>
                   <AccordionDetails>
-                    <Stack spacing={0.25}>
+                    <Stack spacing={0.25} sx={{ minHeight: isWideDesktop ? 190 : undefined }}>
                       {CHECKLIST_ITEMS.map((item) => (
                         <FormControlLabel
                           key={item.key}

@@ -226,6 +226,27 @@ function validatePaymentRequisitesNote(value) {
   return "";
 }
 
+function resolvePaymentUploadError(error) {
+  const statusCode = error?.response?.status;
+  const rawDetail = error?.response?.data?.detail;
+  const detail = normalizeRuText(
+    typeof rawDetail === "string" && rawDetail.trim()
+      ? rawDetail
+      : "Не удалось загрузить чек. Проверьте файл и попробуйте снова."
+  );
+
+  if (statusCode === 413) {
+    return "Файл слишком большой. Максимальный размер чека 100 МБ.";
+  }
+  if (statusCode === 415) {
+    return "Формат файла не поддерживается. Используйте jpg, jpeg, png, webp, heic, heif или pdf.";
+  }
+  if (statusCode >= 500) {
+    return "Сервер временно недоступен. Повторите загрузку через несколько секунд.";
+  }
+  return detail;
+}
+
 function getLatestEventId(eventItems = []) {
   return eventItems.reduce(
     (maxId, event) => (typeof event.id === "number" && event.id > maxId ? event.id : maxId),
@@ -344,6 +365,8 @@ export default function AppointmentDetailPage() {
   const [clientSignal, setClientSignal] = useState("need_help");
   const [clientSignalComment, setClientSignalComment] = useState("");
   const [uploadingProof, setUploadingProof] = useState(false);
+  const [paymentUploadProgress, setPaymentUploadProgress] = useState(0);
+  const [paymentUploadFailed, setPaymentUploadFailed] = useState(false);
   const [paymentUploadedDialogOpen, setPaymentUploadedDialogOpen] = useState(false);
   const [paymentGuideOpen, setPaymentGuideOpen] = useState(false);
   const [paymentFocusOpen, setPaymentFocusOpen] = useState(false);
@@ -885,6 +908,15 @@ export default function AppointmentDetailPage() {
   const paymentProofMeta = paymentProofFile
     ? `${paymentProofFile.name} • ${(paymentProofFile.size / (1024 * 1024)).toFixed(2)} МБ`
     : "Файл не выбран";
+  const showPaymentUploadProgress = uploadingProof || (paymentUploadFailed && paymentUploadProgress > 0);
+  const paymentUploadProgressSafe = Math.max(0, Math.min(100, paymentUploadProgress || 0));
+  const paymentUploadButtonLabel = uploadingProof
+    ? `Загружаем чек... ${paymentUploadProgressSafe > 0 ? `${paymentUploadProgressSafe}%` : ""}`.trim()
+    : paymentUploadFailed
+      ? "Повторить загрузку чека"
+      : appointment.status === "AWAITING_PAYMENT"
+        ? "Загрузить чек и продолжить"
+        : "Отправить новый чек";
   const paymentDropZoneSx = {
     p: 1.1,
     borderRadius: 2,
@@ -1169,7 +1201,15 @@ export default function AppointmentDetailPage() {
   const onSelectPaymentFile = (selected) => {
     setPaymentDragOver(false);
     setPaymentProofFile(selected);
+    setPaymentUploadFailed(false);
+    setPaymentUploadProgress(0);
     setPaymentFileError(selected ? validatePaymentFile(selected) : "");
+    if (selected) {
+      setError("");
+    }
+    if (!selected && paymentFileInputRef.current) {
+      paymentFileInputRef.current.value = "";
+    }
   };
 
   const onPaymentRequisitesChange = (event) => {
@@ -1215,8 +1255,20 @@ export default function AppointmentDetailPage() {
     const formData = new FormData();
     formData.append("payment_proof", paymentProofFile);
     setUploadingProof(true);
+    setPaymentUploadProgress(0);
+    setPaymentUploadFailed(false);
     try {
-      await appointmentsApi.uploadPaymentProof(id, formData);
+      await appointmentsApi.uploadPaymentProof(id, formData, {
+        onUploadProgress: (progressEvent) => {
+          const total = progressEvent?.total || 0;
+          const loaded = progressEvent?.loaded || 0;
+          if (total > 0) {
+            const nextProgress = Math.max(1, Math.min(100, Math.round((loaded / total) * 100)));
+            setPaymentUploadProgress(nextProgress);
+          }
+        },
+      });
+      setPaymentUploadProgress(100);
 
       let autoMarkedPaid = false;
       const requisitesError = validatePaymentRequisitesNote(paymentRequisitesNote);
@@ -1248,6 +1300,7 @@ export default function AppointmentDetailPage() {
       setError("");
       setPaymentProofFile(null);
       setPaymentFileError("");
+      setPaymentUploadFailed(false);
       setToast({
         open: true,
         severity: "success",
@@ -1258,8 +1311,9 @@ export default function AppointmentDetailPage() {
       setPaymentFocusOpen(false);
       setPaymentUploadedDialogOpen(true);
     } catch (err) {
-      const detail = normalizeRuText(err?.response?.data?.detail || "Не удалось загрузить чек. Попробуйте еще раз.");
+      const detail = resolvePaymentUploadError(err);
       setError(detail);
+      setPaymentUploadFailed(true);
       setToast({ open: true, severity: "error", message: detail });
     } finally {
       setUploadingProof(false);
@@ -1272,6 +1326,8 @@ export default function AppointmentDetailPage() {
         ref={paymentFileInputRef}
         hidden
         type="file"
+        accept=".jpg,.jpeg,.png,.webp,.heic,.heif,.pdf,image/*,application/pdf"
+        capture={isMobile ? "environment" : undefined}
         onChange={(event) => onSelectPaymentFile(event.target.files?.[0] || null)}
       />
       <Paper
@@ -1910,9 +1966,15 @@ export default function AppointmentDetailPage() {
                   />
 
                   <Button variant="contained" size="large" onClick={uploadPaymentProof} disabled={!canUploadPaymentProof}>
-                    {uploadingProof ? "Загружаем чек..." : appointment.status === "AWAITING_PAYMENT" ? "Загрузить чек и продолжить" : "Отправить новый чек"}
+                    {paymentUploadButtonLabel}
                   </Button>
-                  {uploadingProof ? <LinearProgress sx={{ borderRadius: 1 }} /> : null}
+                  {showPaymentUploadProgress ? (
+                    <LinearProgress
+                      variant={paymentUploadProgressSafe > 0 ? "determinate" : "indeterminate"}
+                      value={paymentUploadProgressSafe > 0 ? paymentUploadProgressSafe : undefined}
+                      sx={{ borderRadius: 1 }}
+                    />
+                  ) : null}
 
                   {appointment.status === "AWAITING_PAYMENT" ? (
                     <Stack spacing={0.5}>
@@ -1922,6 +1984,11 @@ export default function AppointmentDetailPage() {
                       <Button size="small" variant="text" onClick={markPaidManually}>
                         Не обновилось? Нажать «Я оплатил»
                       </Button>
+                      {paymentUploadFailed ? (
+                        <Button size="small" variant="outlined" onClick={uploadPaymentProof} disabled={!canUploadPaymentProof}>
+                          Повторить загрузку чека
+                        </Button>
+                      ) : null}
                     </Stack>
                   ) : (
                     <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
@@ -2628,18 +2695,27 @@ export default function AppointmentDetailPage() {
               onClick={uploadPaymentProof}
               disabled={!canUploadPaymentProof}
             >
-              {uploadingProof
-                ? "Загружаем чек..."
-                : isAwaitingPayment
-                  ? "Загрузить чек и продолжить"
-                  : "Отправить новый чек"}
+              {paymentUploadButtonLabel}
             </Button>
-            {uploadingProof ? <LinearProgress sx={{ borderRadius: 1 }} /> : null}
+            {showPaymentUploadProgress ? (
+              <LinearProgress
+                variant={paymentUploadProgressSafe > 0 ? "determinate" : "indeterminate"}
+                value={paymentUploadProgressSafe > 0 ? paymentUploadProgressSafe : undefined}
+                sx={{ borderRadius: 1 }}
+              />
+            ) : null}
 
             {isAwaitingPayment ? (
-              <Button size="small" variant="text" onClick={markPaidManually}>
-                Не обновилось? Нажать «Я оплатил»
-              </Button>
+              <Stack spacing={0.6}>
+                <Button size="small" variant="text" onClick={markPaidManually}>
+                  Не обновилось? Нажать «Я оплатил»
+                </Button>
+                {paymentUploadFailed ? (
+                  <Button size="small" variant="outlined" onClick={uploadPaymentProof} disabled={!canUploadPaymentProof}>
+                    Повторить загрузку чека
+                  </Button>
+                ) : null}
+              </Stack>
             ) : null}
 
             <Stack direction="row" spacing={1}>
@@ -2762,7 +2838,13 @@ export default function AppointmentDetailPage() {
                   Форматы: jpg, jpeg, png, webp, heic, heif, pdf. Максимум 100 МБ.
                 </Typography>
               </Stack>
-              <input hidden type="file" onChange={(event) => onSelectPaymentFile(event.target.files?.[0] || null)} />
+              <input
+                hidden
+                type="file"
+                accept=".jpg,.jpeg,.png,.webp,.heic,.heif,.pdf,image/*,application/pdf"
+                capture={isMobile ? "environment" : undefined}
+                onChange={(event) => onSelectPaymentFile(event.target.files?.[0] || null)}
+              />
             </Box>
             <Typography variant="body2">{paymentProofFile ? paymentProofFile.name : "Файл не выбран"}</Typography>
             {paymentFileError ? <Alert severity="warning">{paymentFileError}</Alert> : null}
@@ -2773,17 +2855,27 @@ export default function AppointmentDetailPage() {
               onClick={uploadPaymentProof}
               disabled={!canUploadPaymentProof}
             >
-              {uploadingProof
-                ? "Загружаем чек..."
-                : isAwaitingPayment
-                  ? "Загрузить чек и продолжить"
-                  : "Отправить новый чек"}
+              {paymentUploadButtonLabel}
             </Button>
+            {showPaymentUploadProgress ? (
+              <LinearProgress
+                variant={paymentUploadProgressSafe > 0 ? "determinate" : "indeterminate"}
+                value={paymentUploadProgressSafe > 0 ? paymentUploadProgressSafe : undefined}
+                sx={{ borderRadius: 1 }}
+              />
+            ) : null}
 
             {isAwaitingPayment ? (
-              <Button size="small" variant="text" onClick={markPaidManually}>
-                Не обновилось? Нажать «Я оплатил»
-              </Button>
+              <Stack spacing={0.6}>
+                <Button size="small" variant="text" onClick={markPaidManually}>
+                  Не обновилось? Нажать «Я оплатил»
+                </Button>
+                {paymentUploadFailed ? (
+                  <Button size="small" variant="outlined" onClick={uploadPaymentProof} disabled={!canUploadPaymentProof}>
+                    Повторить загрузку чека
+                  </Button>
+                ) : null}
+              </Stack>
             ) : null}
           </Stack>
         </DialogContent>

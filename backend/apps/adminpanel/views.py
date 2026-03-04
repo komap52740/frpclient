@@ -147,6 +147,27 @@ class AdminWholesaleReviewView(APIView):
 
         decision = serializer.validated_data["decision"]
         review_comment = (serializer.validated_data.get("review_comment") or "").strip()
+
+        if decision == "approve":
+            missing_fields = []
+            if not (user.wholesale_company_name or "").strip():
+                missing_fields.append("название сервиса")
+            if not (user.wholesale_city or "").strip():
+                missing_fields.append("город")
+            if not (user.wholesale_address or "").strip():
+                missing_fields.append("адрес")
+
+            if missing_fields:
+                return Response(
+                    {
+                        "detail": (
+                            "Нельзя одобрить оптовый статус: заполните карточку сервиса клиента "
+                            f"({', '.join(missing_fields)})."
+                        )
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
         requested_at = user.wholesale_requested_at or timezone.now()
         reviewed_at = timezone.now()
 

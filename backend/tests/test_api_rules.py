@@ -1022,13 +1022,22 @@ def test_admin_can_review_wholesale_request(admin_user, client_user):
     client_user.is_service_center = True
     client_user.wholesale_status = WholesaleStatusChoices.PENDING
     client_user.wholesale_company_name = "FixLab"
+    client_user.wholesale_city = "Москва"
+    client_user.wholesale_address = "ул. Тестовая, 10"
     client_user.save(
-        update_fields=["is_service_center", "wholesale_status", "wholesale_company_name", "updated_at"]
+        update_fields=[
+            "is_service_center",
+            "wholesale_status",
+            "wholesale_company_name",
+            "wholesale_city",
+            "wholesale_address",
+            "updated_at",
+        ]
     )
 
     response = auth_as(admin_user).post(
         f"/api/admin/wholesale-requests/{client_user.id}/review/",
-        {"decision": "approve", "review_comment": "РџРѕРґС‚РІРµСЂР¶РґРµРЅ СЃРµСЂРІРёСЃРЅС‹Р№ С†РµРЅС‚СЂ"},
+        {"decision": "approve", "review_comment": "Подтвержден сервисный центр"},
         format="json",
     )
     assert response.status_code == 200

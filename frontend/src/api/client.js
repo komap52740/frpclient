@@ -231,9 +231,11 @@ export const appointmentsApi = {
   setPrice(id, total_price) {
     return api.post(`/appointments/${id}/set-price/`, { total_price });
   },
-  uploadPaymentProof(id, formData) {
+  uploadPaymentProof(id, formData, options = {}) {
     return api.post(`/appointments/${id}/upload-payment-proof/`, formData, {
       headers: { "Content-Type": "multipart/form-data" },
+      onUploadProgress: options.onUploadProgress,
+      signal: options.signal,
     });
   },
   markPaid(id, payment_method, payment_requisites_note) {

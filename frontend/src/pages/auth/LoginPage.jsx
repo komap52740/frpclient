@@ -192,14 +192,32 @@ const oauthVkButtonSx = {
 
 const oauthTelegramShellSx = {
   borderRadius: 3,
-  border: `1.2px solid ${alpha("#88c5ff", 0.72)}`,
-  background: "linear-gradient(135deg, rgba(64,165,248,0.42) 0%, rgba(34,126,226,0.38) 100%)",
+  border: `1.2px solid ${alpha("#89c7ff", 0.76)}`,
+  background: "linear-gradient(135deg, rgba(32,96,176,0.48) 0%, rgba(27,72,142,0.44) 100%)",
   minHeight: AUTH_PROVIDER_BUTTON_HEIGHT,
-  px: 0.75,
-  py: 0.7,
+  px: 0.72,
+  py: 0.68,
   display: "flex",
   alignItems: "center",
-  boxShadow: "0 12px 26px rgba(19,72,141,0.26)",
+  boxShadow: "0 10px 24px rgba(14,55,114,0.3)",
+};
+
+const oauthTelegramFallbackButtonSx = {
+  ...oauthButtonBaseSx,
+  minHeight: AUTH_PROVIDER_BUTTON_HEIGHT - 10,
+  borderRadius: 2.4,
+  fontSize: 17,
+  px: 1.4,
+  color: "#eaf6ff",
+  borderColor: "rgba(148,206,255,0.85)",
+  background: "linear-gradient(135deg, #2ea3f2 0%, #247fe0 52%, #1f66cb 100%)",
+  boxShadow: "0 12px 24px rgba(20,88,175,0.32)",
+  "&:hover": {
+    borderColor: "rgba(168,219,255,0.95)",
+    background: "linear-gradient(135deg, #3ab0ff 0%, #2d8bed 52%, #2872da 100%)",
+    boxShadow: "0 14px 28px rgba(26,96,188,0.42)",
+    transform: "translateY(-1px)",
+  },
 };
 
 const providerBadgeSx = {
@@ -867,7 +885,13 @@ export default function LoginPage() {
                 </Button>
 
                 {!BOT_USERNAME ? (
-                  <Alert severity="warning">Не задано значение VITE_TELEGRAM_BOT_USERNAME.</Alert>
+                  <Typography
+                    variant="caption"
+                    color="rgba(196,219,246,0.88)"
+                    sx={{ px: 0.2 }}
+                  >
+                    Telegram-вход временно недоступен: не задано имя бота.
+                  </Typography>
                 ) : (
                   <Stack spacing={1}>
                     <Box sx={oauthTelegramShellSx}>
@@ -901,7 +925,9 @@ export default function LoginPage() {
 
                     {telegramWidgetError ? (
                       <Stack spacing={1}>
-                        <Alert severity="warning">{telegramWidgetError}</Alert>
+                        <Typography variant="caption" color="rgba(205,223,245,0.9)" sx={{ px: 0.25 }}>
+                          {telegramWidgetError}
+                        </Typography>
                         <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
                           <Button
                             size="small"
@@ -911,21 +937,7 @@ export default function LoginPage() {
                               telegramWidgetRetryRef.current = 0;
                               setTelegramWidgetReloadKey((prev) => prev + 1);
                             }}
-                            sx={{
-                              alignSelf: "flex-start",
-                              textTransform: "none",
-                              borderRadius: 2,
-                              minHeight: 40,
-                              px: 1.8,
-                              fontWeight: 700,
-                              borderColor: "rgba(130,183,247,0.62)",
-                              color: "#cae6ff",
-                              background: "linear-gradient(145deg, rgba(25,54,96,0.52) 0%, rgba(16,35,65,0.54) 100%)",
-                              "&:hover": {
-                                borderColor: "rgba(159,208,255,0.94)",
-                                background: "linear-gradient(145deg, rgba(33,66,114,0.72) 0%, rgba(21,44,80,0.72) 100%)",
-                              },
-                            }}
+                            sx={{ ...oauthTelegramFallbackButtonSx, minHeight: 44, flex: 1 }}
                           >
                             Перезагрузить Telegram вход
                           </Button>
@@ -938,18 +950,17 @@ export default function LoginPage() {
                             target="_blank"
                             rel="noreferrer"
                             sx={{
-                              alignSelf: "flex-start",
-                              textTransform: "none",
-                              borderRadius: 2,
-                              minHeight: 40,
-                              px: 1.8,
+                              flex: 1,
+                              minHeight: 44,
+                              borderRadius: 2.2,
+                              px: 1.4,
                               fontWeight: 700,
-                              borderColor: "rgba(89,184,255,0.62)",
-                              color: "#9fd7ff",
-                              background: "linear-gradient(145deg, rgba(12,38,69,0.3) 0%, rgba(9,29,56,0.32) 100%)",
+                              borderColor: "rgba(121,195,255,0.72)",
+                              color: "#b6e2ff",
+                              background: "linear-gradient(145deg, rgba(17,45,82,0.45) 0%, rgba(12,33,63,0.45) 100%)",
                               "&:hover": {
-                                borderColor: "rgba(124,205,255,0.92)",
-                                background: "linear-gradient(145deg, rgba(17,51,92,0.48) 0%, rgba(12,38,72,0.5) 100%)",
+                                borderColor: "rgba(150,214,255,0.94)",
+                                background: "linear-gradient(145deg, rgba(25,62,108,0.65) 0%, rgba(16,46,84,0.65) 100%)",
                               },
                             }}
                           >

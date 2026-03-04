@@ -412,21 +412,28 @@ export default function ClientProfilePage() {
               {requestSuccess ? <Alert severity="success">{requestSuccess}</Alert> : null}
               <TextField
                 label="Название сервиса"
+                required
                 value={serviceForm.wholesale_company_name}
                 onChange={(event) => updateServiceField("wholesale_company_name", event.target.value)}
+                helperText="Обязательно для заявки на оптовый статус"
               />
               <TextField
                 label="Город"
+                required
                 value={serviceForm.wholesale_city}
                 onChange={(event) => updateServiceField("wholesale_city", event.target.value)}
+                helperText="Обязательно для заявки на оптовый статус"
               />
               <TextField
                 label="Адрес сервиса"
+                required
                 value={serviceForm.wholesale_address}
                 onChange={(event) => updateServiceField("wholesale_address", event.target.value)}
+                helperText="Обязательно для заявки на оптовый статус"
               />
               <TextField
                 label="Описание сервиса"
+                required
                 multiline
                 minRows={3}
                 value={serviceForm.wholesale_service_details}
