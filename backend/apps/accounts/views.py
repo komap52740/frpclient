@@ -1,7 +1,11 @@
 from __future__ import annotations
 
+import base64
+import hashlib
 import json
 import logging
+import os
+import uuid
 from datetime import timedelta
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
@@ -46,6 +50,20 @@ logger = logging.getLogger(__name__)
 
 def _oauth_cookie_name(provider: str) -> str:
     return f"oauth_state_{provider}"
+
+
+def _oauth_pkce_verifier_cookie_name(provider: str) -> str:
+    return f"oauth_pkce_verifier_{provider}"
+
+
+def _oauth_device_cookie_name(provider: str) -> str:
+    return f"oauth_device_id_{provider}"
+
+
+def _clear_oauth_cookies(response, provider: str) -> None:
+    response.delete_cookie(_oauth_cookie_name(provider))
+    response.delete_cookie(_oauth_pkce_verifier_cookie_name(provider))
+    response.delete_cookie(_oauth_device_cookie_name(provider))
 
 
 def _frontend_base_url(request) -> str:
@@ -195,8 +213,20 @@ def _vk_authorize_url(config: dict, state: str) -> str:
         "response_type": "code",
         "state": state,
         "scope": config.get("scope") or "email",
-        "v": config.get("api_version") or "5.131",
     }
+    if _is_vk_id_oauth(config):
+        verifier, challenge = _build_vk_pkce_pair()
+        device_id = str(uuid.uuid4())
+        params.update(
+            {
+                "code_challenge": challenge,
+                "code_challenge_method": "S256",
+                "device_id": device_id,
+            }
+        )
+        return f"{config['authorize_url']}?{urlencode(params)}", verifier, device_id
+
+    params["v"] = config.get("api_version") or "5.131"
     return f"{config['authorize_url']}?{urlencode(params)}"
 
 
@@ -252,7 +282,87 @@ def _load_yandex_profile(config: dict, code: str) -> dict:
     )
 
 
-def _load_vk_profile(config: dict, code: str) -> dict:
+def _is_vk_id_oauth(config: dict) -> bool:
+    authorize_url = (config.get("authorize_url") or "").lower()
+    token_url = (config.get("token_url") or "").lower()
+    userinfo_url = (config.get("userinfo_url") or "").lower()
+    return "id.vk.com" in authorize_url or "id.vk.com" in token_url or "id.vk.com" in userinfo_url
+
+
+def _build_vk_pkce_pair() -> tuple[str, str]:
+    verifier = base64.urlsafe_b64encode(os.urandom(48)).decode("ascii").rstrip("=")
+    challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode("ascii")).digest()).decode("ascii").rstrip("=")
+    return verifier, challenge
+
+
+def _load_vk_profile(config: dict, code: str, *, state: str = "", device_id: str = "", code_verifier: str = "") -> dict:
+    if _is_vk_id_oauth(config):
+        if not device_id:
+            raise ValueError("oauth_vk_missing_device_id")
+        if not code_verifier:
+            raise ValueError("oauth_vk_missing_code_verifier")
+
+        token_payload = {
+            "grant_type": "authorization_code",
+            "client_id": config["client_id"],
+            "redirect_uri": config["redirect_uri"],
+            "code": code,
+            "code_verifier": code_verifier,
+            "device_id": device_id,
+        }
+        if state:
+            token_payload["state"] = state
+        if config.get("client_secret"):
+            token_payload["client_secret"] = config["client_secret"]
+
+        token_data = _fetch_json(
+            config["token_url"],
+            method="POST",
+            form_data=token_payload,
+        )
+        if token_data.get("error"):
+            raise ValueError("oauth_token_error")
+        access_token = token_data.get("access_token")
+        if not access_token:
+            raise ValueError("oauth_missing_access_token")
+
+        user_data = _fetch_json(
+            config["userinfo_url"],
+            method="POST",
+            form_data={
+                "client_id": config["client_id"],
+                "access_token": access_token,
+            },
+        )
+        if user_data.get("error"):
+            raise ValueError("oauth_userinfo_error")
+
+        user_payload = user_data.get("user") or user_data.get("response") or user_data
+        if isinstance(user_payload, list):
+            user_payload = user_payload[0] if user_payload else {}
+
+        full_name = (user_payload.get("name") or "").strip()
+        first_name = (user_payload.get("first_name") or "").strip()
+        last_name = (user_payload.get("last_name") or "").strip()
+        if full_name and not first_name:
+            name_parts = full_name.split(" ", 1)
+            first_name = name_parts[0]
+            if len(name_parts) > 1 and not last_name:
+                last_name = name_parts[1]
+
+        return {
+            "id": user_payload.get("user_id") or user_payload.get("id") or "",
+            "email": (user_payload.get("email") or token_data.get("email") or "").strip(),
+            "first_name": first_name,
+            "last_name": last_name,
+            "username": (
+                user_payload.get("screen_name")
+                or user_payload.get("domain")
+                or user_payload.get("username")
+                or ""
+            ),
+        }
+
     token_data = _fetch_json(
         f"{config['token_url']}?{urlencode({'client_id': config['client_id'], 'client_secret': config['client_secret'], 'redirect_uri': config['redirect_uri'], 'code': code})}"
     )
@@ -705,12 +815,17 @@ class OAuthStartView(APIView):
             return Response({"detail": "OAuth для выбранного провайдера не настроен."}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
         state = get_random_string(40)
+        vk_pkce_verifier = ""
+        vk_device_id = ""
         if normalized_provider == "google":
             auth_url = _google_authorize_url(config, state)
         elif normalized_provider == "yandex":
             auth_url = _yandex_authorize_url(config, state)
         elif normalized_provider == "vk":
-            auth_url = _vk_authorize_url(config, state)
+            if _is_vk_id_oauth(config):
+                auth_url, vk_pkce_verifier, vk_device_id = _vk_authorize_url(config, state)
+            else:
+                auth_url = _vk_authorize_url(config, state)
         elif normalized_provider == "max":
             auth_url = _max_authorize_url(config, state)
         else:
@@ -725,6 +840,23 @@ class OAuthStartView(APIView):
             samesite=settings.REFRESH_COOKIE_SAMESITE,
             max_age=600,
         )
+        if normalized_provider == "vk" and vk_pkce_verifier and vk_device_id:
+            response.set_cookie(
+                key=_oauth_pkce_verifier_cookie_name(normalized_provider),
+                value=vk_pkce_verifier,
+                httponly=True,
+                secure=settings.REFRESH_COOKIE_SECURE,
+                samesite=settings.REFRESH_COOKIE_SAMESITE,
+                max_age=600,
+            )
+            response.set_cookie(
+                key=_oauth_device_cookie_name(normalized_provider),
+                value=vk_device_id,
+                httponly=True,
+                secure=settings.REFRESH_COOKIE_SECURE,
+                samesite=settings.REFRESH_COOKIE_SAMESITE,
+                max_age=600,
+            )
         return response
 
 
@@ -739,26 +871,26 @@ class OAuthCallbackView(APIView):
         oauth_error = (request.GET.get("error_description") or request.GET.get("error") or "").strip()
         if oauth_error:
             response = _oauth_redirect_with_error(request, oauth_error, normalized_provider)
-            response.delete_cookie(_oauth_cookie_name(normalized_provider))
+            _clear_oauth_cookies(response, normalized_provider)
             return response
 
         received_state = (request.GET.get("state") or "").strip()
         expected_state = request.COOKIES.get(_oauth_cookie_name(normalized_provider), "")
         if not received_state or not expected_state or received_state != expected_state:
             response = _oauth_redirect_with_error(request, "OAuth-сессия недействительна. Повторите вход.", normalized_provider)
-            response.delete_cookie(_oauth_cookie_name(normalized_provider))
+            _clear_oauth_cookies(response, normalized_provider)
             return response
 
         code = (request.GET.get("code") or "").strip()
         if not code:
             response = _oauth_redirect_with_error(request, "OAuth-код не получен.", normalized_provider)
-            response.delete_cookie(_oauth_cookie_name(normalized_provider))
+            _clear_oauth_cookies(response, normalized_provider)
             return response
 
         config = _oauth_config(normalized_provider, request)
         if not config:
             response = _oauth_redirect_with_error(request, "OAuth для выбранного провайдера не настроен.", normalized_provider)
-            response.delete_cookie(_oauth_cookie_name(normalized_provider))
+            _clear_oauth_cookies(response, normalized_provider)
             return response
 
         try:
@@ -767,7 +899,15 @@ class OAuthCallbackView(APIView):
             elif normalized_provider == "yandex":
                 raw_profile = _load_yandex_profile(config, code)
             elif normalized_provider == "vk":
-                raw_profile = _load_vk_profile(config, code)
+                vk_code_verifier = request.COOKIES.get(_oauth_pkce_verifier_cookie_name(normalized_provider), "")
+                vk_device_id = (request.GET.get("device_id") or request.COOKIES.get(_oauth_device_cookie_name(normalized_provider), "")).strip()
+                raw_profile = _load_vk_profile(
+                    config,
+                    code,
+                    state=received_state,
+                    device_id=vk_device_id,
+                    code_verifier=vk_code_verifier,
+                )
             else:
                 raw_profile = _load_max_profile(config, code)
             profile = _normalize_oauth_profile(normalized_provider, raw_profile)
@@ -775,11 +915,11 @@ class OAuthCallbackView(APIView):
         except Exception as exc:  # noqa: BLE001
             logger.warning("OAuth callback failed for provider=%s: %s", normalized_provider, exc)
             response = _oauth_redirect_with_error(request, "Не удалось выполнить вход. Попробуйте снова.", normalized_provider)
-            response.delete_cookie(_oauth_cookie_name(normalized_provider))
+            _clear_oauth_cookies(response, normalized_provider)
             return response
 
         response = _oauth_success_response(request, user, normalized_provider)
-        response.delete_cookie(_oauth_cookie_name(normalized_provider))
+        _clear_oauth_cookies(response, normalized_provider)
         return response
 
 
