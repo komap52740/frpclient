@@ -31,6 +31,7 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const ALLOWED_EXTENSIONS = ["jpg", "jpeg", "png", "pdf", "txt", "log", "zip", "webp", "mp4", "mov", "webm", "m4v"];
 const URL_REGEX = /\bhttps?:\/\/[^\s<>"']+/gi;
 const LINK_SOURCE_ROLES = new Set(["master", "admin"]);
+const INCOMING_SOUND_SOURCE_ROLES = new Set(["master", "admin"]);
 
 function mapSystemEvents(systemEvents = []) {
   const seen = new Set();
@@ -137,6 +138,8 @@ export default function ChatPanel({
   const [ruDesktopSuccess, setRuDesktopSuccess] = useState("");
 
   const threadRef = useRef(null);
+  const sendAudioContextRef = useRef(null);
+  const hasLoadedInitialBatchRef = useRef(false);
 
   const isClientRole = currentUser.role === "client";
   const isSplitClientLayout = isClientRole && !isMobile;
@@ -178,6 +181,11 @@ export default function ChatPanel({
         if (response.data.length) {
           const shouldStickToBottom = isNearBottom();
           const hasForeignMessages = response.data.some((item) => item.sender !== currentUser.id);
+          const hasMasterOrAdminIncoming = response.data.some((item) => {
+            if (item.sender === currentUser.id) return false;
+            const role = String(item.sender_role || "").toLowerCase();
+            return INCOMING_SOUND_SOURCE_ROLES.has(role);
+          });
 
           setMessages((prev) => {
             const merged = [...prev.filter((item) => !item.is_pending), ...response.data];
@@ -185,6 +193,12 @@ export default function ChatPanel({
             merged.forEach((message) => dedup.set(String(message.id), message));
             return Array.from(dedup.values()).sort((a, b) => dayjs(a.created_at).valueOf() - dayjs(b.created_at).valueOf());
           });
+
+          if (afterId === 0) {
+            hasLoadedInitialBatchRef.current = true;
+          } else if (hasLoadedInitialBatchRef.current && hasMasterOrAdminIncoming) {
+            playIncomingMessageSound();
+          }
 
           if (afterId === 0 || shouldStickToBottom) {
             setNewIncomingCount(0);
@@ -224,6 +238,87 @@ export default function ChatPanel({
     }
   }, [isNearBottom]);
 
+  const playSendMessageSound = useCallback(() => {
+    try {
+      if (typeof window === "undefined") return;
+      const AudioContextCtor = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContextCtor) return;
+
+      let audioCtx = sendAudioContextRef.current;
+      if (!audioCtx || audioCtx.state === "closed") {
+        audioCtx = new AudioContextCtor();
+        sendAudioContextRef.current = audioCtx;
+      }
+
+      if (audioCtx.state === "suspended") {
+        audioCtx.resume().catch(() => undefined);
+      }
+
+      const now = audioCtx.currentTime;
+      const oscillator = audioCtx.createOscillator();
+      const gainNode = audioCtx.createGain();
+
+      oscillator.type = "triangle";
+      oscillator.frequency.setValueAtTime(860, now);
+      oscillator.frequency.exponentialRampToValueAtTime(640, now + 0.1);
+
+      gainNode.gain.setValueAtTime(0.0001, now);
+      gainNode.gain.exponentialRampToValueAtTime(0.04, now + 0.015);
+      gainNode.gain.exponentialRampToValueAtTime(0.0001, now + 0.12);
+
+      oscillator.connect(gainNode);
+      gainNode.connect(audioCtx.destination);
+      oscillator.start(now);
+      oscillator.stop(now + 0.13);
+    } catch {
+      // Silent fallback: chat should work even if audio is blocked by browser policy.
+    }
+  }, []);
+
+  const playIncomingMessageSound = useCallback(() => {
+    try {
+      if (typeof window === "undefined") return;
+      const AudioContextCtor = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContextCtor) return;
+
+      let audioCtx = sendAudioContextRef.current;
+      if (!audioCtx || audioCtx.state === "closed") {
+        audioCtx = new AudioContextCtor();
+        sendAudioContextRef.current = audioCtx;
+      }
+
+      if (audioCtx.state === "suspended") {
+        audioCtx.resume().catch(() => undefined);
+      }
+
+      const now = audioCtx.currentTime;
+      const oscA = audioCtx.createOscillator();
+      const oscB = audioCtx.createOscillator();
+      const gainNode = audioCtx.createGain();
+
+      oscA.type = "sine";
+      oscB.type = "triangle";
+      oscA.frequency.setValueAtTime(740, now);
+      oscA.frequency.exponentialRampToValueAtTime(880, now + 0.08);
+      oscB.frequency.setValueAtTime(520, now);
+      oscB.frequency.exponentialRampToValueAtTime(640, now + 0.08);
+
+      gainNode.gain.setValueAtTime(0.0001, now);
+      gainNode.gain.exponentialRampToValueAtTime(0.035, now + 0.02);
+      gainNode.gain.exponentialRampToValueAtTime(0.0001, now + 0.16);
+
+      oscA.connect(gainNode);
+      oscB.connect(gainNode);
+      gainNode.connect(audioCtx.destination);
+      oscA.start(now);
+      oscB.start(now);
+      oscA.stop(now + 0.17);
+      oscB.stop(now + 0.17);
+    } catch {
+      // Silent fallback when browser blocks audio.
+    }
+  }, []);
+
   const onSend = async () => {
     const rawText = text.trim();
     if (!rawText && !file) return;
@@ -251,6 +346,8 @@ export default function ChatPanel({
     if (rawText) formData.append("text", rawText);
     if (file) formData.append("file", file);
 
+    playSendMessageSound();
+
     setText("");
     setFile(null);
     setFileError("");
@@ -272,6 +369,16 @@ export default function ChatPanel({
       setIsSending(false);
     }
   };
+
+  useEffect(
+    () => () => {
+      const audioCtx = sendAudioContextRef.current;
+      if (audioCtx && audioCtx.state !== "closed") {
+        audioCtx.close().catch(() => undefined);
+      }
+    },
+    []
+  );
 
   const onDelete = async (messageId) => {
     try {
