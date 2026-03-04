@@ -1,5 +1,6 @@
 import axios from "axios";
 import { clearTokens, getAccessToken, setAccessToken } from "./authStorage";
+import { normalizeRuText } from "../utils/text";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
 export const BANNED_EVENT_NAME = "frp:user-banned";
@@ -8,6 +9,23 @@ export const api = axios.create({
   baseURL: API_BASE_URL,
   withCredentials: true,
 });
+
+function normalizeRuPayload(value) {
+  if (typeof value === "string") {
+    return normalizeRuText(value);
+  }
+  if (Array.isArray(value)) {
+    return value.map(normalizeRuPayload);
+  }
+  if (value && typeof value === "object") {
+    const normalized = {};
+    Object.entries(value).forEach(([key, innerValue]) => {
+      normalized[key] = normalizeRuPayload(innerValue);
+    });
+    return normalized;
+  }
+  return value;
+}
 
 api.interceptors.request.use((config) => {
   const token = getAccessToken();
@@ -45,8 +63,16 @@ async function refreshAccessToken() {
 }
 
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    if (response?.data !== undefined) {
+      response.data = normalizeRuPayload(response.data);
+    }
+    return response;
+  },
   async (error) => {
+    if (error?.response?.data !== undefined) {
+      error.response.data = normalizeRuPayload(error.response.data);
+    }
     const originalRequest = error.config;
     const requestUrl = originalRequest?.url || "";
     const detailMessage = error?.response?.data?.detail;

@@ -65,7 +65,7 @@ def test_appointment_lifecycle_emits_platform_events():
 
     mark_paid_response = auth_as(client_user).post(
         f"/api/appointments/{appointment_id}/mark-paid/",
-        {"payment_method": "bank_transfer"},
+        {"payment_method": "bank_transfer", "payment_requisites_note": "Сбер +7... 4411"},
         format="json",
     )
     assert mark_paid_response.status_code == 200

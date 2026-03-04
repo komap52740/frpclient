@@ -13,6 +13,7 @@ class BanUserSerializer(serializers.Serializer):
 class AdminUserSerializer(serializers.ModelSerializer):
     client_stats = ClientStatsSerializer(read_only=True)
     master_stats = MasterStatsSerializer(read_only=True)
+    master_tier = serializers.SerializerMethodField()
     profile_photo_url = serializers.SerializerMethodField()
     wholesale_service_photo_1_url = serializers.SerializerMethodField()
     wholesale_service_photo_2_url = serializers.SerializerMethodField()
@@ -31,6 +32,7 @@ class AdminUserSerializer(serializers.ModelSerializer):
             "ban_reason",
             "banned_at",
             "is_master_active",
+            "master_tier",
             "master_level",
             "master_specializations",
             "master_quality_approved",
@@ -38,8 +40,8 @@ class AdminUserSerializer(serializers.ModelSerializer):
             "master_quality_comment",
             "is_service_center",
             "wholesale_status",
-            "wholesale_discount_percent",
             "wholesale_company_name",
+            "wholesale_address",
             "wholesale_comment",
             "wholesale_service_details",
             "wholesale_service_photo_1_url",
@@ -69,6 +71,9 @@ class AdminUserSerializer(serializers.ModelSerializer):
     def get_profile_photo_url(self, obj: User):
         return self._build_file_url(obj, "profile_photo")
 
+    def get_master_tier(self, obj: User) -> str:
+        return "senior" if obj.master_level == MasterLevelChoices.SENIOR else "regular"
+
 
 class AdminUserRoleSerializer(serializers.Serializer):
     role = serializers.ChoiceField(choices=RoleChoices.choices)
@@ -76,6 +81,7 @@ class AdminUserRoleSerializer(serializers.Serializer):
 
 
 class AdminMasterQualitySerializer(serializers.Serializer):
+    master_tier = serializers.ChoiceField(choices=(("senior", "senior"), ("regular", "regular")), required=False)
     master_level = serializers.ChoiceField(choices=MasterLevelChoices.choices, required=False)
     master_specializations = serializers.CharField(max_length=255, required=False, allow_blank=True)
     master_quality_approved = serializers.BooleanField(required=False)

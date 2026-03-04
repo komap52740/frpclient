@@ -98,6 +98,12 @@ export function createAppTheme(mode = "light") {
           ":root": {
             colorScheme: mode,
           },
+          html: {
+            maxWidth: "100%",
+            overflowX: "hidden",
+            overflowY: "scroll",
+            scrollbarGutter: "stable both-edges",
+          },
           "html, body": {
             maxWidth: "100%",
             overflowX: "hidden",
@@ -113,6 +119,7 @@ export function createAppTheme(mode = "light") {
               : "radial-gradient(1300px 680px at -10% -20%, #deebff 0%, #f3f7ff 40%, #edf2fa 100%)",
             color: colors.textMain,
             textRendering: "geometricPrecision",
+            overflowY: "scroll",
           },
           "::selection": {
             background: isDark ? alpha(colors.brand, 0.45) : alpha(colors.brand, 0.22),

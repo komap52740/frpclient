@@ -57,7 +57,6 @@ def notify_master_about_client_chat_message(message) -> bool:
     if not master or not master.telegram_id:
         return False
 
-    # Notify only on client-originated messages.
     if sender.id != appointment.client_id:
         return False
 

@@ -197,12 +197,23 @@ function validatePaymentFile(file) {
     return "Выберите файл чека";
   }
   const ext = (file.name.split(".").pop() || "").toLowerCase();
-  const allowed = ["jpg", "jpeg", "png", "pdf"];
-  if (!allowed.includes(ext)) {
-    return "Формат файла: jpg, jpeg, png или pdf";
+  const mime = (file.type || "").toLowerCase();
+  const allowedExtensions = ["jpg", "jpeg", "png", "webp", "heic", "heif", "pdf"];
+  const allowedMimePrefixes = [
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+    "image/heic",
+    "image/heif",
+    "application/pdf",
+  ];
+  const hasAllowedExtension = allowedExtensions.includes(ext);
+  const hasAllowedMime = allowedMimePrefixes.some((prefix) => mime.startsWith(prefix));
+  if (!hasAllowedExtension && !hasAllowedMime) {
+    return "Формат файла: jpg, jpeg, png, webp, heic, heif или pdf";
   }
-  if (file.size > 10 * 1024 * 1024) {
-    return "Размер файла не должен превышать 10 МБ";
+  if (file.size > 100 * 1024 * 1024) {
+    return "Размер файла не должен превышать 100 МБ";
   }
   return "";
 }
@@ -622,9 +633,10 @@ export default function AppointmentDetailPage() {
       setToast({ open: true, severity: "success", message: "Действие выполнено" });
       return true;
     } catch (err) {
-      const detailMessage = err.response?.data?.detail || "Ошибка выполнения действия";
+      const rawDetail = err.response?.data?.detail || "Ошибка выполнения действия";
+      const detailMessage = normalizeRuText(rawDetail);
       setSuccess("");
-      setError(err.response?.data?.detail || "Ошибка выполнения действия");
+      setError(detailMessage);
       setToast({ open: true, severity: "error", message: detailMessage });
       return false;
     }
@@ -842,6 +854,7 @@ export default function AppointmentDetailPage() {
   const showClientSecondaryCards = isClient
     ? false
     : !isClientMinimal && !isClientCompact && (!showClientTabs || clientTab === "details");
+  const showClientReviewCard = showClientReview && (isClientStrictLayout ? clientTab === "details" : showClientSecondaryCards);
   const paymentFlowStatusesDone = ["PAYMENT_PROOF_UPLOADED", "PAID", "IN_PROGRESS", "COMPLETED"];
   const paymentConfirmedStatuses = ["PAID", "IN_PROGRESS", "COMPLETED"];
   const latestPaymentProofEvent = timelineEvents.find((event) => event.event_type === "payment_proof_uploaded");
@@ -1057,6 +1070,15 @@ export default function AppointmentDetailPage() {
           ? "Открыть"
           : "";
 
+  const scrollToSection = (sectionRef) => {
+    window.requestAnimationFrame(() => {
+      sectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+    window.setTimeout(() => {
+      sectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 180);
+  };
+
   const handlePrimaryAction = async (actionKey) => {
     if (actionKey === "open_payment") {
       if (isClient) {
@@ -1107,7 +1129,7 @@ export default function AppointmentDetailPage() {
           setClientTab("details");
         }
       }
-      reviewRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      scrollToSection(reviewRef);
       return;
     }
     if (actionKey === "create_new") {
@@ -1204,10 +1226,13 @@ export default function AppointmentDetailPage() {
           await appointmentsApi.markPaid(id, paymentMethod, (paymentRequisitesNote || "").trim());
           autoMarkedPaid = true;
         } catch (markError) {
+          const markDetail = normalizeRuText(
+            markError?.response?.data?.detail || "Чек загружен. Нажмите «Я оплатил», если статус не изменился автоматически."
+          );
           setToast({
             open: true,
             severity: "warning",
-            message: markError?.response?.data?.detail || "Чек загружен. Нажмите «Я оплатил», если статус не изменился автоматически.",
+            message: markDetail,
           });
         }
       } else if (appointment?.status === "AWAITING_PAYMENT" && requisitesError) {
@@ -1233,7 +1258,7 @@ export default function AppointmentDetailPage() {
       setPaymentFocusOpen(false);
       setPaymentUploadedDialogOpen(true);
     } catch (err) {
-      const detail = err?.response?.data?.detail || "Не удалось загрузить чек. Попробуйте еще раз.";
+      const detail = normalizeRuText(err?.response?.data?.detail || "Не удалось загрузить чек. Попробуйте еще раз.");
       setError(detail);
       setToast({ open: true, severity: "error", message: detail });
     } finally {
@@ -1491,6 +1516,11 @@ export default function AppointmentDetailPage() {
               {isClient ? (
                 <Button size="small" variant="contained" onClick={() => navigate("/client/create")}>
                   Новая заявка
+                </Button>
+              ) : null}
+              {showClientReview ? (
+                <Button size="small" variant="outlined" onClick={() => handlePrimaryAction("leave_review")}>
+                  Оставить отзыв
                 </Button>
               ) : null}
               <Button size="small" variant="outlined" onClick={() => handlePrimaryAction("open_chat")}>
@@ -1843,7 +1873,7 @@ export default function AppointmentDetailPage() {
                         {appointment.status === "AWAITING_PAYMENT" ? "Выберите или перетащите файл чека" : "Загрузите новый чек"}
                       </Typography>
                       <Typography variant="caption" color="text.secondary">
-                        Форматы: jpg, jpeg, png, pdf. Максимум 10 МБ.
+                        Форматы: jpg, jpeg, png, webp, heic, heif, pdf. Максимум 100 МБ.
                       </Typography>
                     </Stack>
                   </Box>
@@ -1996,7 +2026,7 @@ export default function AppointmentDetailPage() {
               </Paper>
             ) : null}
 
-            {showClientReview && showClientSecondaryCards ? (
+            {showClientReviewCard ? (
               <Paper ref={reviewRef} sx={{ p: 2.2 }}>
                 <Typography variant="h3" sx={{ mb: 1 }}>Оцените работу мастера</Typography>
                 <Stack spacing={1}>
@@ -2566,7 +2596,7 @@ export default function AppointmentDetailPage() {
                   {isAwaitingPayment ? "Выберите или перетащите файл чека" : "Загрузите новый чек"}
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
-                  Форматы: jpg, jpeg, png, pdf. Максимум 10 МБ.
+                  Форматы: jpg, jpeg, png, webp, heic, heif, pdf. Максимум 100 МБ.
                 </Typography>
               </Stack>
             </Box>
@@ -2729,7 +2759,7 @@ export default function AppointmentDetailPage() {
                   {isAwaitingPayment ? "Выберите или перетащите файл чека" : "Загрузите новый чек"}
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
-                  Форматы: jpg, jpeg, png, pdf. Максимум 10 МБ.
+                  Форматы: jpg, jpeg, png, webp, heic, heif, pdf. Максимум 100 МБ.
                 </Typography>
               </Stack>
               <input hidden type="file" onChange={(event) => onSelectPaymentFile(event.target.files?.[0] || null)} />

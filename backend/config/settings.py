@@ -172,6 +172,21 @@ GOOGLE_OAUTH_REDIRECT_URI = os.getenv("GOOGLE_OAUTH_REDIRECT_URI", "")
 YANDEX_OAUTH_CLIENT_ID = os.getenv("YANDEX_OAUTH_CLIENT_ID", "")
 YANDEX_OAUTH_CLIENT_SECRET = os.getenv("YANDEX_OAUTH_CLIENT_SECRET", "")
 YANDEX_OAUTH_REDIRECT_URI = os.getenv("YANDEX_OAUTH_REDIRECT_URI", "")
+VK_OAUTH_CLIENT_ID = os.getenv("VK_OAUTH_CLIENT_ID", "")
+VK_OAUTH_CLIENT_SECRET = os.getenv("VK_OAUTH_CLIENT_SECRET", "")
+VK_OAUTH_REDIRECT_URI = os.getenv("VK_OAUTH_REDIRECT_URI", "")
+VK_OAUTH_AUTHORIZE_URL = os.getenv("VK_OAUTH_AUTHORIZE_URL", "https://oauth.vk.com/authorize")
+VK_OAUTH_TOKEN_URL = os.getenv("VK_OAUTH_TOKEN_URL", "https://oauth.vk.com/access_token")
+VK_OAUTH_USERINFO_URL = os.getenv("VK_OAUTH_USERINFO_URL", "https://api.vk.com/method/users.get")
+VK_OAUTH_SCOPE = os.getenv("VK_OAUTH_SCOPE", "email")
+VK_OAUTH_API_VERSION = os.getenv("VK_OAUTH_API_VERSION", "5.131")
+MAX_OAUTH_CLIENT_ID = os.getenv("MAX_OAUTH_CLIENT_ID", "")
+MAX_OAUTH_CLIENT_SECRET = os.getenv("MAX_OAUTH_CLIENT_SECRET", "")
+MAX_OAUTH_REDIRECT_URI = os.getenv("MAX_OAUTH_REDIRECT_URI", "")
+MAX_OAUTH_AUTHORIZE_URL = os.getenv("MAX_OAUTH_AUTHORIZE_URL", "https://oauth.max.ru/authorize")
+MAX_OAUTH_TOKEN_URL = os.getenv("MAX_OAUTH_TOKEN_URL", "https://oauth.max.ru/token")
+MAX_OAUTH_USERINFO_URL = os.getenv("MAX_OAUTH_USERINFO_URL", "https://oauth.max.ru/userinfo")
+MAX_OAUTH_SCOPE = os.getenv("MAX_OAUTH_SCOPE", "openid profile email")
 
 REFRESH_COOKIE_NAME = os.getenv("REFRESH_COOKIE_NAME", "refresh_token")
 REFRESH_COOKIE_SECURE = os.getenv("REFRESH_COOKIE_SECURE", "0") == "1"
@@ -194,3 +209,8 @@ DEFAULT_ADMIN_PAYMENT_CRYPTO = os.getenv("DEFAULT_ADMIN_PAYMENT_CRYPTO", "")
 DEFAULT_ADMIN_PAYMENT_INSTRUCTIONS = os.getenv("DEFAULT_ADMIN_PAYMENT_INSTRUCTIONS", "")
 DEFAULT_SLA_RESPONSE_MINUTES = int(os.getenv("DEFAULT_SLA_RESPONSE_MINUTES", "15"))
 DEFAULT_SLA_COMPLETION_HOURS = int(os.getenv("DEFAULT_SLA_COMPLETION_HOURS", "24"))
+
+# Large proof/media uploads (camera originals, HEIC) should not fail on server-side parser limits.
+MAX_UPLOAD_MB = int(os.getenv("MAX_UPLOAD_MB", "100"))
+DATA_UPLOAD_MAX_MEMORY_SIZE = MAX_UPLOAD_MB * 1024 * 1024
+FILE_UPLOAD_MAX_MEMORY_SIZE = 8 * 1024 * 1024

@@ -6,7 +6,7 @@ from rest_framework import permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.accounts.models import MasterLevelChoices, RoleChoices, WholesaleStatusChoices
+from apps.accounts.models import RoleChoices, WholesaleStatusChoices
 from apps.accounts.notifications import notify_masters_about_new_appointment
 from apps.accounts.permissions import IsAdminRole, IsAuthenticatedAndNotBanned
 from apps.accounts.services import recalculate_client_stats
@@ -40,9 +40,9 @@ class AppointmentCreateView(APIView):
 
     def post(self, request):
         if request.user.role != RoleChoices.CLIENT:
-            return Response({"detail": "РўРѕР»СЊРєРѕ РєР»РёРµРЅС‚ РјРѕР¶РµС‚ СЃРѕР·РґР°РІР°С‚СЊ Р·Р°СЏРІРєРё"}, status=status.HTTP_403_FORBIDDEN)
+            return Response({"detail": "Только клиент может создавать заявки"}, status=status.HTTP_403_FORBIDDEN)
         if request.user.is_banned:
-            return Response({"detail": "РљР»РёРµРЅС‚ Р·Р°Р±Р°РЅРµРЅ"}, status=status.HTTP_403_FORBIDDEN)
+            return Response({"detail": "Клиент забанен"}, status=status.HTTP_403_FORBIDDEN)
 
         serializer = AppointmentCreateSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
@@ -68,7 +68,7 @@ class MyAppointmentsView(APIView):
 
     def get(self, request):
         if request.user.role != RoleChoices.CLIENT:
-            return Response({"detail": "РўРѕР»СЊРєРѕ РґР»СЏ РєР»РёРµРЅС‚РѕРІ"}, status=status.HTTP_403_FORBIDDEN)
+            return Response({"detail": "Только для клиентов"}, status=status.HTTP_403_FORBIDDEN)
 
         queryset = Appointment.objects.filter(client=request.user).select_related("assigned_master", "client")
         data = AppointmentSerializer(queryset, many=True, context={"request": request}).data
@@ -133,7 +133,7 @@ class AppointmentEventsView(APIView):
         try:
             after_id = int(after_id_raw or 0)
         except (TypeError, ValueError):
-            return Response({"detail": "РџР°СЂР°РјРµС‚СЂ after_id РґРѕР»Р¶РµРЅ Р±С‹С‚СЊ С‡РёСЃР»РѕРј"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"detail": "Параметр after_id должен быть числом"}, status=status.HTTP_400_BAD_REQUEST)
 
         queryset = appointment.events.select_related("actor").all()
         if after_id > 0:
@@ -149,15 +149,28 @@ class UploadPaymentProofView(APIView):
     def post(self, request, appointment_id: int):
         appointment = get_appointment_for_user(request.user, appointment_id)
         if request.user.role != RoleChoices.CLIENT or appointment.client_id != request.user.id:
-            return Response({"detail": "РўРѕР»СЊРєРѕ РєР»РёРµРЅС‚ Р·Р°СЏРІРєРё"}, status=status.HTTP_403_FORBIDDEN)
-        if appointment.status != AppointmentStatusChoices.AWAITING_PAYMENT:
-            return Response({"detail": "Р§РµРє РјРѕР¶РЅРѕ Р·Р°РіСЂСѓР·РёС‚СЊ С‚РѕР»СЊРєРѕ РІ СЃС‚Р°С‚СѓСЃРµ AWAITING_PAYMENT"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"detail": "Только клиент заявки"}, status=status.HTTP_403_FORBIDDEN)
+        if appointment.status not in (
+            AppointmentStatusChoices.AWAITING_PAYMENT,
+            AppointmentStatusChoices.PAYMENT_PROOF_UPLOADED,
+        ):
+            return Response(
+                {"detail": "Чек можно загрузить только в статусе «Ожидает оплату» или «Чек загружен»"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         if "payment_proof" not in request.FILES:
-            return Response({"detail": "РџРµСЂРµРґР°Р№С‚Рµ С„Р°Р№Р» payment_proof"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"detail": "Передайте файл чека в поле payment_proof"}, status=status.HTTP_400_BAD_REQUEST)
 
         serializer = UploadPaymentProofSerializer(appointment, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         serializer.save()
+        if appointment.status != AppointmentStatusChoices.PAYMENT_PROOF_UPLOADED:
+            transition_status(
+                appointment,
+                request.user,
+                AppointmentStatusChoices.PAYMENT_PROOF_UPLOADED,
+                note="Клиент загрузил чек",
+            )
         add_event(appointment, request.user, AppointmentEventType.PAYMENT_PROOF_UPLOADED)
         emit_event(
             "appointment.payment_proof_uploaded",
@@ -174,30 +187,41 @@ class MarkPaidView(APIView):
     def post(self, request, appointment_id: int):
         appointment = get_appointment_for_user(request.user, appointment_id)
         if request.user.role != RoleChoices.CLIENT or appointment.client_id != request.user.id:
-            return Response({"detail": "РўРѕР»СЊРєРѕ РєР»РёРµРЅС‚ Р·Р°СЏРІРєРё"}, status=status.HTTP_403_FORBIDDEN)
-        if appointment.status != AppointmentStatusChoices.AWAITING_PAYMENT:
-            return Response({"detail": "РќРµРІРѕР·РјРѕР¶РЅРѕ РѕС‚РјРµС‚РёС‚СЊ РѕРїР»Р°С‚Сѓ РІ С‚РµРєСѓС‰РµРј СЃС‚Р°С‚СѓСЃРµ"}, status=status.HTTP_400_BAD_REQUEST)
-        if not appointment.payment_proof:
-            return Response({"detail": "РЎРЅР°С‡Р°Р»Р° Р·Р°РіСЂСѓР·РёС‚Рµ С‡РµРє"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"detail": "Только клиент заявки"}, status=status.HTTP_403_FORBIDDEN)
+        if appointment.status not in (
+            AppointmentStatusChoices.AWAITING_PAYMENT,
+            AppointmentStatusChoices.PAYMENT_PROOF_UPLOADED,
+        ):
+            return Response({"detail": "Невозможно отметить оплату в текущем статусе"}, status=status.HTTP_400_BAD_REQUEST)
 
         serializer = MarkPaidSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
         appointment.payment_method = serializer.validated_data["payment_method"]
+        appointment.payment_requisites_note = serializer.validated_data["payment_requisites_note"]
         appointment.payment_marked_at = timezone.now()
-        appointment.save(update_fields=["payment_method", "payment_marked_at", "updated_at"])
-        transition_status(appointment, request.user, AppointmentStatusChoices.PAYMENT_PROOF_UPLOADED, note="РљР»РёРµРЅС‚ РѕС‚РјРµС‚РёР» РѕРїР»Р°С‚Сѓ")
+        appointment.save(update_fields=["payment_method", "payment_requisites_note", "payment_marked_at", "updated_at"])
+        if appointment.status != AppointmentStatusChoices.PAYMENT_PROOF_UPLOADED:
+            transition_status(appointment, request.user, AppointmentStatusChoices.PAYMENT_PROOF_UPLOADED, note="Клиент отметил оплату")
         add_event(
             appointment,
             request.user,
             AppointmentEventType.PAYMENT_MARKED,
-            metadata={"payment_method": appointment.payment_method},
+            metadata={
+                "payment_method": appointment.payment_method,
+                "payment_requisites_note": appointment.payment_requisites_note,
+                "has_payment_proof": bool(appointment.payment_proof),
+            },
         )
         emit_event(
             "appointment.payment_marked",
             appointment,
             actor=request.user,
-            payload={"payment_method": appointment.payment_method},
+            payload={
+                "payment_method": appointment.payment_method,
+                "payment_requisites_note": appointment.payment_requisites_note,
+                "has_payment_proof": bool(appointment.payment_proof),
+            },
         )
         return Response(AppointmentSerializer(appointment, context={"request": request}).data)
 
@@ -208,9 +232,9 @@ class ClientSignalView(APIView):
     def post(self, request, appointment_id: int):
         appointment = get_appointment_for_user(request.user, appointment_id)
         if request.user.role != RoleChoices.CLIENT or appointment.client_id != request.user.id:
-            return Response({"detail": "РўРѕР»СЊРєРѕ РєР»РёРµРЅС‚ Р·Р°СЏРІРєРё"}, status=status.HTTP_403_FORBIDDEN)
+            return Response({"detail": "Только клиент заявки"}, status=status.HTTP_403_FORBIDDEN)
         if not can_client_signal(appointment):
-            return Response({"detail": "РЎРёРіРЅР°Р»С‹ РЅРµРґРѕСЃС‚СѓРїРЅС‹ РґР»СЏ С‚РµРєСѓС‰РµРіРѕ СЃС‚Р°С‚СѓСЃР°"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"detail": "Сигналы недоступны для текущего статуса"}, status=status.HTTP_400_BAD_REQUEST)
 
         serializer = ClientSignalSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -225,7 +249,7 @@ class ClientSignalView(APIView):
         return Response(
             {
                 "ok": True,
-                "detail": "РЎРёРіРЅР°Р» РѕС‚РїСЂР°РІР»РµРЅ РјР°СЃС‚РµСЂСѓ",
+                "detail": "Сигнал отправлен мастеру",
                 "signal": signal_code,
             }
         )
@@ -237,9 +261,9 @@ class RepeatAppointmentView(APIView):
     def post(self, request, appointment_id: int):
         source = get_appointment_for_user(request.user, appointment_id)
         if request.user.role != RoleChoices.CLIENT or source.client_id != request.user.id:
-            return Response({"detail": "РўРѕР»СЊРєРѕ РєР»РёРµРЅС‚ Р·Р°СЏРІРєРё"}, status=status.HTTP_403_FORBIDDEN)
+            return Response({"detail": "Только клиент заявки"}, status=status.HTTP_403_FORBIDDEN)
         if request.user.is_banned:
-            return Response({"detail": "РљР»РёРµРЅС‚ Р·Р°Р±Р°РЅРµРЅ"}, status=status.HTTP_403_FORBIDDEN)
+            return Response({"detail": "Клиент забанен"}, status=status.HTTP_403_FORBIDDEN)
 
         repeated = repeat_client_appointment(source=source, client_user=request.user)
 
@@ -254,12 +278,8 @@ class MasterNewAppointmentsView(APIView):
 
     def get(self, request):
         if request.user.role != RoleChoices.MASTER:
-            return Response({"detail": "РўРѕР»СЊРєРѕ РґР»СЏ РјР°СЃС‚РµСЂРѕРІ"}, status=status.HTTP_403_FORBIDDEN)
-        if (
-            not request.user.is_master_active
-            or not request.user.master_quality_approved
-            or request.user.master_level == MasterLevelChoices.TRAINEE
-        ):
+            return Response({"detail": "Только для мастеров"}, status=status.HTTP_403_FORBIDDEN)
+        if not request.user.is_master_active:
             return Response([], status=status.HTTP_200_OK)
 
         queryset = Appointment.objects.filter(status=AppointmentStatusChoices.NEW, assigned_master__isnull=True).select_related("client")
@@ -272,7 +292,7 @@ class MasterActiveAppointmentsView(APIView):
 
     def get(self, request):
         if request.user.role != RoleChoices.MASTER:
-            return Response({"detail": "РўРѕР»СЊРєРѕ РґР»СЏ РјР°СЃС‚РµСЂРѕРІ"}, status=status.HTTP_403_FORBIDDEN)
+            return Response({"detail": "Только для мастеров"}, status=status.HTTP_403_FORBIDDEN)
 
         active_statuses = (
             AppointmentStatusChoices.IN_REVIEW,
@@ -300,10 +320,10 @@ class MasterDeclineView(APIView):
     def post(self, request, appointment_id: int):
         appointment = get_appointment_for_user(request.user, appointment_id)
         if request.user.role != RoleChoices.MASTER:
-            return Response({"detail": "РўРѕР»СЊРєРѕ РјР°СЃС‚РµСЂ"}, status=status.HTTP_403_FORBIDDEN)
+            return Response({"detail": "Только мастер"}, status=status.HTTP_403_FORBIDDEN)
         assert_master_assigned(appointment, request.user)
         if appointment.status not in (AppointmentStatusChoices.IN_REVIEW, AppointmentStatusChoices.AWAITING_PAYMENT):
-            return Response({"detail": "РћС‚РєР»РѕРЅРµРЅРёРµ РґРѕСЃС‚СѓРїРЅРѕ С‚РѕР»СЊРєРѕ РІ IN_REVIEW РёР»Рё AWAITING_PAYMENT"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"detail": "Отклонение доступно только в IN_REVIEW или AWAITING_PAYMENT"}, status=status.HTTP_400_BAD_REQUEST)
 
         transition_status(appointment, request.user, AppointmentStatusChoices.DECLINED_BY_MASTER)
         recalculate_client_stats(appointment.client)
@@ -316,10 +336,10 @@ class MasterSetPriceView(APIView):
     def post(self, request, appointment_id: int):
         appointment = get_appointment_for_user(request.user, appointment_id)
         if request.user.role != RoleChoices.MASTER:
-            return Response({"detail": "РўРѕР»СЊРєРѕ РјР°СЃС‚РµСЂ"}, status=status.HTTP_403_FORBIDDEN)
+            return Response({"detail": "Только мастер"}, status=status.HTTP_403_FORBIDDEN)
         assert_master_assigned(appointment, request.user)
         if appointment.status != AppointmentStatusChoices.IN_REVIEW:
-            return Response({"detail": "Р¦РµРЅСѓ РјРѕР¶РЅРѕ РІС‹СЃС‚Р°РІРёС‚СЊ С‚РѕР»СЊРєРѕ РІ IN_REVIEW"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"detail": "Цену можно выставить только в IN_REVIEW"}, status=status.HTTP_400_BAD_REQUEST)
 
         serializer = SetPriceSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -369,9 +389,9 @@ class ConfirmPaymentMixin:
         if request.user.role == RoleChoices.MASTER and appointment.assigned_master_id == request.user.id:
             allowed = True
         if not allowed:
-            return Response({"detail": "РќРµС‚ РїСЂР°РІ РЅР° РїРѕРґС‚РІРµСЂР¶РґРµРЅРёРµ РѕРїР»Р°С‚С‹"}, status=status.HTTP_403_FORBIDDEN)
+            return Response({"detail": "Нет прав на подтверждение оплаты"}, status=status.HTTP_403_FORBIDDEN)
         if appointment.status != AppointmentStatusChoices.PAYMENT_PROOF_UPLOADED:
-            return Response({"detail": "РџРѕРґС‚РІРµСЂРґРёС‚СЊ РѕРїР»Р°С‚Сѓ РјРѕР¶РЅРѕ С‚РѕР»СЊРєРѕ РёР· PAYMENT_PROOF_UPLOADED"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"detail": "Подтвердить оплату можно только из PAYMENT_PROOF_UPLOADED"}, status=status.HTTP_400_BAD_REQUEST)
 
         appointment.payment_confirmed_by = request.user
         appointment.payment_confirmed_at = timezone.now()
@@ -400,10 +420,10 @@ class MasterStartView(APIView):
     def post(self, request, appointment_id: int):
         appointment = get_appointment_for_user(request.user, appointment_id)
         if request.user.role != RoleChoices.MASTER:
-            return Response({"detail": "РўРѕР»СЊРєРѕ РјР°СЃС‚РµСЂ"}, status=status.HTTP_403_FORBIDDEN)
+            return Response({"detail": "Только мастер"}, status=status.HTTP_403_FORBIDDEN)
         assert_master_assigned(appointment, request.user)
         if appointment.status != AppointmentStatusChoices.PAID:
-            return Response({"detail": "РЎС‚Р°СЂС‚ РґРѕСЃС‚СѓРїРµРЅ С‚РѕР»СЊРєРѕ РїРѕСЃР»Рµ PAID"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"detail": "Старт доступен только после PAID"}, status=status.HTTP_400_BAD_REQUEST)
 
         transition_status(appointment, request.user, AppointmentStatusChoices.IN_PROGRESS)
         emit_event(
@@ -421,10 +441,10 @@ class MasterCompleteView(APIView):
     def post(self, request, appointment_id: int):
         appointment = get_appointment_for_user(request.user, appointment_id)
         if request.user.role != RoleChoices.MASTER:
-            return Response({"detail": "РўРѕР»СЊРєРѕ РјР°СЃС‚РµСЂ"}, status=status.HTTP_403_FORBIDDEN)
+            return Response({"detail": "Только мастер"}, status=status.HTTP_403_FORBIDDEN)
         assert_master_assigned(appointment, request.user)
         if appointment.status != AppointmentStatusChoices.IN_PROGRESS:
-            return Response({"detail": "Р—Р°РІРµСЂС€РµРЅРёРµ РґРѕСЃС‚СѓРїРЅРѕ С‚РѕР»СЊРєРѕ РІ IN_PROGRESS"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"detail": "Завершение доступно только в IN_PROGRESS"}, status=status.HTTP_400_BAD_REQUEST)
 
         transition_status(appointment, request.user, AppointmentStatusChoices.COMPLETED)
         emit_event(

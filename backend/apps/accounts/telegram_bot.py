@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import json
 import logging
@@ -63,22 +63,22 @@ CHAT_ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".pdf", ".txt", ".log", ".zi
 
 def parse_yes_no(value: str) -> bool | None:
     normalized = (value or "").strip().lower()
-    if normalized in {"да", "y", "yes", "1", "true"}:
+    if normalized in {"да", "рґр°", "y", "yes", "1", "true"}:
         return True
-    if normalized in {"нет", "n", "no", "0", "false"}:
+    if normalized in {"нет", "рѕñ‚", "n", "no", "0", "false"}:
         return False
     return None
 
 
 def parse_lock_type_input(value: str) -> str | None:
     normalized = (value or "").strip().lower()
-    if normalized in {"1", "pin", "пароль", "пин"}:
+    if normalized in {"1", "pin", "пароль", "пин", "рїр°сђрѕр»сњ", "рїрёрЅ"}:
         return "PIN"
-    if normalized in {"2", "google", "гугл"}:
+    if normalized in {"2", "google", "гугл", "ріѓріѓр»"}:
         return "GOOGLE"
     if normalized in {"3", "apple", "apple_id", "appleid"}:
         return "APPLE_ID"
-    if normalized in {"4", "other", "другое"}:
+    if normalized in {"4", "other", "другое", "рдсђсѓріѕрµ"}:
         return "OTHER"
     return None
 

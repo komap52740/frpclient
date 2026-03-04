@@ -7,6 +7,7 @@ from django.utils import timezone
 from rest_framework import serializers
 
 from apps.appointments.models import Appointment, AppointmentStatusChoices
+from apps.reviews.models import Review, ReviewTypeChoices
 
 from .models import ClientStats, MasterStats, SiteSettings, User, WholesaleStatusChoices
 from .telegram import verify_telegram_login
@@ -67,6 +68,7 @@ class MeSerializer(serializers.ModelSerializer):
             "is_service_center",
             "wholesale_status",
             "wholesale_company_name",
+            "wholesale_address",
             "wholesale_comment",
             "wholesale_service_details",
             "wholesale_service_photo_1_url",
@@ -211,6 +213,7 @@ class BootstrapAdminSerializer(serializers.Serializer):
 class WholesaleRequestSerializer(serializers.Serializer):
     is_service_center = serializers.BooleanField(default=True)
     wholesale_company_name = serializers.CharField(max_length=255, required=False, allow_blank=True)
+    wholesale_address = serializers.CharField(max_length=255, required=False, allow_blank=True)
     wholesale_comment = serializers.CharField(max_length=500, required=False, allow_blank=True)
     wholesale_service_details = serializers.CharField(max_length=2000, required=False, allow_blank=True)
     wholesale_service_photo_1 = serializers.FileField(required=False, allow_null=True)
@@ -219,6 +222,8 @@ class WholesaleRequestSerializer(serializers.Serializer):
     def validate(self, attrs):
         if attrs.get("is_service_center") and not (attrs.get("wholesale_company_name") or "").strip():
             raise serializers.ValidationError({"wholesale_company_name": "Укажите название сервисного центра"})
+        if attrs.get("is_service_center") and not (attrs.get("wholesale_address") or "").strip():
+            raise serializers.ValidationError({"wholesale_address": "Укажите адрес сервисного центра"})
         return attrs
 
 
@@ -226,6 +231,7 @@ class WholesaleStatusSerializer(serializers.Serializer):
     is_service_center = serializers.BooleanField()
     wholesale_status = serializers.ChoiceField(choices=WholesaleStatusChoices.choices)
     wholesale_company_name = serializers.CharField(allow_blank=True)
+    wholesale_address = serializers.CharField(allow_blank=True)
     wholesale_comment = serializers.CharField(allow_blank=True)
     wholesale_service_details = serializers.CharField(allow_blank=True)
     wholesale_service_photo_1_url = serializers.CharField(allow_blank=True, allow_null=True)
@@ -244,6 +250,7 @@ class ClientProfileDetailSerializer(serializers.ModelSerializer):
     appointments_active = serializers.SerializerMethodField()
     appointments_completed = serializers.SerializerMethodField()
     last_appointment_at = serializers.SerializerMethodField()
+    master_behavior_reviews = serializers.SerializerMethodField()
 
     class Meta:
         model = User
@@ -260,6 +267,7 @@ class ClientProfileDetailSerializer(serializers.ModelSerializer):
             "is_service_center",
             "wholesale_status",
             "wholesale_company_name",
+            "wholesale_address",
             "wholesale_comment",
             "wholesale_service_details",
             "wholesale_service_photo_1_url",
@@ -273,6 +281,7 @@ class ClientProfileDetailSerializer(serializers.ModelSerializer):
             "appointments_active",
             "appointments_completed",
             "last_appointment_at",
+            "master_behavior_reviews",
         )
 
     def _build_file_url(self, obj: User, field_name: str):
@@ -313,6 +322,39 @@ class ClientProfileDetailSerializer(serializers.ModelSerializer):
 
     def get_last_appointment_at(self, obj: User):
         return self._queryset(obj).order_by("-updated_at").values_list("updated_at", flat=True).first()
+
+    def get_master_behavior_reviews(self, obj: User):
+        request = self.context.get("request")
+        viewer = getattr(request, "user", None)
+
+        queryset = (
+            Review.objects.filter(
+                target_id=obj.id,
+                review_type=ReviewTypeChoices.CLIENT_REVIEW,
+            )
+            .select_related("author")
+            .prefetch_related("behavior_flags")
+            .order_by("-created_at")
+        )
+
+        if viewer and getattr(viewer, "role", None) == "master" and not getattr(viewer, "is_superuser", False):
+            queryset = queryset.filter(author_id=viewer.id)
+
+        return [
+            {
+                "id": review.id,
+                "author_id": review.author_id,
+                "author_username": review.author.username if review.author_id else "",
+                "rating": review.rating,
+                "comment": review.comment or "",
+                "created_at": review.created_at,
+                "behavior_flags": [
+                    {"code": flag.code, "label": flag.label}
+                    for flag in review.behavior_flags.all()
+                ],
+            }
+            for review in queryset[:20]
+        ]
 
 
 class ProfileUpdateSerializer(serializers.ModelSerializer):

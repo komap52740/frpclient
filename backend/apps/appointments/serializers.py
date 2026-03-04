@@ -43,6 +43,7 @@ class AppointmentSerializer(serializers.ModelSerializer):
             "is_wholesale_request",
             "currency",
             "payment_method",
+            "payment_requisites_note",
             "payment_proof",
             "payment_proof_url",
             "payment_marked_at",
@@ -238,6 +239,13 @@ class UploadPaymentProofSerializer(serializers.ModelSerializer):
 
 class MarkPaidSerializer(serializers.Serializer):
     payment_method = serializers.ChoiceField(choices=PaymentMethodChoices.choices)
+    payment_requisites_note = serializers.CharField(max_length=255)
+
+    def validate_payment_requisites_note(self, value: str) -> str:
+        note = (value or "").strip()
+        if len(note) < 3:
+            raise serializers.ValidationError("Укажите реквизиты оплаты (минимум 3 символа)")
+        return note
 
 
 class ClientSignalSerializer(serializers.Serializer):

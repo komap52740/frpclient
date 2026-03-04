@@ -85,6 +85,7 @@ export default function ClientProfilePage() {
 
   const [serviceForm, setServiceForm] = useState({
     wholesale_company_name: user?.wholesale_company_name || "",
+    wholesale_address: user?.wholesale_address || "",
     wholesale_comment: user?.wholesale_comment || "",
     wholesale_service_details: user?.wholesale_service_details || "",
     wholesale_service_photo_1: null,
@@ -162,9 +163,14 @@ export default function ClientProfilePage() {
 
   const submitWholesaleRequest = async () => {
     const company = (serviceForm.wholesale_company_name || "").trim();
+    const address = (serviceForm.wholesale_address || "").trim();
     const details = (serviceForm.wholesale_service_details || "").trim();
     if (!company) {
       setRequestError("Укажите название сервисного центра");
+      return;
+    }
+    if (!address) {
+      setRequestError("Укажите адрес сервисного центра");
       return;
     }
     if (details.length < 20) {
@@ -183,6 +189,7 @@ export default function ClientProfilePage() {
       const payload = new FormData();
       payload.append("is_service_center", "true");
       payload.append("wholesale_company_name", company);
+      payload.append("wholesale_address", address);
       payload.append("wholesale_comment", (serviceForm.wholesale_comment || "").trim());
       payload.append("wholesale_service_details", details);
       if (serviceForm.wholesale_service_photo_1) payload.append("wholesale_service_photo_1", serviceForm.wholesale_service_photo_1);
@@ -199,6 +206,7 @@ export default function ClientProfilePage() {
       if (!detail && responseData && typeof responseData === "object") {
         const preferredFields = [
           "wholesale_company_name",
+          "wholesale_address",
           "wholesale_service_details",
           "wholesale_comment",
           "wholesale_service_photo_1",
@@ -398,6 +406,11 @@ export default function ClientProfilePage() {
                 label="Название сервиса"
                 value={serviceForm.wholesale_company_name}
                 onChange={(event) => updateServiceField("wholesale_company_name", event.target.value)}
+              />
+              <TextField
+                label="����� �������"
+                value={serviceForm.wholesale_address}
+                onChange={(event) => updateServiceField("wholesale_address", event.target.value)}
               />
               <TextField
                 label="Описание сервиса"

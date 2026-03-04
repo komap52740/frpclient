@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from unittest.mock import patch
 
@@ -224,8 +224,8 @@ def test_status_change_is_forwarded_to_client_telegram(client_user, master_user)
         tg_mock.assert_called()
         args, _ = tg_mock.call_args
         assert args[0] == 222333444
-        assert f"Р·Р°СЏРІРєРµ #{appointment.id}".lower() in args[1].lower()
-        assert "РЎС‚Р°С‚СѓСЃ:" in args[1]
+        assert f"#{appointment.id}" in args[1]
+        assert "статус" in args[1].lower()
 
 
 @pytest.mark.django_db
@@ -286,6 +286,32 @@ def test_upload_proof_only_awaiting_payment(client_user, master_user):
         format="multipart",
     )
     assert ok.status_code == 200
+
+
+@pytest.mark.django_db
+def test_upload_proof_accepts_heic_from_mobile_camera(client_user, master_user):
+    appointment = Appointment.objects.create(
+        client=client_user,
+        assigned_master=master_user,
+        brand="iPhone",
+        model="14",
+        lock_type="APPLE_ID",
+        has_pc=True,
+        description="desc",
+        status=AppointmentStatusChoices.AWAITING_PAYMENT,
+    )
+
+    proof = SimpleUploadedFile("IMG_0001.HEIC", b"heic-bytes", content_type="image/heic")
+    response = auth_as(client_user).post(
+        f"/api/appointments/{appointment.id}/upload-payment-proof/",
+        {"payment_proof": proof},
+        format="multipart",
+    )
+
+    assert response.status_code == 200
+    appointment.refresh_from_db()
+    assert appointment.status == AppointmentStatusChoices.PAYMENT_PROOF_UPLOADED
+    assert appointment.payment_proof.name.lower().endswith(".heic")
 
 
 @pytest.mark.django_db
@@ -361,14 +387,14 @@ def test_master_message_is_forwarded_to_client_telegram(client_user, master_user
     with patch("apps.chat.services.send_telegram_message", return_value=True) as telegram_mock:
         response = auth_as(master_user).post(
             f"/api/appointments/{appointment.id}/messages/",
-            {"text": "РџСЂРѕРІРµСЂРёР», РјРѕР¶РЅРѕ РїСЂРѕРґРѕР»Р¶Р°С‚СЊ"},
+            {"text": "Р СџРЎР‚Р С•Р Р†Р ВµРЎР‚Р С‘Р В», Р СР С•Р В¶Р Р…Р С• Р С—РЎР‚Р С•Р Т‘Р С•Р В»Р В¶Р В°РЎвЂљРЎРЉ"},
             format="json",
         )
         assert response.status_code == 201
         telegram_mock.assert_called_once()
         args, _ = telegram_mock.call_args
         assert args[0] == 123456789
-        assert f"Р·Р°СЏРІРєРµ #{appointment.id}".lower() in args[1].lower()
+        assert f"#{appointment.id}" in args[1]
 
 
 @pytest.mark.django_db
@@ -390,14 +416,14 @@ def test_client_message_is_forwarded_to_master_telegram(client_user, master_user
     with patch("apps.chat.services.send_telegram_message", return_value=True) as telegram_mock:
         response = auth_as(client_user).post(
             f"/api/appointments/{appointment.id}/messages/",
-            {"text": "Р—РґСЂР°РІСЃС‚РІСѓР№С‚Рµ, РіРѕС‚РѕРІ Рє РїРѕРґРєР»СЋС‡РµРЅРёСЋ"},
+            {"text": "Р вЂ”Р Т‘РЎР‚Р В°Р Р†РЎРѓРЎвЂљР Р†РЎС“Р в„–РЎвЂљР Вµ, Р С–Р С•РЎвЂљР С•Р Р† Р С” Р С—Р С•Р Т‘Р С”Р В»РЎР‹РЎвЂЎР ВµР Р…Р С‘РЎР‹"},
             format="json",
         )
         assert response.status_code == 201
         telegram_mock.assert_called()
         args, _ = telegram_mock.call_args
         assert args[0] == 987654321
-        assert f"Р·Р°СЏРІРєРµ #{appointment.id}".lower() in args[1].lower()
+        assert f"#{appointment.id}" in args[1]
 
 
 @pytest.mark.django_db
@@ -455,8 +481,8 @@ def test_bootstrap_admin_flow(api_client):
         {
             "username": "owner",
             "password": "supersecure123",
-            "first_name": "РРІР°РЅ",
-            "last_name": "РђРґРјРёРЅ",
+            "first_name": "Р ВР Р†Р В°Р Р…",
+            "last_name": "Р С’Р Т‘Р СР С‘Р Р…",
         },
         format="json",
     )
@@ -499,9 +525,9 @@ def test_password_login_flow(api_client):
 @pytest.mark.django_db
 def test_admin_can_update_system_settings(admin_user):
     payload = {
-        "bank_requisites": "РЎС‡РµС‚ 123",
+        "bank_requisites": "Р РЋРЎвЂЎР ВµРЎвЂљ 123",
         "crypto_requisites": "USDT TRC20 ...",
-        "instructions": "РћРїР»Р°С‚РёС‚Рµ Рё РїСЂРёР»РѕР¶РёС‚Рµ С‡РµРє.",
+        "instructions": "Р С›Р С—Р В»Р В°РЎвЂљР С‘РЎвЂљР Вµ Р С‘ Р С—РЎР‚Р С‘Р В»Р С•Р В¶Р С‘РЎвЂљР Вµ РЎвЂЎР ВµР С”.",
     }
     response = auth_as(admin_user).put("/api/admin/system/settings/", payload, format="json")
     assert response.status_code == 200
@@ -606,7 +632,7 @@ def test_client_signal_creates_event_and_master_notification(client_user, master
 
     response = auth_as(client_user).post(
         f"/api/appointments/{appointment.id}/client-signal/",
-        {"signal": "need_help", "comment": "РќРµ РїРѕРЅРёРјР°СЋ СЃР»РµРґСѓСЋС‰РёР№ С€Р°Рі"},
+        {"signal": "need_help", "comment": "Р СњР Вµ Р С—Р С•Р Р…Р С‘Р СР В°РЎР‹ РЎРѓР В»Р ВµР Т‘РЎС“РЎР‹РЎвЂ°Р С‘Р в„– РЎв‚¬Р В°Р С–"},
         format="json",
     )
     assert response.status_code == 200
@@ -617,7 +643,7 @@ def test_client_signal_creates_event_and_master_notification(client_user, master
     assert any(item["event_type"] == "client_signal" for item in events_response.data)
 
     note = events_response.data[0]["note"]
-    assert "РљР»РёРµРЅС‚ РїСЂРѕСЃРёС‚ РїРѕРјРѕС‰СЊ" in note
+    assert "Клиент просит помощь" in note
 
     notification = Notification.objects.filter(user=master_user).order_by("-id").first()
     assert notification is not None
@@ -634,7 +660,7 @@ def test_client_can_repeat_appointment(client_user):
         lock_type="PIN",
         has_pc=True,
         contact_phone="+79001112233",
-        description="РџРѕРІС‚РѕСЂРЅР°СЏ РґРёР°РіРЅРѕСЃС‚РёРєР°",
+        description="Р СџР С•Р Р†РЎвЂљР С•РЎР‚Р Р…Р В°РЎРЏ Р Т‘Р С‘Р В°Р С–Р Р…Р С•РЎРѓРЎвЂљР С‘Р С”Р В°",
         rustdesk_id="123 456 789",
         rustdesk_password="pass-001",
         status=AppointmentStatusChoices.COMPLETED,
@@ -689,12 +715,12 @@ def test_register_flow(api_client, monkeypatch, settings):
 @pytest.mark.django_db
 def test_banned_client_is_blocked_from_functional_api_but_can_read_me(client_user):
     client_user.is_banned = True
-    client_user.ban_reason = "РќР°СЂСѓС€РµРЅРёРµ РїСЂР°РІРёР» РїР»Р°С‚С„РѕСЂРјС‹"
+    client_user.ban_reason = "Р СњР В°РЎР‚РЎС“РЎв‚¬Р ВµР Р…Р С‘Р Вµ Р С—РЎР‚Р В°Р Р†Р С‘Р В» Р С—Р В»Р В°РЎвЂљРЎвЂћР С•РЎР‚Р СРЎвЂ№"
     client_user.save(update_fields=["is_banned", "ban_reason", "updated_at"])
 
     list_response = auth_as(client_user).get("/api/appointments/my/")
     assert list_response.status_code == 403
-    assert "Р·Р°Р±Р»РѕРєРёСЂРѕРІР°РЅ" in str(list_response.data.get("detail", "")).lower()
+    assert "заблок" in str(list_response.data.get("detail", "")).lower()
 
     dashboard_response = auth_as(client_user).get("/api/dashboard/")
     assert dashboard_response.status_code == 403
@@ -702,7 +728,7 @@ def test_banned_client_is_blocked_from_functional_api_but_can_read_me(client_use
     me_response = auth_as(client_user).get("/api/me/")
     assert me_response.status_code == 200
     assert me_response.data["user"]["is_banned"] is True
-    assert "РќР°СЂСѓС€РµРЅРёРµ РїСЂР°РІРёР» РїР»Р°С‚С„РѕСЂРјС‹" in me_response.data["user"]["ban_reason"]
+    assert "Р СњР В°РЎР‚РЎС“РЎв‚¬Р ВµР Р…Р С‘Р Вµ Р С—РЎР‚Р В°Р Р†Р С‘Р В» Р С—Р В»Р В°РЎвЂљРЎвЂћР С•РЎР‚Р СРЎвЂ№" in me_response.data["user"]["ban_reason"]
 
 
 @pytest.mark.django_db
@@ -763,8 +789,8 @@ def test_create_appointment_rejects_wholesale_fields_from_payload(client_user):
         "is_wholesale_request": True,
         "is_service_center": True,
         "wholesale_company_name": "FixLab",
-        "wholesale_comment": "15+ заявок в месяц",
-        "wholesale_service_details": "Сервисный центр с потоком заявок, работаем с Samsung/Xiaomi/Realme.",
+        "wholesale_comment": "15+ Р·Р°СЏРІРѕРє РІ РјРµСЃСЏС†",
+        "wholesale_service_details": "РЎРµСЂРІРёСЃРЅС‹Р№ С†РµРЅС‚СЂ СЃ РїРѕС‚РѕРєРѕРј Р·Р°СЏРІРѕРє, СЂР°Р±РѕС‚Р°РµРј СЃ Samsung/Xiaomi/Realme.",
         "wholesale_service_photo_1": service_photo,
     }
 
@@ -869,7 +895,7 @@ def test_master_can_list_own_reviews(client_user, master_user):
         target=master_user,
         review_type=ReviewTypeChoices.MASTER_REVIEW,
         rating=5,
-        comment="РћС‚Р»РёС‡РЅРѕ",
+        comment="Р С›РЎвЂљР В»Р С‘РЎвЂЎР Р…Р С•",
     )
 
     response = auth_as(master_user).get("/api/reviews/my/")
@@ -897,7 +923,7 @@ def test_admin_can_list_all_reviews_with_filters(client_user, master_user, admin
         target=master_user,
         review_type=ReviewTypeChoices.MASTER_REVIEW,
         rating=5,
-        comment="РЎСѓРїРµСЂ",
+        comment="Р РЋРЎС“Р С—Р ВµРЎР‚",
     )
     Review.objects.create(
         appointment=appointment,
@@ -905,7 +931,7 @@ def test_admin_can_list_all_reviews_with_filters(client_user, master_user, admin
         target=client_user,
         review_type=ReviewTypeChoices.CLIENT_REVIEW,
         rating=3,
-        comment="РћРє",
+        comment="Р С›Р С”",
     )
 
     response = auth_as(admin_user).get("/api/admin/reviews/")
@@ -926,8 +952,9 @@ def test_client_can_submit_wholesale_request(client_user):
         {
             "is_service_center": True,
             "wholesale_company_name": "FixLab",
-            "wholesale_comment": "15 заявок в месяц",
-            "wholesale_service_details": "Сервисный центр с потоком 15+ заявок в месяц, специализация Samsung и Xiaomi",
+            "wholesale_address": "РњРѕСЃРєРІР°, СѓР». РўРµСЃС‚РѕРІР°СЏ, 10",
+            "wholesale_comment": "15 Р·Р°СЏРІРѕРє РІ РјРµСЃСЏС†",
+            "wholesale_service_details": "РЎРµСЂРІРёСЃРЅС‹Р№ С†РµРЅС‚СЂ СЃ РїРѕС‚РѕРєРѕРј 15+ Р·Р°СЏРІРѕРє РІ РјРµСЃСЏС†, СЃРїРµС†РёР°Р»РёР·Р°С†РёСЏ Samsung Рё Xiaomi",
             "wholesale_service_photo_1": service_photo,
         },
         format="multipart",
@@ -939,8 +966,30 @@ def test_client_can_submit_wholesale_request(client_user):
     assert client_user.is_service_center is True
     assert client_user.wholesale_status == WholesaleStatusChoices.PENDING
     assert client_user.wholesale_company_name == "FixLab"
+    assert client_user.wholesale_address == "РњРѕСЃРєРІР°, СѓР». РўРµСЃС‚РѕРІР°СЏ, 10"
     assert client_user.wholesale_service_details
     assert bool(client_user.wholesale_service_photo_1)
+
+
+@pytest.mark.django_db
+def test_client_wholesale_request_requires_service_address(client_user):
+    service_photo = SimpleUploadedFile("service.jpg", b"photo-data", content_type="image/jpeg")
+    response = auth_as(client_user).post(
+        "/api/wholesale/request/",
+        {
+            "is_service_center": True,
+            "wholesale_company_name": "FixLab",
+            "wholesale_comment": "15 заявок в месяц",
+            "wholesale_service_details": "Сервисный центр с потоком 15+ заявок в месяц, специализация Samsung и Xiaomi",
+            "wholesale_service_photo_1": service_photo,
+        },
+        format="multipart",
+    )
+
+    assert response.status_code == 400
+    payload_text = str(response.data).lower()
+    assert "wholesale_address" in payload_text
+    assert "адрес сервисного центра" in payload_text
 
 
 @pytest.mark.django_db
@@ -954,7 +1003,7 @@ def test_admin_can_review_wholesale_request(admin_user, client_user):
 
     response = auth_as(admin_user).post(
         f"/api/admin/wholesale-requests/{client_user.id}/review/",
-        {"decision": "approve", "review_comment": "Подтвержден сервисный центр"},
+        {"decision": "approve", "review_comment": "РџРѕРґС‚РІРµСЂР¶РґРµРЅ СЃРµСЂРІРёСЃРЅС‹Р№ С†РµРЅС‚СЂ"},
         format="json",
     )
     assert response.status_code == 200

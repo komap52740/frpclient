@@ -80,6 +80,7 @@ class User(AbstractUser, TimeStampedModel):
     )
     wholesale_discount_percent = models.PositiveSmallIntegerField(default=0)
     wholesale_company_name = models.CharField(max_length=255, blank=True)
+    wholesale_address = models.CharField(max_length=255, blank=True)
     wholesale_comment = models.CharField(max_length=500, blank=True)
     wholesale_service_details = models.TextField(blank=True)
     wholesale_service_photo_1 = models.FileField(

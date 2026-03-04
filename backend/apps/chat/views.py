@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -69,7 +69,7 @@ class AppointmentMessagesView(APIView):
     def post(self, request, appointment_id: int):
         appointment = get_appointment_for_user(request.user, appointment_id)
         if request.user.role == RoleChoices.CLIENT and request.user.is_banned:
-            return Response({"detail": "РљР»РёРµРЅС‚ Р·Р°Р±Р°РЅРµРЅ"}, status=status.HTTP_403_FORBIDDEN)
+            return Response({"detail": "Клиент забанен"}, status=status.HTTP_403_FORBIDDEN)
 
         serializer = MessageCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -115,7 +115,7 @@ class MessageDeleteView(APIView):
 
         is_admin = request.user.is_superuser or request.user.role == RoleChoices.ADMIN
         if message.sender_id != request.user.id and not is_admin:
-            return Response({"detail": "РЈРґР°Р»СЏС‚СЊ РјРѕР¶РЅРѕ С‚РѕР»СЊРєРѕ СЃРІРѕРё СЃРѕРѕР±С‰РµРЅРёСЏ"}, status=status.HTTP_403_FORBIDDEN)
+            return Response({"detail": "Удалять можно только свои сообщения"}, status=status.HTTP_403_FORBIDDEN)
 
         message.is_deleted = True
         message.deleted_at = timezone.now()
@@ -160,7 +160,7 @@ class MasterQuickReplyListCreateView(APIView):
 
     def _ensure_master(self, request):
         if request.user.role != RoleChoices.MASTER:
-            return Response({"detail": "РўРѕР»СЊРєРѕ РґР»СЏ РјР°СЃС‚РµСЂРѕРІ"}, status=status.HTTP_403_FORBIDDEN)
+            return Response({"detail": "Только для мастеров"}, status=status.HTTP_403_FORBIDDEN)
         return None
 
     def get(self, request):
@@ -180,7 +180,7 @@ class MasterQuickReplyListCreateView(APIView):
         serializer = MasterQuickReplySerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
         if MasterQuickReply.objects.filter(user=request.user, command=serializer.validated_data["command"]).exists():
-            return Response({"detail": "РЁР°Р±Р»РѕРЅ СЃ С‚Р°РєРѕР№ РєРѕРјР°РЅРґРѕР№ СѓР¶Рµ СЃСѓС‰РµСЃС‚РІСѓРµС‚."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"detail": "Шаблон с такой командой уже существует."}, status=status.HTTP_400_BAD_REQUEST)
         reply = serializer.save(user=request.user)
         data = MasterQuickReplySerializer(reply, context={"request": request}).data
         return Response(data, status=status.HTTP_201_CREATED)
@@ -197,20 +197,19 @@ class MasterQuickReplyDetailView(APIView):
     def patch(self, request, reply_id: int):
         reply = self._get_master_reply(request, reply_id)
         if not reply:
-            return Response({"detail": "РЁР°Р±Р»РѕРЅ РЅРµ РЅР°Р№РґРµРЅ."}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"detail": "Шаблон не найден."}, status=status.HTTP_404_NOT_FOUND)
 
         serializer = MasterQuickReplySerializer(reply, data=request.data, partial=True, context={"request": request})
         serializer.is_valid(raise_exception=True)
         next_command = serializer.validated_data.get("command")
         if next_command and MasterQuickReply.objects.filter(user=request.user, command=next_command).exclude(id=reply.id).exists():
-            return Response({"detail": "РЁР°Р±Р»РѕРЅ СЃ С‚Р°РєРѕР№ РєРѕРјР°РЅРґРѕР№ СѓР¶Рµ СЃСѓС‰РµСЃС‚РІСѓРµС‚."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"detail": "Шаблон с такой командой уже существует."}, status=status.HTTP_400_BAD_REQUEST)
         serializer.save()
         return Response(serializer.data)
 
     def delete(self, request, reply_id: int):
         reply = self._get_master_reply(request, reply_id)
         if not reply:
-            return Response({"detail": "РЁР°Р±Р»РѕРЅ РЅРµ РЅР°Р№РґРµРЅ."}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"detail": "Шаблон не найден."}, status=status.HTTP_404_NOT_FOUND)
         reply.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
-

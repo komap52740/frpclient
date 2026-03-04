@@ -1,4 +1,5 @@
-import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
+﻿import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
+import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import {
   Accordion,
   AccordionDetails,
@@ -6,6 +7,8 @@ import {
   Alert,
   Button,
   Chip,
+  Divider,
+  InputAdornment,
   Link,
   MenuItem,
   Paper,
@@ -36,6 +39,7 @@ export default function AdminClientsPage() {
   const [reasonById, setReasonById] = useState({});
   const [reviewDraftById, setReviewDraftById] = useState({});
   const [statusFilter, setStatusFilter] = useState("all");
+  const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(false);
   const [savingId, setSavingId] = useState(0);
 
@@ -50,9 +54,7 @@ export default function AdminClientsPage() {
         const next = { ...prev };
         items.forEach((row) => {
           if (!next[row.id]) {
-            next[row.id] = {
-              review_comment: row.wholesale_review_comment || "",
-            };
+            next[row.id] = { review_comment: row.wholesale_review_comment || "" };
           }
         });
         return next;
@@ -115,37 +117,116 @@ export default function AdminClientsPage() {
   };
 
   const filteredRows = useMemo(() => {
-    if (statusFilter === "all") return rows;
-    return rows.filter((row) => row.wholesale_status === statusFilter);
-  }, [rows, statusFilter]);
+    const query = searchQuery.trim().toLowerCase();
+    return rows.filter((row) => {
+      if (statusFilter !== "all" && row.wholesale_status !== statusFilter) {
+        return false;
+      }
+      if (!query) return true;
+      const haystack = [
+        row.username,
+        row.wholesale_company_name,
+        row.wholesale_address,
+        row.wholesale_comment,
+        row.wholesale_service_details,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return haystack.includes(query);
+    });
+  }, [rows, searchQuery, statusFilter]);
+
+  const stats = useMemo(() => {
+    const total = rows.length;
+    const pending = rows.filter((row) => row.wholesale_status === "pending").length;
+    const approved = rows.filter((row) => row.wholesale_status === "approved").length;
+    const banned = rows.filter((row) => row.is_banned).length;
+    return { total, pending, approved, banned };
+  }, [rows]);
 
   return (
     <Stack spacing={2}>
-      <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" spacing={1}>
+      <Stack spacing={1}>
         <Typography variant="h5">{canManage ? "Клиенты и оптовый статус" : "Клиенты"}</Typography>
-        <TextField
-          select
-          size="small"
-          label="Опт-статус"
-          value={statusFilter}
-          onChange={(event) => setStatusFilter(event.target.value)}
-          sx={{ minWidth: 220 }}
-        >
-          <MenuItem value="all">Все</MenuItem>
-          <MenuItem value="pending">На рассмотрении</MenuItem>
-          <MenuItem value="approved">Одобрено</MenuItem>
-          <MenuItem value="rejected">Отклонено</MenuItem>
-          <MenuItem value="none">Не запрошено</MenuItem>
-        </TextField>
+        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+          <Chip size="small" variant="outlined" label={`Всего: ${stats.total}`} />
+          <Chip
+            size="small"
+            color={stats.pending ? "warning" : "default"}
+            variant={stats.pending ? "filled" : "outlined"}
+            label={`На рассмотрении: ${stats.pending}`}
+          />
+          <Chip
+            size="small"
+            color={stats.approved ? "success" : "default"}
+            variant={stats.approved ? "filled" : "outlined"}
+            label={`Одобрено: ${stats.approved}`}
+          />
+          <Chip
+            size="small"
+            color={stats.banned ? "error" : "default"}
+            variant={stats.banned ? "filled" : "outlined"}
+            label={`Заблокированы: ${stats.banned}`}
+          />
+        </Stack>
       </Stack>
+
+      <Paper sx={{ p: 1.5, borderRadius: 1.8 }}>
+        <Stack direction={{ xs: "column", md: "row" }} spacing={1}>
+          <TextField
+            size="small"
+            label="Поиск клиента или сервиса"
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            sx={{ flex: 1, minWidth: { xs: "100%", md: 320 } }}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchRoundedIcon fontSize="small" />
+                </InputAdornment>
+              ),
+            }}
+          />
+          <TextField
+            select
+            size="small"
+            label="Опт-статус"
+            value={statusFilter}
+            onChange={(event) => setStatusFilter(event.target.value)}
+            sx={{ minWidth: { xs: "100%", md: 220 } }}
+          >
+            <MenuItem value="all">Все</MenuItem>
+            <MenuItem value="pending">На рассмотрении</MenuItem>
+            <MenuItem value="approved">Одобрено</MenuItem>
+            <MenuItem value="rejected">Отклонено</MenuItem>
+            <MenuItem value="none">Не запрошено</MenuItem>
+          </TextField>
+          <Button
+            size="small"
+            variant="outlined"
+            onClick={() => {
+              setSearchQuery("");
+              setStatusFilter("all");
+            }}
+          >
+            Сбросить
+          </Button>
+        </Stack>
+      </Paper>
 
       {error ? <Alert severity="error">{error}</Alert> : null}
       {loading ? <Alert severity="info">Загрузка...</Alert> : null}
+      {!loading && filteredRows.length === 0 ? (
+        <Alert severity="info">По фильтрам ничего не найдено. Попробуйте снять ограничения.</Alert>
+      ) : null}
 
       <Stack spacing={1}>
         {filteredRows.map((row) => {
           const isSaving = savingId === row.id;
           const draft = reviewDraftById[row.id] || { review_comment: "" };
+          const company = (row.wholesale_company_name || "").trim();
+          const address = (row.wholesale_address || "").trim();
 
           return (
             <Accordion key={row.id} disableGutters>
@@ -157,14 +238,18 @@ export default function AdminClientsPage() {
                   justifyContent="space-between"
                   sx={{ width: "100%", pr: 1 }}
                 >
-                  <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
-                    <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
-                      {row.username}
+                  <Stack spacing={0.6} sx={{ minWidth: 0 }}>
+                    <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
+                      <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
+                        {row.username}
+                      </Typography>
+                      <WholesaleStatusChip status={row.wholesale_status} />
+                      {row.is_banned ? <Chip size="small" color="error" variant="outlined" label="Заблокирован" /> : null}
+                    </Stack>
+                    <Typography variant="caption" color="text.secondary" sx={{ maxWidth: 560 }} noWrap>
+                      {company || "Без названия сервиса"}
+                      {address ? ` • ${address}` : ""}
                     </Typography>
-                    <WholesaleStatusChip status={row.wholesale_status} />
-                    {row.is_banned ? (
-                      <Chip size="small" color="error" variant="outlined" label="Заблокирован" />
-                    ) : null}
                   </Stack>
                   <Button size="small" variant="outlined" onClick={() => navigate(`/clients/${row.id}/profile`)}>
                     Профиль
@@ -172,33 +257,9 @@ export default function AdminClientsPage() {
                 </Stack>
               </AccordionSummary>
               <AccordionDetails>
-                <Stack spacing={1.1}>
-                  {canManage ? (
-                    <TextField
-                      size="small"
-                      label="Причина бана"
-                      value={reasonById[row.id] || row.ban_reason || ""}
-                      onChange={(e) => setReasonById((prev) => ({ ...prev, [row.id]: e.target.value }))}
-                    />
-                  ) : null}
-
-                  {canManage ? (
-                    <TextField
-                      size="small"
-                      label="Комментарий администратора"
-                      value={draft.review_comment}
-                      onChange={(e) =>
-                        setReviewDraftById((prev) => ({
-                          ...prev,
-                          [row.id]: { ...draft, review_comment: e.target.value },
-                        }))
-                      }
-                      fullWidth
-                    />
-                  ) : null}
-
+                <Stack spacing={1.2}>
                   {row.wholesale_service_details ? (
-                    <Paper variant="outlined" sx={{ p: 1, borderRadius: 1.2 }}>
+                    <Paper variant="outlined" sx={{ p: 1.2, borderRadius: 1.4 }}>
                       <Typography variant="caption" color="text.secondary">
                         Описание сервиса
                       </Typography>
@@ -221,6 +282,32 @@ export default function AdminClientsPage() {
                         </Link>
                       ) : null}
                     </Stack>
+                  ) : null}
+
+                  {canManage ? <Divider /> : null}
+
+                  {canManage ? (
+                    <TextField
+                      size="small"
+                      label="Причина бана"
+                      value={reasonById[row.id] || row.ban_reason || ""}
+                      onChange={(event) => setReasonById((prev) => ({ ...prev, [row.id]: event.target.value }))}
+                    />
+                  ) : null}
+
+                  {canManage ? (
+                    <TextField
+                      size="small"
+                      label="Комментарий администратора"
+                      value={draft.review_comment}
+                      onChange={(event) =>
+                        setReviewDraftById((prev) => ({
+                          ...prev,
+                          [row.id]: { ...draft, review_comment: event.target.value },
+                        }))
+                      }
+                      fullWidth
+                    />
                   ) : null}
 
                   {canManage ? (
@@ -251,4 +338,3 @@ export default function AdminClientsPage() {
     </Stack>
   );
 }
-

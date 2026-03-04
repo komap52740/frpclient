@@ -494,9 +494,12 @@ export default function ChatPanel({
           <Stack direction="row" spacing={0.7} alignItems="center">
             <ComputerRoundedIcon fontSize="small" color="primary" />
             <Typography variant="caption" color="text.secondary">
-              Быстрый ввод RuDesktop
+              Данные RuDesktop (не чат)
             </Typography>
           </Stack>
+          <Typography variant="caption" color="text.secondary">
+            Здесь указываются только логин/ID и пароль RuDesktop. Сообщение пишите в поле "Сообщение мастеру" ниже.
+          </Typography>
           {ruDesktopError ? (
             <Alert severity="error" sx={{ py: 0, "& .MuiAlert-message": { py: 0.25 } }}>
               {ruDesktopError}
@@ -509,7 +512,8 @@ export default function ChatPanel({
           ) : null}
           <TextField
             size="small"
-            label="Логин/ID"
+            label="Логин/ID RuDesktop"
+            placeholder="Например: 123 456 789"
             value={ruDesktopForm.rustdesk_id}
             onChange={(event) => {
               setRuDesktopForm((prev) => ({
@@ -523,7 +527,8 @@ export default function ChatPanel({
           />
           <TextField
             size="small"
-            label="Пароль"
+            label="Пароль RuDesktop"
+            placeholder="Пароль для подключения"
             value={ruDesktopForm.rustdesk_password}
             onChange={(event) => {
               setRuDesktopForm((prev) => ({
@@ -707,8 +712,6 @@ export default function ChatPanel({
           linksPanel
         )}
 
-        {!isSplitClientLayout && ruDesktopInputPanel}
-
         <Paper
           elevation={0}
           sx={{
@@ -725,11 +728,20 @@ export default function ChatPanel({
           }}
         >
           <Stack spacing={1}>
+            <Stack spacing={0.25}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
+                Сообщение мастеру
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                Пишите сообщение здесь. Поля RuDesktop находятся ниже отдельным блоком.
+              </Typography>
+            </Stack>
             <TextField
-              label="Сообщение"
+              label="Сообщение в чат"
+              placeholder="Напишите сообщение мастеру..."
               multiline
               minRows={isMobile ? 2.3 : 2}
-              maxRows={isMobile ? 6 : 8}
+              maxRows={isMobile ? 4 : 8}
               value={text}
               onChange={(event) => setText(event.target.value)}
               onKeyDown={(event) => {
@@ -740,24 +752,36 @@ export default function ChatPanel({
               }}
               helperText={
                 text.trim().length
-                  ? "Сообщение готово к отправке. Ctrl+Enter для быстрой отправки"
-                  : "Пишите коротко и по делу. Ctrl+Enter для быстрой отправки"
+                  ? "Сообщение готово к отправке. Ctrl+Enter для быстрой отправки."
+                  : "Введите текст сообщения. Ctrl+Enter для быстрой отправки."
               }
             />
-            <Stack direction="row" spacing={1} alignItems="center">
-              <Button component="label" variant="outlined" startIcon={<AttachFileIcon />}>
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems={{ xs: "stretch", sm: "center" }}>
+              <Button
+                component="label"
+                variant="outlined"
+                startIcon={<AttachFileIcon />}
+                sx={{ alignSelf: { xs: "stretch", sm: "auto" } }}
+              >
                 Файл
                 <input hidden type="file" onChange={(event) => onFileChange(event.target.files?.[0] || null)} />
               </Button>
-              <Typography variant="body2" sx={{ flexGrow: 1 }}>
+              <Typography variant="body2" sx={{ flexGrow: 1, minWidth: 0, overflowWrap: "anywhere" }}>
                 {file ? file.name : "Файл не выбран"}
               </Typography>
-              <Button variant="contained" onClick={onSend} endIcon={<SendIcon />} disabled={isSending || Boolean(fileError)}>
+              <Button
+                variant="contained"
+                onClick={onSend}
+                endIcon={<SendIcon />}
+                disabled={isSending || Boolean(fileError)}
+                sx={{ alignSelf: { xs: "stretch", sm: "auto" }, minWidth: { sm: 132 } }}
+              >
                 {isSending ? "Отправка..." : "Отправить"}
               </Button>
             </Stack>
           </Stack>
         </Paper>
+        {!isSplitClientLayout && ruDesktopInputPanel}
       </Stack>
     </Paper>
   );

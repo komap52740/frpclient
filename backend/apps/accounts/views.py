@@ -67,6 +67,10 @@ def _oauth_redirect_uri(request, provider: str) -> str:
         return settings.GOOGLE_OAUTH_REDIRECT_URI
     if provider == "yandex" and settings.YANDEX_OAUTH_REDIRECT_URI:
         return settings.YANDEX_OAUTH_REDIRECT_URI
+    if provider == "vk" and settings.VK_OAUTH_REDIRECT_URI:
+        return settings.VK_OAUTH_REDIRECT_URI
+    if provider == "max" and settings.MAX_OAUTH_REDIRECT_URI:
+        return settings.MAX_OAUTH_REDIRECT_URI
     return f"{_frontend_base_url(request)}/api/auth/oauth/{provider}/callback/"
 
 
@@ -77,17 +81,47 @@ def _oauth_config(provider: str, request):
     elif provider == "yandex":
         client_id = settings.YANDEX_OAUTH_CLIENT_ID
         client_secret = settings.YANDEX_OAUTH_CLIENT_SECRET
+    elif provider == "vk":
+        client_id = settings.VK_OAUTH_CLIENT_ID
+        client_secret = settings.VK_OAUTH_CLIENT_SECRET
+    elif provider == "max":
+        client_id = settings.MAX_OAUTH_CLIENT_ID
+        client_secret = settings.MAX_OAUTH_CLIENT_SECRET
     else:
         return None
 
     if not client_id or not client_secret:
         return None
 
-    return {
+    config = {
         "client_id": client_id,
         "client_secret": client_secret,
         "redirect_uri": _oauth_redirect_uri(request, provider),
     }
+    if provider == "vk":
+        config.update(
+            {
+                "authorize_url": (settings.VK_OAUTH_AUTHORIZE_URL or "").strip(),
+                "token_url": (settings.VK_OAUTH_TOKEN_URL or "").strip(),
+                "userinfo_url": (settings.VK_OAUTH_USERINFO_URL or "").strip(),
+                "scope": (settings.VK_OAUTH_SCOPE or "").strip() or "email",
+                "api_version": (settings.VK_OAUTH_API_VERSION or "").strip() or "5.131",
+            }
+        )
+        if not config["authorize_url"] or not config["token_url"] or not config["userinfo_url"]:
+            return None
+    if provider == "max":
+        config.update(
+            {
+                "authorize_url": (settings.MAX_OAUTH_AUTHORIZE_URL or "").strip(),
+                "token_url": (settings.MAX_OAUTH_TOKEN_URL or "").strip(),
+                "userinfo_url": (settings.MAX_OAUTH_USERINFO_URL or "").strip(),
+                "scope": (settings.MAX_OAUTH_SCOPE or "").strip() or "openid profile email",
+            }
+        )
+        if not config["authorize_url"] or not config["token_url"] or not config["userinfo_url"]:
+            return None
+    return config
 
 
 def _sanitize_username_seed(value: str) -> str:
@@ -154,6 +188,29 @@ def _yandex_authorize_url(config: dict, state: str) -> str:
     return f"https://oauth.yandex.ru/authorize?{urlencode(params)}"
 
 
+def _vk_authorize_url(config: dict, state: str) -> str:
+    params = {
+        "client_id": config["client_id"],
+        "redirect_uri": config["redirect_uri"],
+        "response_type": "code",
+        "state": state,
+        "scope": config.get("scope") or "email",
+        "v": config.get("api_version") or "5.131",
+    }
+    return f"{config['authorize_url']}?{urlencode(params)}"
+
+
+def _max_authorize_url(config: dict, state: str) -> str:
+    params = {
+        "client_id": config["client_id"],
+        "redirect_uri": config["redirect_uri"],
+        "response_type": "code",
+        "state": state,
+        "scope": config.get("scope") or "openid profile email",
+    }
+    return f"{config['authorize_url']}?{urlencode(params)}"
+
+
 def _load_google_profile(config: dict, code: str) -> dict:
     token_data = _fetch_json(
         "https://oauth2.googleapis.com/token",
@@ -195,6 +252,57 @@ def _load_yandex_profile(config: dict, code: str) -> dict:
     )
 
 
+def _load_vk_profile(config: dict, code: str) -> dict:
+    token_data = _fetch_json(
+        f"{config['token_url']}?{urlencode({'client_id': config['client_id'], 'client_secret': config['client_secret'], 'redirect_uri': config['redirect_uri'], 'code': code})}"
+    )
+    if token_data.get("error"):
+        raise ValueError("oauth_token_error")
+    access_token = token_data.get("access_token")
+    if not access_token:
+        raise ValueError("oauth_missing_access_token")
+
+    user_data = _fetch_json(
+        f"{config['userinfo_url']}?{urlencode({'access_token': access_token, 'v': config.get('api_version') or '5.131', 'fields': 'screen_name,photo_200'})}"
+    )
+    if user_data.get("error"):
+        raise ValueError("oauth_userinfo_error")
+
+    user_payload = {}
+    response_items = user_data.get("response") or []
+    if isinstance(response_items, list) and response_items:
+        user_payload = response_items[0] or {}
+
+    return {
+        "id": user_payload.get("id") or token_data.get("user_id"),
+        "email": token_data.get("email") or "",
+        "first_name": user_payload.get("first_name") or "",
+        "last_name": user_payload.get("last_name") or "",
+        "username": user_payload.get("screen_name") or "",
+    }
+
+
+def _load_max_profile(config: dict, code: str) -> dict:
+    token_data = _fetch_json(
+        config["token_url"],
+        method="POST",
+        form_data={
+            "grant_type": "authorization_code",
+            "code": code,
+            "client_id": config["client_id"],
+            "client_secret": config["client_secret"],
+            "redirect_uri": config["redirect_uri"],
+        },
+    )
+    access_token = token_data.get("access_token")
+    if not access_token:
+        raise ValueError("oauth_missing_access_token")
+    return _fetch_json(
+        config["userinfo_url"],
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+
 def _normalize_oauth_profile(provider: str, raw_profile: dict) -> dict:
     if provider == "google":
         external_id = str(raw_profile.get("sub") or "").strip()
@@ -213,12 +321,45 @@ def _normalize_oauth_profile(provider: str, raw_profile: dict) -> dict:
             "last_name": last_name,
         }
 
-    external_id = str(raw_profile.get("id") or "").strip()
-    email = (raw_profile.get("default_email") or "").strip().lower()
-    login = (raw_profile.get("login") or "").strip()
-    first_name = (raw_profile.get("first_name") or "").strip()
-    last_name = (raw_profile.get("last_name") or "").strip()
-    username_seed = login or (email.split("@", 1)[0] if email else "") or f"yandex_{external_id[-10:]}"
+    if provider == "yandex":
+        external_id = str(raw_profile.get("id") or "").strip()
+        email = (raw_profile.get("default_email") or "").strip().lower()
+        login = (raw_profile.get("login") or "").strip()
+        first_name = (raw_profile.get("first_name") or "").strip()
+        last_name = (raw_profile.get("last_name") or "").strip()
+        username_seed = login or (email.split("@", 1)[0] if email else "") or f"yandex_{external_id[-10:]}"
+        return {
+            "external_id": external_id,
+            "email": email,
+            "username_seed": str(username_seed),
+            "first_name": first_name,
+            "last_name": last_name,
+        }
+
+    if provider == "vk":
+        external_id = str(raw_profile.get("id") or raw_profile.get("user_id") or "").strip()
+        email = (raw_profile.get("email") or "").strip().lower()
+        login = (raw_profile.get("username") or raw_profile.get("screen_name") or "").strip()
+        first_name = (raw_profile.get("first_name") or "").strip()
+        last_name = (raw_profile.get("last_name") or "").strip()
+        suffix = external_id[-10:] if external_id else get_random_string(6).lower()
+        username_seed = login or (email.split("@", 1)[0] if email else "") or f"vk_{suffix}"
+        return {
+            "external_id": external_id,
+            "email": email,
+            "username_seed": str(username_seed),
+            "first_name": first_name,
+            "last_name": last_name,
+        }
+
+    external_id = str(raw_profile.get("id") or raw_profile.get("sub") or raw_profile.get("user_id") or "").strip()
+    email = (raw_profile.get("email") or raw_profile.get("default_email") or "").strip().lower()
+    login = (raw_profile.get("username") or raw_profile.get("login") or "").strip()
+    first_name = (raw_profile.get("first_name") or raw_profile.get("given_name") or "").strip()
+    last_name = (raw_profile.get("last_name") or raw_profile.get("family_name") or "").strip()
+    name = (raw_profile.get("name") or "").strip()
+    suffix = external_id[-10:] if external_id else get_random_string(6).lower()
+    username_seed = login or (email.split("@", 1)[0] if email else "") or name or f"max_{suffix}"
     return {
         "external_id": external_id,
         "email": email,
@@ -568,6 +709,10 @@ class OAuthStartView(APIView):
             auth_url = _google_authorize_url(config, state)
         elif normalized_provider == "yandex":
             auth_url = _yandex_authorize_url(config, state)
+        elif normalized_provider == "vk":
+            auth_url = _vk_authorize_url(config, state)
+        elif normalized_provider == "max":
+            auth_url = _max_authorize_url(config, state)
         else:
             return Response({"detail": "Неизвестный OAuth-провайдер."}, status=status.HTTP_404_NOT_FOUND)
 
@@ -588,7 +733,7 @@ class OAuthCallbackView(APIView):
 
     def get(self, request, provider: str):
         normalized_provider = (provider or "").lower()
-        if normalized_provider not in {"google", "yandex"}:
+        if normalized_provider not in {"google", "yandex", "vk", "max"}:
             return _oauth_redirect_with_error(request, "Неизвестный OAuth-провайдер.")
 
         oauth_error = (request.GET.get("error_description") or request.GET.get("error") or "").strip()
@@ -619,8 +764,12 @@ class OAuthCallbackView(APIView):
         try:
             if normalized_provider == "google":
                 raw_profile = _load_google_profile(config, code)
-            else:
+            elif normalized_provider == "yandex":
                 raw_profile = _load_yandex_profile(config, code)
+            elif normalized_provider == "vk":
+                raw_profile = _load_vk_profile(config, code)
+            else:
+                raw_profile = _load_max_profile(config, code)
             profile = _normalize_oauth_profile(normalized_provider, raw_profile)
             user = _get_or_create_oauth_user(normalized_provider, profile)
         except Exception as exc:  # noqa: BLE001
@@ -781,6 +930,7 @@ def serialize_wholesale_status(user: User, request=None) -> dict:
             "is_service_center": user.is_service_center,
             "wholesale_status": user.wholesale_status,
             "wholesale_company_name": user.wholesale_company_name,
+            "wholesale_address": user.wholesale_address,
             "wholesale_comment": user.wholesale_comment,
             "wholesale_service_details": user.wholesale_service_details,
             "wholesale_service_photo_1_url": file_url(user.wholesale_service_photo_1),
@@ -816,6 +966,7 @@ class WholesaleRequestView(APIView):
         previous_status = user.wholesale_status
         is_service_center = bool(payload.get("is_service_center", True))
         service_name = (payload.get("wholesale_company_name") or "").strip()
+        service_address = (payload.get("wholesale_address") or "").strip()
         comment = (payload.get("wholesale_comment") or "").strip()
         service_details = (payload.get("wholesale_service_details") or "").strip()
         service_photo_1 = payload.get("wholesale_service_photo_1")
@@ -826,10 +977,11 @@ class WholesaleRequestView(APIView):
         update_fields = ["updated_at"]
         user.is_service_center = is_service_center
         user.wholesale_company_name = service_name
+        user.wholesale_address = service_address
         user.wholesale_comment = comment
         user.wholesale_service_details = service_details
         update_fields.extend(
-            ["is_service_center", "wholesale_company_name", "wholesale_comment", "wholesale_service_details"]
+            ["is_service_center", "wholesale_company_name", "wholesale_address", "wholesale_comment", "wholesale_service_details"]
         )
 
         if is_service_center:
@@ -857,6 +1009,7 @@ class WholesaleRequestView(APIView):
             user.wholesale_requested_at = None
             user.wholesale_reviewed_at = None
             user.wholesale_review_comment = ""
+            user.wholesale_address = ""
             user.wholesale_service_details = ""
             user.wholesale_service_photo_1 = None
             user.wholesale_service_photo_2 = None
@@ -867,6 +1020,7 @@ class WholesaleRequestView(APIView):
                     "wholesale_requested_at",
                     "wholesale_reviewed_at",
                     "wholesale_review_comment",
+                    "wholesale_address",
                     "wholesale_service_details",
                     "wholesale_service_photo_1",
                     "wholesale_service_photo_2",
@@ -896,6 +1050,7 @@ class WholesaleRequestView(APIView):
                 actor=user,
                 payload={
                     "company": service_name,
+                    "address": service_address,
                     "comment": comment,
                     "has_photo_1": bool(user.wholesale_service_photo_1),
                     "has_photo_2": bool(user.wholesale_service_photo_2),
@@ -1004,3 +1159,5 @@ class DashboardSummaryView(APIView):
 
         # Defensive fallback for unknown role values.
         return Response({"role": user.role, "counts": {}}, status=status.HTTP_200_OK)
+
+

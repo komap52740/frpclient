@@ -22,10 +22,10 @@ def validate_payment_proof(value):
     if not value:
         return
     ext = os.path.splitext(value.name.lower())[1]
-    if ext not in {".jpg", ".jpeg", ".png", ".pdf"}:
-        raise ValidationError("Чек должен быть jpg/png/pdf")
-    if value.size > 10 * 1024 * 1024:
-        raise ValidationError("Максимальный размер файла 10MB")
+    if ext not in {".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif", ".pdf"}:
+        raise ValidationError("Чек должен быть jpg/jpeg/png/webp/heic/heif/pdf")
+    if value.size > 100 * 1024 * 1024:
+        raise ValidationError("Максимальный размер файла 100MB")
 
 
 class LockTypeChoices(models.TextChoices):
@@ -99,6 +99,7 @@ class Appointment(TimeStampedModel):
         null=True,
         blank=True,
     )
+    payment_requisites_note = models.CharField(max_length=255, blank=True, default="")
     payment_proof = models.FileField(
         upload_to="payment_proofs/",
         null=True,

@@ -124,5 +124,5 @@ def test_bot_rejects_unsupported_document_extension(client_user, master_user):
         )
 
     assert not Message.objects.filter(appointment=appointment).exists()
-    assert any("Р¤РѕСЂРјР°С‚ С„Р°Р№Р»Р° РЅРµ РїРѕРґРґРµСЂР¶РёРІР°РµС‚СЃСЏ." in (call.args[1] if len(call.args) > 1 else "") for call in send_mock.call_args_list)
+    assert any("не поддерживается" in (call.args[1] if len(call.args) > 1 else "").lower() for call in send_mock.call_args_list)
 

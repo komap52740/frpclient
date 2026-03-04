@@ -15,6 +15,7 @@ import {
   Typography,
 } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
+import useMediaQuery from "@mui/material/useMediaQuery";
 import dayjs from "dayjs";
 import "dayjs/locale/ru";
 
@@ -53,8 +54,10 @@ export default function NotificationsDrawer({
   onMarkRead,
 }) {
   const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const isDark = theme.palette.mode === "dark";
   const unreadCount = items.filter((item) => !item.is_read).length;
+  const markAllLabel = isMobile ? "Прочитать" : "Прочитать все";
 
   return (
     <Drawer
@@ -76,7 +79,7 @@ export default function NotificationsDrawer({
       <Box sx={{ p: 1.5 }}>
         <Stack
           direction="row"
-          alignItems="center"
+          alignItems={{ xs: "stretch", sm: "center" }}
           flexWrap="wrap"
           gap={0.9}
           sx={{
@@ -133,7 +136,7 @@ export default function NotificationsDrawer({
               disabled={loading || !items.length}
               sx={{ flex: { xs: "1 1 0", sm: "0 1 auto" }, whiteSpace: "nowrap", minWidth: 0 }}
             >
-              Прочитать все
+              {markAllLabel}
             </Button>
           </Stack>
         </Stack>

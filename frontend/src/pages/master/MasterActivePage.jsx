@@ -1,5 +1,18 @@
 ﻿import RefreshIcon from "@mui/icons-material/Refresh";
-import { Alert, Button, Chip, Grid, Paper, Stack, Tab, Tabs, Typography } from "@mui/material";
+import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
+import {
+  Alert,
+  Button,
+  Chip,
+  Grid,
+  InputAdornment,
+  Paper,
+  Stack,
+  Tab,
+  Tabs,
+  TextField,
+  Typography,
+} from "@mui/material";
 import dayjs from "dayjs";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -75,16 +88,14 @@ export default function MasterActivePage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [focusMode, setFocusMode] = useState("urgent");
+  const [searchQuery, setSearchQuery] = useState("");
 
   const load = useCallback(async ({ silent = false, withLoading = true } = {}) => {
     if (withLoading) {
       setLoading(true);
     }
     try {
-      const [appointmentsResponse, summaryData] = await Promise.all([
-        appointmentsApi.activeList(),
-        authApi.dashboardSummary(),
-      ]);
+      const [appointmentsResponse, summaryData] = await Promise.all([appointmentsApi.activeList(), authApi.dashboardSummary()]);
       setItems(sortByUrgency(appointmentsResponse.data || []));
       setSummary(summaryData.counts || {});
       setError("");
@@ -106,8 +117,29 @@ export default function MasterActivePage() {
   useAutoRefresh(() => load({ silent: true, withLoading: false }), { intervalMs: 5000 });
 
   const urgentItems = useMemo(() => items.filter(isUrgent), [items]);
-  const visibleItems = useMemo(() => (focusMode === "urgent" ? urgentItems : items), [focusMode, items, urgentItems]);
+
+  const visibleItems = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    const base = focusMode === "urgent" ? urgentItems : items;
+    if (!query) return base;
+    return base.filter((item) => {
+      const haystack = [item.brand, item.model, item.description, item.client_username, item.assigned_master_username]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return haystack.includes(query);
+    });
+  }, [focusMode, items, searchQuery, urgentItems]);
+
   const focusItem = visibleItems[0] || items[0] || null;
+
+  const focusDeadline = useMemo(() => {
+    if (!focusItem) return null;
+    const deadline = focusItem.completion_deadline_at || focusItem.response_deadline_at;
+    if (!deadline) return null;
+    const minutesLeft = dayjs(deadline).diff(dayjs(), "minute");
+    return minutesLeft;
+  }, [focusItem]);
 
   return (
     <Stack spacing={2}>
@@ -126,14 +158,9 @@ export default function MasterActivePage() {
         </Stack>
       </Stack>
 
-      <Paper sx={{ p: 1.4, borderRadius: 3 }}>
+      <Paper sx={{ p: 1.4, borderRadius: 2.2 }}>
         <Stack spacing={1}>
-          <Stack
-            direction={{ xs: "column", sm: "row" }}
-            spacing={1}
-            justifyContent="space-between"
-            alignItems={{ xs: "flex-start", sm: "center" }}
-          >
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={1} justifyContent="space-between" alignItems={{ xs: "flex-start", sm: "center" }}>
             <Tabs
               value={focusMode}
               onChange={(_, value) => setFocusMode(value)}
@@ -148,11 +175,56 @@ export default function MasterActivePage() {
               </Button>
             ) : null}
           </Stack>
+
+          <TextField
+            size="small"
+            placeholder="Поиск по модели, описанию или клиенту"
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchRoundedIcon fontSize="small" />
+                </InputAdornment>
+              ),
+            }}
+          />
+
           <Typography variant="caption" color="text.secondary">
-            Срочные: SLA риск, дедлайн до 60 минут или новые сообщения от клиента.
+            Сначала отображаются заявки с риском SLA и непрочитанными сообщениями.
           </Typography>
         </Stack>
       </Paper>
+
+      {focusItem ? (
+        <Paper sx={{ p: 1.5, borderRadius: 2.2 }}>
+          <Stack direction={{ xs: "column", md: "row" }} spacing={1} justifyContent="space-between" alignItems={{ xs: "flex-start", md: "center" }}>
+            <Stack spacing={0.4}>
+              <Typography variant="subtitle1" sx={{ fontWeight: 800 }}>
+                Фокус: заявка #{focusItem.id}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                {focusItem.brand} {focusItem.model}
+              </Typography>
+              <Typography variant="caption" color={focusDeadline != null && focusDeadline <= 0 ? "error.main" : "text.secondary"}>
+                {focusDeadline == null
+                  ? "Без SLA-дедлайна"
+                  : focusDeadline <= 0
+                    ? "SLA уже нарушен"
+                    : `До SLA: ~${focusDeadline} мин`}
+              </Typography>
+            </Stack>
+            <Stack direction="row" spacing={1}>
+              <Button variant="outlined" size="small" onClick={() => navigate(`/appointments/${focusItem.id}?focus=chat`)}>
+                К чату
+              </Button>
+              <Button variant="contained" size="small" onClick={() => navigate(`/appointments/${focusItem.id}`)}>
+                Открыть карточку
+              </Button>
+            </Stack>
+          </Stack>
+        </Paper>
+      ) : null}
 
       <Grid container spacing={2} sx={{ width: "100%", m: 0, minWidth: 0 }}>
         <Grid item xs={12} sm={6} md={3}>
@@ -169,12 +241,6 @@ export default function MasterActivePage() {
         </Grid>
       </Grid>
 
-      <Paper sx={{ p: 1.5 }}>
-        <Typography variant="body2" color="text.secondary">
-          Порядок заявок: сначала риск SLA, затем близость дедлайна и непрочитанные сообщения.
-        </Typography>
-      </Paper>
-
       {error && <Alert severity="error">{error}</Alert>}
 
       {loading && !items.length ? (
@@ -190,10 +256,7 @@ export default function MasterActivePage() {
           ))}
         </Stack>
       ) : (
-        <EmptyState
-          title="Сейчас нет активных заявок"
-          description="Возьмите новую заявку в разделе «Новые заявки», и она появится здесь."
-        />
+        <EmptyState title="Сейчас нет активных заявок" description="Возьмите новую заявку в разделе «Новые заявки», и она появится здесь." />
       )}
     </Stack>
   );

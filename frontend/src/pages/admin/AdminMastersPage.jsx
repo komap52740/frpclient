@@ -1,4 +1,5 @@
-import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
+﻿import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
+import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import {
   Accordion,
   AccordionDetails,
@@ -6,6 +7,7 @@ import {
   Alert,
   Button,
   Chip,
+  InputAdornment,
   MenuItem,
   Paper,
   Stack,
@@ -18,10 +20,10 @@ import { adminApi } from "../../api/client";
 
 const LEVEL_OPTIONS = [
   { value: "trainee", label: "Стажер" },
-  { value: "junior", label: "Junior" },
-  { value: "middle", label: "Middle" },
-  { value: "senior", label: "Senior" },
-  { value: "lead", label: "Lead" },
+  { value: "junior", label: "Обычный мастер" },
+  { value: "middle", label: "Опытный мастер" },
+  { value: "senior", label: "Старший мастер" },
+  { value: "lead", label: "Тимлид" },
 ];
 
 function qualityChip(approved) {
@@ -35,6 +37,7 @@ export default function AdminMastersPage() {
   const [savingId, setSavingId] = useState(0);
   const [qualityFilter, setQualityFilter] = useState("all");
   const [levelFilter, setLevelFilter] = useState("all");
+  const [searchQuery, setSearchQuery] = useState("");
   const [drafts, setDrafts] = useState({});
 
   const requestParams = useMemo(() => {
@@ -125,13 +128,71 @@ export default function AdminMastersPage() {
     }
   };
 
+  const filteredRows = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return rows;
+    return rows.filter((row) => {
+      const haystack = [row.username, row.master_specializations, row.master_quality_comment]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return haystack.includes(query);
+    });
+  }, [rows, searchQuery]);
+
+  const stats = useMemo(() => {
+    const total = rows.length;
+    const active = rows.filter((row) => row.is_master_active).length;
+    const approved = rows.filter((row) => row.master_quality_approved).length;
+    const pending = total - approved;
+    return { total, active, approved, pending };
+  }, [rows]);
+
   return (
     <Stack spacing={2}>
-      <Typography variant="h5">Качество мастеров</Typography>
+      <Stack spacing={1}>
+        <Typography variant="h5">Качество мастеров</Typography>
+        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+          <Chip size="small" variant="outlined" label={`Всего: ${stats.total}`} />
+          <Chip
+            size="small"
+            color={stats.active ? "success" : "default"}
+            variant={stats.active ? "filled" : "outlined"}
+            label={`Активны: ${stats.active}`}
+          />
+          <Chip
+            size="small"
+            color={stats.approved ? "success" : "default"}
+            variant={stats.approved ? "filled" : "outlined"}
+            label={`С допуском: ${stats.approved}`}
+          />
+          <Chip
+            size="small"
+            color={stats.pending ? "warning" : "default"}
+            variant={stats.pending ? "filled" : "outlined"}
+            label={`Без допуска: ${stats.pending}`}
+          />
+        </Stack>
+      </Stack>
+
       {error ? <Alert severity="error">{error}</Alert> : null}
 
       <Paper sx={{ p: 1.5, borderRadius: 1.8 }}>
         <Stack direction={{ xs: "column", md: "row" }} spacing={1}>
+          <TextField
+            size="small"
+            label="Поиск мастера"
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            sx={{ flex: 1, minWidth: { xs: "100%", md: 300 } }}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchRoundedIcon fontSize="small" />
+                </InputAdornment>
+              ),
+            }}
+          />
           <TextField
             select
             label="Фильтр допуска"
@@ -159,11 +220,24 @@ export default function AdminMastersPage() {
               </MenuItem>
             ))}
           </TextField>
+          <Button
+            size="small"
+            variant="outlined"
+            onClick={() => {
+              setSearchQuery("");
+              setQualityFilter("all");
+              setLevelFilter("all");
+            }}
+          >
+            Сбросить
+          </Button>
         </Stack>
       </Paper>
 
+      {!filteredRows.length ? <Alert severity="info">Мастера по текущим фильтрам не найдены.</Alert> : null}
+
       <Stack spacing={1}>
-        {rows.map((row) => {
+        {filteredRows.map((row) => {
           const draft = drafts[row.id] || {};
           const busy = savingId === row.id;
 
@@ -177,10 +251,17 @@ export default function AdminMastersPage() {
                   justifyContent="space-between"
                   sx={{ width: "100%", pr: 1 }}
                 >
-                  <Stack direction="row" spacing={1} alignItems="center">
-                    <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>{row.username}</Typography>
-                    {qualityChip(row.master_quality_approved)}
-                    <Chip size="small" variant="outlined" label={`Score: ${row.master_stats?.master_score ?? "—"}`} />
+                  <Stack spacing={0.6} sx={{ minWidth: 0 }}>
+                    <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
+                      <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
+                        {row.username}
+                      </Typography>
+                      {qualityChip(row.master_quality_approved)}
+                      <Chip size="small" variant="outlined" label={`Score: ${row.master_stats?.master_score ?? "—"}`} />
+                    </Stack>
+                    <Typography variant="caption" color="text.secondary" noWrap sx={{ maxWidth: 560 }}>
+                      {row.master_specializations || "Специализация не указана"}
+                    </Typography>
                   </Stack>
                   <Chip
                     size="small"
@@ -199,7 +280,7 @@ export default function AdminMastersPage() {
                       label="Уровень"
                       value={draft.master_level || "junior"}
                       onChange={(event) => onDraftChange(row.id, "master_level", event.target.value)}
-                      sx={{ minWidth: 200 }}
+                      sx={{ minWidth: 230 }}
                     >
                       {LEVEL_OPTIONS.map((option) => (
                         <MenuItem key={option.value} value={option.value}>

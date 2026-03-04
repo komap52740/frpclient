@@ -154,12 +154,12 @@ def test_client_message_with_profanity_is_rejected(client_user, master_user):
 
     response = auth_as(client_user).post(
         f"/api/appointments/{appointment.id}/messages/",
-        {"text": "С‚С‹ РїРёРґРѕСЂ"},
+        {"text": "ты пидор"},
         format="json",
     )
 
     assert response.status_code == 400
-    assert "РЅРµРґРѕРїСѓСЃС‚РёРјСѓСЋ Р»РµРєСЃРёРєСѓ" in response.data["detail"].lower()
+    assert "недопустим" in response.data["detail"].lower()
     assert Message.objects.filter(appointment=appointment).count() == 0
 
 
@@ -178,12 +178,12 @@ def test_client_spam_like_message_is_rejected(client_user, master_user):
 
     response = auth_as(client_user).post(
         f"/api/appointments/{appointment.id}/messages/",
-        {"text": "Р°Р°Р°Р°Р°Р°Р°Р°Р°Р°Р°Р°Р°Р°Р°"},
+        {"text": "ааааааааааааааа"},
         format="json",
     )
 
     assert response.status_code == 400
-    assert "СЃРїР°Рј" in response.data["detail"].lower()
+    assert "спам" in response.data["detail"].lower()
     assert Message.objects.filter(appointment=appointment).count() == 0
 
 

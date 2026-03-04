@@ -8,7 +8,7 @@ export default function PageMotion({ children }) {
 
   return (
     <Box
-      key={`${location.pathname}${location.search}`}
+      key={location.pathname}
       sx={{
         animation: reducedMotion ? "none" : "frpPageEnter 320ms cubic-bezier(0.16, 1, 0.3, 1)",
         transformOrigin: "top center",

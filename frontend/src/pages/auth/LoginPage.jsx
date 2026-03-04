@@ -48,6 +48,72 @@ function getApiErrorMessage(error, fallback) {
   return fallback;
 }
 
+const authInputSx = {
+  "& .MuiInputLabel-root": {
+    color: "rgba(188, 207, 232, 0.82)",
+    fontWeight: 600,
+  },
+  "& .MuiInputLabel-root.Mui-focused": {
+    color: "#bfe0ff",
+  },
+  "& .MuiOutlinedInput-root": {
+    borderRadius: 1.9,
+    fontWeight: 600,
+    color: "#f1f7ff",
+    background: "rgba(9, 20, 39, 0.76)",
+    transition: "all .22s ease",
+    "& fieldset": {
+      borderColor: "rgba(132, 169, 224, 0.36)",
+      borderWidth: 1.1,
+    },
+    "&:hover fieldset": {
+      borderColor: "rgba(148, 193, 255, 0.62)",
+    },
+    "&.Mui-focused fieldset": {
+      borderColor: "rgba(150, 204, 255, 0.95)",
+      boxShadow: "0 0 0 3px rgba(86, 157, 255, 0.14)",
+    },
+  },
+  "& .MuiInputBase-input": {
+    py: 1.32,
+  },
+};
+
+const authPrimaryButtonSx = {
+  borderRadius: 1.9,
+  py: 1.2,
+  textTransform: "none",
+  fontWeight: 800,
+  letterSpacing: 0.15,
+  background: "linear-gradient(135deg, #72b4ff 0%, #4e8dff 48%, #3b78e8 100%)",
+  color: "#f7fcff",
+  border: "1px solid rgba(148, 196, 255, 0.48)",
+  boxShadow: "0 14px 28px rgba(50, 116, 226, 0.3)",
+  "&:hover": {
+    background: "linear-gradient(135deg, #82beff 0%, #5d99ff 48%, #4b84ef 100%)",
+    boxShadow: "0 16px 34px rgba(56, 125, 238, 0.36)",
+  },
+  "&.Mui-disabled": {
+    color: "rgba(213,230,255,0.72)",
+    background: "linear-gradient(135deg, rgba(91,145,222,0.62) 0%, rgba(69,116,199,0.6) 100%)",
+  },
+};
+
+const authGhostButtonSx = {
+  borderRadius: 1.9,
+  py: 1.2,
+  textTransform: "none",
+  fontWeight: 800,
+  letterSpacing: 0.12,
+  borderColor: "rgba(128, 170, 230, 0.62)",
+  color: "#d3e9ff",
+  background: "linear-gradient(150deg, rgba(22, 42, 75, 0.58) 0%, rgba(14, 28, 53, 0.64) 100%)",
+  "&:hover": {
+    borderColor: "rgba(156, 198, 255, 0.98)",
+    background: "linear-gradient(150deg, rgba(29, 51, 87, 0.78) 0%, rgba(17, 34, 63, 0.8) 100%)",
+  },
+};
+
 export default function LoginPage() {
   const { loginWithTelegram, loginWithAccessToken, loginWithPassword } = useAuth();
   const navigate = useNavigate();
@@ -491,41 +557,94 @@ export default function LoginPage() {
           id="auth-login-card"
           elevation={0}
           sx={{
-            borderRadius: 5,
-            p: { xs: 2.4, md: 3.2 },
-            border: "1px solid rgba(124,167,255,0.30)",
+            position: "relative",
+            overflow: "hidden",
+            borderRadius: 3.5,
+            p: { xs: 2.1, md: 3.1 },
+            border: "1px solid rgba(126,171,232,0.34)",
             background:
-              "linear-gradient(165deg, rgba(23,35,64,0.95) 0%, rgba(16,27,52,0.94) 55%, rgba(12,21,42,0.95) 100%)",
-            boxShadow: "0 22px 58px rgba(0,0,0,0.44)",
+              "linear-gradient(165deg, rgba(24,37,69,0.97) 0%, rgba(15,27,53,0.96) 55%, rgba(9,18,39,0.98) 100%)",
+            boxShadow: "0 24px 56px rgba(0,0,0,0.42)",
             backdropFilter: "blur(10px)",
+            "&::before": {
+              content: '""',
+              position: "absolute",
+              inset: 0,
+              background:
+                "radial-gradient(360px 220px at 100% -15%, rgba(92,163,255,0.24) 0%, rgba(92,163,255,0) 62%), radial-gradient(320px 180px at -5% 110%, rgba(26,169,127,0.16) 0%, rgba(26,169,127,0) 66%)",
+              pointerEvents: "none",
+            },
+            "&::after": {
+              content: '""',
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              height: 1,
+              background: "linear-gradient(90deg, rgba(138,192,255,0.14) 0%, rgba(167,212,255,0.62) 50%, rgba(138,192,255,0.14) 100%)",
+              pointerEvents: "none",
+            },
           }}
         >
-          <Stack spacing={2}>
+          <Stack spacing={2} sx={{ position: "relative", zIndex: 1 }}>
             <Stack direction="row" justifyContent="space-between" alignItems="center" flexWrap="wrap" useFlexGap>
-              <Typography variant="h4" sx={{ fontWeight: 900, fontSize: { xs: 32, md: 42 }, color: "#f8fbff" }}>
+              <Typography
+                variant="h4"
+                sx={{
+                  fontWeight: 800,
+                  fontSize: { xs: 30, md: 40 },
+                  lineHeight: 1.05,
+                  letterSpacing: -0.4,
+                  fontFamily: "'Sora', 'Manrope', sans-serif",
+                  color: "#f2f8ff",
+                }}
+              >
                 {requiresSetup ? "Первичная настройка" : "Вход в систему"}
               </Typography>
               {!requiresSetup ? (
                 <Chip
                   label="Безопасный вход"
                   sx={{
-                    color: "#d0ebff",
-                    border: "1px solid rgba(118,173,255,0.48)",
-                    bgcolor: "rgba(86,147,255,0.14)",
+                    color: "#d9ecff",
+                    border: "1px solid rgba(118,173,255,0.52)",
+                    bgcolor: "rgba(79,138,235,0.18)",
                     fontWeight: 700,
+                    borderRadius: 1.2,
                   }}
                 />
               ) : null}
             </Stack>
 
-            <Typography sx={{ color: "rgba(213,227,249,0.78)", fontSize: 14.5 }}>
+            <Typography sx={{ color: "rgba(204,221,244,0.82)", fontSize: 14.2 }}>
               {requiresSetup
                 ? "Создайте первого администратора для запуска платформы."
-                : "Авторизация через Google, Яндекс, Telegram или логин/пароль."}
+                : "Авторизация через Google, Яндекс, VK, Telegram или логин/пароль."}
             </Typography>
 
-            {error ? <Alert severity="error">{error}</Alert> : null}
-            {success ? <Alert severity="success">{success}</Alert> : null}
+            {error ? (
+              <Alert
+                severity="error"
+                sx={{
+                  borderRadius: 1.6,
+                  border: "1px solid rgba(255, 129, 129, 0.28)",
+                  bgcolor: "rgba(78, 25, 26, 0.78)",
+                }}
+              >
+                {error}
+              </Alert>
+            ) : null}
+            {success ? (
+              <Alert
+                severity="success"
+                sx={{
+                  borderRadius: 1.6,
+                  border: "1px solid rgba(116, 220, 165, 0.28)",
+                  bgcolor: "rgba(17, 56, 39, 0.76)",
+                }}
+              >
+                {success}
+              </Alert>
+            ) : null}
 
             {requiresSetup ? (
               <Box component="form" onSubmit={submitBootstrap}>
@@ -536,6 +655,7 @@ export default function LoginPage() {
                     label="Логин администратора"
                     value={setupForm.username}
                     onChange={(e) => setSetupForm((prev) => ({ ...prev, username: e.target.value }))}
+                    sx={authInputSx}
                   />
                   <TextField
                     required
@@ -543,6 +663,7 @@ export default function LoginPage() {
                     type="password"
                     value={setupForm.password}
                     onChange={(e) => setSetupForm((prev) => ({ ...prev, password: e.target.value }))}
+                    sx={authInputSx}
                   />
                   <TextField
                     required
@@ -550,30 +671,25 @@ export default function LoginPage() {
                     type="password"
                     value={setupForm.passwordConfirm}
                     onChange={(e) => setSetupForm((prev) => ({ ...prev, passwordConfirm: e.target.value }))}
+                    sx={authInputSx}
                   />
                   <TextField
                     label="Имя"
                     value={setupForm.first_name}
                     onChange={(e) => setSetupForm((prev) => ({ ...prev, first_name: e.target.value }))}
+                    sx={authInputSx}
                   />
                   <TextField
                     label="Фамилия"
                     value={setupForm.last_name}
                     onChange={(e) => setSetupForm((prev) => ({ ...prev, last_name: e.target.value }))}
+                    sx={authInputSx}
                   />
                   <Button
                     type="submit"
                     variant="contained"
                     disabled={loading}
-                    sx={{
-                      mt: 0.4,
-                      borderRadius: 2,
-                      py: 1.25,
-                      textTransform: "none",
-                      fontWeight: 800,
-                      background: "linear-gradient(135deg, #67adff 0%, #3e84ff 100%)",
-                      boxShadow: "0 12px 30px rgba(75,145,255,0.38)",
-                    }}
+                    sx={{ mt: 0.5, ...authPrimaryButtonSx }}
                   >
                     {loading ? "Создаем администратора..." : "Создать администратора и войти"}
                   </Button>
@@ -587,14 +703,7 @@ export default function LoginPage() {
                     variant="contained"
                     disabled={loading}
                     onClick={() => startOAuthLogin("google")}
-                    sx={{
-                      borderRadius: 2,
-                      py: 1.2,
-                      textTransform: "none",
-                      fontWeight: 800,
-                      background: "linear-gradient(135deg, #6aaeff 0%, #3f86ff 100%)",
-                      boxShadow: "0 10px 28px rgba(61,133,255,0.33)",
-                    }}
+                    sx={authPrimaryButtonSx}
                   >
                     Войти через Google
                   </Button>
@@ -603,22 +712,20 @@ export default function LoginPage() {
                     variant="outlined"
                     disabled={loading}
                     onClick={() => startOAuthLogin("yandex")}
-                    sx={{
-                      borderRadius: 2,
-                      py: 1.2,
-                      textTransform: "none",
-                      fontWeight: 800,
-                      borderColor: "rgba(129,177,255,0.68)",
-                      color: "#afd6ff",
-                      "&:hover": {
-                        borderColor: "rgba(153,196,255,0.95)",
-                        background: "rgba(93,149,255,0.10)",
-                      },
-                    }}
+                    sx={authGhostButtonSx}
                   >
                     Войти через Яндекс
                   </Button>
                 </Stack>
+                <Button
+                  fullWidth
+                  variant="outlined"
+                  disabled={loading}
+                  onClick={() => startOAuthLogin("vk")}
+                  sx={authGhostButtonSx}
+                >
+                  Войти через VK
+                </Button>
 
                 {!BOT_USERNAME ? (
                   <Alert severity="warning">Не задано значение VITE_TELEGRAM_BOT_USERNAME.</Alert>
@@ -627,25 +734,25 @@ export default function LoginPage() {
                     <Paper
                       variant="outlined"
                       sx={{
-                        p: 1.1,
-                        borderRadius: 2,
-                        borderColor: alpha("#8bc2ff", 0.55),
-                        background: alpha("#0d1f42", 0.56),
+                        p: 1.2,
+                        borderRadius: 1.9,
+                        borderColor: alpha("#8bc2ff", 0.46),
+                        background: "linear-gradient(140deg, rgba(13, 30, 60, 0.72) 0%, rgba(8, 19, 41, 0.72) 100%)",
                       }}
                     >
                       <Stack spacing={0.7}>
-                        <Typography sx={{ color: "rgba(213,230,252,0.88)", fontSize: 13.5, fontWeight: 700 }}>
+                        <Typography sx={{ color: "rgba(216,232,255,0.9)", fontSize: 13.5, fontWeight: 700 }}>
                           Telegram вход
                         </Typography>
                         <Box
                           id="telegram-login-container"
                           sx={{
                             minHeight: 50,
-                            px: 0.7,
-                            py: 0.65,
-                            borderRadius: 1.6,
-                            border: `1px dashed ${alpha("#86bdff", 0.48)}`,
-                            bgcolor: alpha("#0e2042", 0.42),
+                            px: 0.85,
+                            py: 0.7,
+                            borderRadius: 1.5,
+                            border: `1px dashed ${alpha("#9cc7ff", 0.5)}`,
+                            bgcolor: alpha("#0e2042", 0.34),
                             display: "flex",
                             alignItems: "center",
                           }}
@@ -664,7 +771,13 @@ export default function LoginPage() {
                               telegramWidgetRetryRef.current = 0;
                               setTelegramWidgetReloadKey((prev) => prev + 1);
                             }}
-                            sx={{ alignSelf: "flex-start", textTransform: "none", borderRadius: 1.4 }}
+                            sx={{
+                              alignSelf: "flex-start",
+                              textTransform: "none",
+                              borderRadius: 1.4,
+                              borderColor: "rgba(140,182,238,0.55)",
+                              color: "#bfddff",
+                            }}
                           >
                             Перезагрузить Telegram вход
                           </Button>
@@ -675,7 +788,7 @@ export default function LoginPage() {
                             href={`https://t.me/${BOT_USERNAME}`}
                             target="_blank"
                             rel="noreferrer"
-                            sx={{ alignSelf: "flex-start", textTransform: "none", borderRadius: 1.4 }}
+                            sx={{ alignSelf: "flex-start", textTransform: "none", borderRadius: 1.4, color: "#8ec5ff" }}
                           >
                             Открыть @{BOT_USERNAME}
                           </Button>
@@ -685,7 +798,9 @@ export default function LoginPage() {
                   </Stack>
                 )}
 
-                <Divider sx={{ color: "rgba(205,222,248,0.65)", fontSize: 12.5 }}>или вход по логину/паролю</Divider>
+                <Divider sx={{ color: "rgba(194,214,243,0.66)", fontSize: 12, "&::before, &::after": { borderColor: "rgba(140,177,229,0.34)" } }}>
+                  или вход по логину/паролю
+                </Divider>
 
                 <Box component="form" onSubmit={submitPasswordLogin}>
                   <Stack spacing={1.2}>
@@ -695,6 +810,7 @@ export default function LoginPage() {
                       autoComplete="username"
                       value={loginForm.username}
                       onChange={(e) => setLoginForm((prev) => ({ ...prev, username: e.target.value }))}
+                      sx={authInputSx}
                     />
                     <TextField
                       required
@@ -703,20 +819,13 @@ export default function LoginPage() {
                       autoComplete="current-password"
                       value={loginForm.password}
                       onChange={(e) => setLoginForm((prev) => ({ ...prev, password: e.target.value }))}
+                      sx={authInputSx}
                     />
                     <Button
                       type="submit"
                       variant="contained"
                       disabled={loading}
-                      sx={{
-                        mt: 0.4,
-                        borderRadius: 2,
-                        py: 1.15,
-                        textTransform: "none",
-                        fontWeight: 800,
-                        background: "linear-gradient(135deg, #67adff 0%, #3e84ff 100%)",
-                        boxShadow: "0 10px 26px rgba(75,145,255,0.34)",
-                      }}
+                      sx={{ mt: 0.5, ...authPrimaryButtonSx }}
                     >
                       {loading ? "Входим..." : "Войти"}
                     </Button>

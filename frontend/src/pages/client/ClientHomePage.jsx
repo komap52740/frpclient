@@ -398,11 +398,12 @@ export default function ClientHomePage() {
         </Paper>
       ) : null}
 
-      <Grid container spacing={2} sx={{ width: "100%", m: 0, minWidth: 0 }}>
+      <Grid container spacing={2} sx={{ minWidth: 0, alignItems: "stretch" }}>
         <Grid item xs={12} md={7}>
           <Paper
             sx={{
               p: { xs: 1.45, md: 2.25 },
+              minHeight: { md: 320 },
               borderRadius: 1.8,
               border: "1px solid",
               borderColor: isDark ? "divider" : `${scenario.tone}33`,
@@ -411,7 +412,7 @@ export default function ClientHomePage() {
                 : `linear-gradient(140deg, ${scenario.tone}12 0%, #ffffff 45%)`,
             }}
           >
-            <Stack spacing={1.25}>
+            <Stack spacing={1.25} sx={{ minHeight: { md: 272 } }}>
               <Stack direction="row" alignItems="center" spacing={1}>
                 <BoltRoundedIcon sx={{ color: scenario.tone }} />
                 <Typography variant="h6">Центр действий</Typography>
@@ -472,7 +473,7 @@ export default function ClientHomePage() {
 
         {showSecondaryBlocks ? (
           <Grid item xs={12} md={5}>
-            <Paper sx={{ p: { xs: 1.55, md: 2.25 }, borderRadius: 1.8 }}>
+            <Paper sx={{ p: { xs: 1.55, md: 2.25 }, minHeight: { md: 320 }, borderRadius: 1.8 }}>
               <Stack spacing={1.2}>
                 <Typography variant="h6">Готовность к сессии: {checklistProgress}%</Typography>
                 <LinearProgress
@@ -530,7 +531,7 @@ export default function ClientHomePage() {
       </Grid>
 
       {showSecondaryBlocks ? (
-        <Grid container spacing={2} sx={{ width: "100%", m: 0, minWidth: 0 }}>
+        <Grid container spacing={2} sx={{ minWidth: 0 }}>
           <Grid item xs={6} sm={6} lg={3}>
             <KpiCard title="Всего заявок" value={summary?.appointments_total ?? "-"} />
           </Grid>

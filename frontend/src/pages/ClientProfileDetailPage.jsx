@@ -110,10 +110,12 @@ export default function ClientProfileDetailPage() {
   }, [loadProfile]);
 
   const stats = profile?.client_stats || {};
+  const behaviorReviews = profile?.master_behavior_reviews || [];
   const riskLabel = resolveRiskLabel(stats.risk_level);
   const riskColor = resolveRiskColor(stats.risk_level);
   const wholesaleLabel = resolveWholesaleStatusLabel(profile?.wholesale_status);
   const backPath = user?.role === "admin" ? "/admin/clients" : "/master/active";
+  const isMasterViewer = user?.role === "master";
 
   const servicePhotoLinks = useMemo(
     () => [profile?.wholesale_service_photo_1_url, profile?.wholesale_service_photo_2_url].filter(Boolean),
@@ -254,6 +256,62 @@ export default function ClientProfileDetailPage() {
           <Typography variant="caption" color="text.secondary">
             Обновлено: {formatDate(stats.risk_updated_at)}
           </Typography>
+        </Stack>
+      </Paper>
+
+      <Paper
+        sx={{
+          p: 2,
+          borderRadius: 2.8,
+          "& .MuiTypography-body2": { overflowWrap: "anywhere" },
+        }}
+      >
+        <Stack spacing={0.9}>
+          <Typography variant="h3">Поведенческие факторы от мастера</Typography>
+          {behaviorReviews.length ? (
+            <Stack spacing={0.8}>
+              {behaviorReviews.map((review) => (
+                <Paper
+                  key={review.id}
+                  elevation={0}
+                  sx={{ p: 1.1, borderRadius: 1.8, border: "1px solid", borderColor: "divider" }}
+                >
+                  <Stack spacing={0.6}>
+                    <Typography variant="caption" color="text.secondary">
+                      {isMasterViewer
+                        ? `Ваша оценка • ${formatDate(review.created_at)}`
+                        : `Мастер: ${review.author_username || "—"} • ${formatDate(review.created_at)}`}
+                    </Typography>
+                    <Typography variant="body2">
+                      Рейтинг: <b>{review.rating}/5</b>
+                    </Typography>
+                    {review.behavior_flags?.length ? (
+                      <Stack direction="row" spacing={0.6} flexWrap="wrap" useFlexGap>
+                        {review.behavior_flags.map((flag) => (
+                          <Chip key={`${review.id}-${flag.code}`} size="small" label={flag.label || flag.code} variant="outlined" />
+                        ))}
+                      </Stack>
+                    ) : (
+                      <Typography variant="caption" color="text.secondary">
+                        Отметки не добавлены.
+                      </Typography>
+                    )}
+                    {review.comment ? (
+                      <Typography variant="body2">
+                        Комментарий: <b>{review.comment}</b>
+                      </Typography>
+                    ) : null}
+                  </Stack>
+                </Paper>
+              ))}
+            </Stack>
+          ) : (
+            <Typography variant="body2" color="text.secondary">
+              {isMasterViewer
+                ? "Вы еще не оставляли поведенческие комментарии по этому клиенту."
+                : "Пока нет поведенческих комментариев от мастеров."}
+            </Typography>
+          )}
         </Stack>
       </Paper>
 

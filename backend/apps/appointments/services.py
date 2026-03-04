@@ -6,7 +6,7 @@ from django.db import transaction
 from django.utils import timezone
 from rest_framework.exceptions import PermissionDenied, ValidationError
 
-from apps.accounts.models import MasterLevelChoices, RoleChoices, User
+from apps.accounts.models import RoleChoices, User
 from apps.platform.services import emit_event
 
 from .models import (
@@ -148,10 +148,6 @@ def take_appointment(appointment_id: int, master: User) -> Appointment:
         raise PermissionDenied("Только мастер может брать заявку")
     if not master.is_master_active:
         raise PermissionDenied("Мастер ещё не активирован администратором")
-    if not master.master_quality_approved:
-        raise PermissionDenied("Мастер не допущен к заявкам. Нужна проверка качества в админ-панели.")
-    if master.master_level == MasterLevelChoices.TRAINEE:
-        raise PermissionDenied("Уровень мастера недостаточен для заявок сервисных центров.")
 
     appointment = Appointment.objects.select_for_update().get(id=appointment_id)
     if appointment.status != AppointmentStatusChoices.NEW:
