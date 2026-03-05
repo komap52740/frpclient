@@ -25,6 +25,12 @@ const FAQ_ITEMS = [
   },
 ];
 
+const LANDING_STEPS = [
+  "Оставьте заявку: модель устройства и краткое описание проблемы.",
+  "Передайте данные RuDesktop и согласуйте работу с мастером в чате.",
+  "Оплатите услугу, загрузите чек и дождитесь завершения работ.",
+];
+
 function upsertMetaByName(name, content) {
   if (!name) return;
   let node = document.head.querySelector(`meta[name="${name}"]`);
@@ -86,7 +92,11 @@ function upsertJsonLd(payload) {
   node.textContent = JSON.stringify(payload);
 }
 
-function buildPublicJsonLd(origin) {
+function buildPublicJsonLd(origin, pathname) {
+  const normalized = pathname === "/" ? "/" : pathname.replace(/\/+$/, "");
+  const isLanding = normalized === "/remote-unlock";
+  const pageUrl = `${origin}${normalized}`;
+
   return {
     "@context": "https://schema.org",
     "@graph": [
@@ -97,6 +107,15 @@ function buildPublicJsonLd(origin) {
         inLanguage: "ru-RU",
       },
       {
+        "@type": "WebPage",
+        name: isLanding ? "Удаленная разблокировка устройств" : "Вход в FRP Client",
+        url: pageUrl,
+        inLanguage: "ru-RU",
+        description: isLanding
+          ? "Удаленная разблокировка устройств: онлайн-заявка, чат с мастером и прозрачные этапы выполнения работ."
+          : DEFAULT_DESCRIPTION,
+      },
+      {
         "@type": "ProfessionalService",
         name: SITE_NAME,
         serviceType: "Удаленная разблокировка устройств",
@@ -104,6 +123,18 @@ function buildPublicJsonLd(origin) {
         url: `${origin}/`,
         description: DEFAULT_DESCRIPTION,
       },
+      ...(isLanding
+        ? [
+            {
+              "@type": "HowTo",
+              name: "Как проходит удаленная разблокировка",
+              step: LANDING_STEPS.map((text) => ({
+                "@type": "HowToStep",
+                text,
+              })),
+            },
+          ]
+        : []),
       {
         "@type": "FAQPage",
         mainEntity: FAQ_ITEMS.map((item) => ({
@@ -121,12 +152,15 @@ function buildPublicJsonLd(origin) {
 
 function getRouteMeta(pathname) {
   const normalized = pathname === "/" ? "/" : pathname.replace(/\/+$/, "");
-  const isPublic = normalized === "/" || normalized === "/login";
+  const isPublic = normalized === "/" || normalized === "/login" || normalized === "/remote-unlock";
 
   if (isPublic) {
+    const isLanding = normalized === "/remote-unlock";
     return {
-      title: normalized === "/login" ? "Вход в FRP Client" : DEFAULT_TITLE,
-      description: DEFAULT_DESCRIPTION,
+      title: isLanding ? "Удаленная разблокировка устройств — FRP Client" : normalized === "/login" ? "Вход в FRP Client" : DEFAULT_TITLE,
+      description: isLanding
+        ? "Подача заявки онлайн, чат с мастером и прозрачные статусы работы. Подключение через RuDesktop без визита в сервис."
+        : DEFAULT_DESCRIPTION,
       robots: "index,follow",
       isPublic,
     };
@@ -172,7 +206,7 @@ export default function SeoMeta() {
     upsertMetaByProperty("og:image:alt", "FRP Client — удаленная разблокировка устройств");
     upsertMetaByProperty("og:locale", "ru_RU");
 
-    upsertJsonLd(routeMeta.isPublic ? buildPublicJsonLd(origin) : null);
+    upsertJsonLd(routeMeta.isPublic ? buildPublicJsonLd(origin, path) : null);
   }, [pathname]);
 
   return null;
