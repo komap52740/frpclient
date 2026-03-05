@@ -2,7 +2,7 @@
 import { useLocation } from "react-router-dom";
 
 const SITE_NAME = "FRP Client";
-const SITE_ORIGIN = "https://client.androidmultitool.ru";
+const SITE_ORIGIN = (import.meta.env.VITE_SITE_URL || "").replace(/\/+$/, "");
 const DEFAULT_TITLE = "FRP Client — удаленная разблокировка устройств";
 const DEFAULT_DESCRIPTION =
   "FRP Client — сервис удаленной разблокировки устройств: онлайн-заявка, чат с мастером и прозрачные статусы всех этапов.";
@@ -132,7 +132,7 @@ export default function SeoMeta() {
   const { pathname } = useLocation();
 
   useEffect(() => {
-    const origin = window.location.origin || SITE_ORIGIN;
+    const origin = SITE_ORIGIN || window.location.origin;
     const path = pathname || "/";
     const canonical = `${origin}${path}`;
     const routeMeta = getRouteMeta(path);
