@@ -148,7 +148,7 @@ function resolveScenario(appointment) {
       helper: "Опишите устройство и проблему. Обычно заполнение занимает до 2 минут.",
       ctaLabel: "Создать заявку",
       to: "/client/create",
-      tone: "#0d6e9f",
+      tone: "#2563eb",
       eta: "",
       tips: WAITING_TIPS.idle,
     };
@@ -160,7 +160,7 @@ function resolveScenario(appointment) {
       helper: "Оплатите и прикрепите чек. Это самый быстрый путь к старту работ.",
       ctaLabel: "Перейти к оплате",
       to: buildAppointmentLink(appointment.id, "payment"),
-      tone: "#d1890f",
+      tone: "#1d4ed8",
       eta: "",
       tips: WAITING_TIPS.payment,
     };
@@ -175,7 +175,7 @@ function resolveScenario(appointment) {
       helper: "Проверка обычно занимает 1-5 минут. Если есть вопрос — откройте чат.",
       ctaLabel: "Открыть заявку",
       to: buildAppointmentLink(appointment.id, "chat"),
-      tone: "#b8740f",
+      tone: "#1e40af",
       eta: responseEta != null ? `Проверка: ${formatEtaMinutes(responseEta)}` : "Проверка: 1-5 мин",
       tips: WAITING_TIPS.payment,
     };
@@ -195,7 +195,7 @@ function resolveScenario(appointment) {
       helper: "Следите за лентой событий и держите чат открытым для быстрых уточнений.",
       ctaLabel: "Открыть чат и статус",
       to: buildAppointmentLink(appointment.id, "chat"),
-      tone: "#0a567c",
+      tone: "#1e3a8a",
       eta: targetMinutes != null ? `Ожидание: ${formatEtaMinutes(targetMinutes)}` : "",
       tips: WAITING_TIPS.progress,
     };
@@ -207,7 +207,7 @@ function resolveScenario(appointment) {
       helper: "Ответьте мастеру, чтобы ускорить завершение заявки.",
       ctaLabel: "Перейти к диалогу",
       to: buildAppointmentLink(appointment.id, "chat"),
-      tone: "#7b2cbf",
+      tone: "#4338ca",
       eta: "",
       tips: WAITING_TIPS.review,
     };
@@ -218,7 +218,7 @@ function resolveScenario(appointment) {
     helper: "Все ключевые действия доступны на странице заявки в одном экране.",
     ctaLabel: "Открыть заявку",
     to: buildAppointmentLink(appointment.id, "timeline"),
-    tone: "#0d6e9f",
+    tone: "#2563eb",
     eta: "",
     tips: WAITING_TIPS.idle,
   };
@@ -359,8 +359,8 @@ export default function ClientHomePage() {
           minHeight: { xs: 132, sm: 146 },
           borderRadius: 1.8,
           background: isDark
-            ? "linear-gradient(135deg, #10213a 0%, #143744 48%, #174b3a 100%)"
-            : "linear-gradient(135deg, #0d6e9f 0%, #2e8a66 48%, #1c9a4d 100%)",
+            ? "linear-gradient(135deg, #0b1b34 0%, #10264a 46%, #1b3f7a 100%)"
+            : "linear-gradient(135deg, #1e3a8a 0%, #1d4ed8 48%, #2563eb 100%)",
           color: "#fff",
           position: "relative",
           overflow: "hidden",
@@ -374,7 +374,7 @@ export default function ClientHomePage() {
             width: 160,
             height: 160,
             borderRadius: "50%",
-            background: "rgba(255,255,255,0.16)",
+            background: "rgba(96, 165, 250, 0.22)",
           }}
         />
           <Stack spacing={1} sx={{ position: "relative" }}>
@@ -537,9 +537,9 @@ export default function ClientHomePage() {
           <Grid item xs={6} sm={6} lg={3}>
             <KpiCard title="Всего заявок" value={summary?.appointments_total ?? "-"} />
           </Grid>
-          <Grid item xs={6} sm={6} lg={3}>
-            <KpiCard title="Активные" value={summary?.appointments_active ?? "-"} accent="#2e8a66" />
-          </Grid>
+        <Grid item xs={6} sm={6} lg={3}>
+          <KpiCard title="Активные" value={summary?.appointments_active ?? "-"} accent="#3a76ff" />
+        </Grid>
           <Grid item xs={6} sm={6} lg={3}>
             <KpiCard title="Ожидают оплату" value={summary?.awaiting_payment ?? "-"} accent="#c97a00" />
           </Grid>
