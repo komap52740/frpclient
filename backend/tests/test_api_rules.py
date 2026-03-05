@@ -352,6 +352,31 @@ def test_upload_proof_accepts_heic_from_mobile_camera(client_user, master_user):
 
 
 @pytest.mark.django_db
+def test_upload_proof_accepts_heic_without_extension(client_user, master_user):
+    appointment = Appointment.objects.create(
+        client=client_user,
+        assigned_master=master_user,
+        brand="iPhone",
+        model="15",
+        lock_type="APPLE_ID",
+        has_pc=True,
+        description="desc",
+        status=AppointmentStatusChoices.AWAITING_PAYMENT,
+    )
+
+    proof = SimpleUploadedFile("camera_upload", b"heic-bytes", content_type="image/heic")
+    response = auth_as(client_user).post(
+        f"/api/appointments/{appointment.id}/upload-payment-proof/",
+        {"payment_proof": proof},
+        format="multipart",
+    )
+
+    assert response.status_code == 200
+    appointment.refresh_from_db()
+    assert appointment.status == AppointmentStatusChoices.PAYMENT_PROOF_UPLOADED
+
+
+@pytest.mark.django_db
 def test_start_only_from_paid(client_user, master_user):
     appointment = Appointment.objects.create(
         client=client_user,
@@ -826,8 +851,6 @@ def test_create_appointment_rejects_wholesale_fields_from_payload(client_user):
         "is_wholesale_request": True,
         "is_service_center": True,
         "wholesale_company_name": "FixLab",
-        "wholesale_comment": "15+ Р·Р°СЏРІРѕРє РІ РјРµСЃСЏС†",
-        "wholesale_service_details": "РЎРµСЂРІРёСЃРЅС‹Р№ С†РµРЅС‚СЂ СЃ РїРѕС‚РѕРєРѕРј Р·Р°СЏРІРѕРє, СЂР°Р±РѕС‚Р°РµРј СЃ Samsung/Xiaomi/Realme.",
         "wholesale_service_photo_1": service_photo,
     }
 
@@ -991,8 +1014,6 @@ def test_client_can_submit_wholesale_request(client_user):
             "wholesale_company_name": "FixLab",
             "wholesale_city": "Москва",
             "wholesale_address": "РњРѕСЃРєРІР°, СѓР». РўРµСЃС‚РѕРІР°СЏ, 10",
-            "wholesale_comment": "15 Р·Р°СЏРІРѕРє РІ РјРµСЃСЏС†",
-            "wholesale_service_details": "РЎРµСЂРІРёСЃРЅС‹Р№ С†РµРЅС‚СЂ СЃ РїРѕС‚РѕРєРѕРј 15+ Р·Р°СЏРІРѕРє РІ РјРµСЃСЏС†, СЃРїРµС†РёР°Р»РёР·Р°С†РёСЏ Samsung Рё Xiaomi",
             "wholesale_service_photo_1": service_photo,
         },
         format="multipart",
@@ -1006,7 +1027,8 @@ def test_client_can_submit_wholesale_request(client_user):
     assert client_user.wholesale_company_name == "FixLab"
     assert client_user.wholesale_city == "Москва"
     assert client_user.wholesale_address == "РњРѕСЃРєРІР°, СѓР». РўРµСЃС‚РѕРІР°СЏ, 10"
-    assert client_user.wholesale_service_details
+    assert client_user.wholesale_comment == ""
+    assert client_user.wholesale_service_details == ""
     assert bool(client_user.wholesale_service_photo_1)
 
 
@@ -1019,8 +1041,6 @@ def test_client_wholesale_request_requires_service_city(client_user):
             "is_service_center": True,
             "wholesale_company_name": "FixLab",
             "wholesale_address": "Москва, ул. Тестовая, 10",
-            "wholesale_comment": "15 заявок в месяц",
-            "wholesale_service_details": "Сервисный центр с потоком 15+ заявок в месяц, специализация Samsung и Xiaomi",
             "wholesale_service_photo_1": service_photo,
         },
         format="multipart",
@@ -1041,8 +1061,6 @@ def test_client_wholesale_request_requires_service_address(client_user):
             "is_service_center": True,
             "wholesale_company_name": "FixLab",
             "wholesale_city": "Москва",
-            "wholesale_comment": "15 заявок в месяц",
-            "wholesale_service_details": "Сервисный центр с потоком 15+ заявок в месяц, специализация Samsung и Xiaomi",
             "wholesale_service_photo_1": service_photo,
         },
         format="multipart",

@@ -511,7 +511,11 @@ class ClientTelegramBot:
                 type="appointment",
                 title=f"Новое сообщение в заявке #{appointment.id}",
                 message="Клиент отправил сообщение через Telegram-бот.",
-                payload={"appointment_id": appointment.id},
+                payload={
+                    "appointment_id": appointment.id,
+                    "target_role": "master",
+                    "master_id": appointment.assigned_master_id,
+                },
             )
         notify_master_about_client_chat_message(message)
         self.send_message(chat_id, f"Сообщение отправлено в заявку #{appointment.id}.")

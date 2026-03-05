@@ -337,12 +337,6 @@ export default function ClientProfileDetailPage() {
             Адрес: <b>{profile.wholesale_address || "—"}</b>
           </Typography>
           <Typography variant="body2">
-            Комментарий: <b>{profile.wholesale_comment || "—"}</b>
-          </Typography>
-          <Typography variant="body2">
-            Описание сервиса: <b>{profile.wholesale_service_details || "—"}</b>
-          </Typography>
-          <Typography variant="body2">
             Запросил опт: <b>{formatDate(profile.wholesale_requested_at)}</b>
           </Typography>
           <Typography variant="body2">

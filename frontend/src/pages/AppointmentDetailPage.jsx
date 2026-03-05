@@ -226,15 +226,40 @@ function validatePaymentRequisitesNote(value) {
   return "";
 }
 
+function extractApiErrorText(data) {
+  if (!data) return "";
+  if (typeof data === "string") return data.trim();
+  if (typeof data?.detail === "string") return data.detail.trim();
+  if (Array.isArray(data?.detail) && typeof data.detail[0] === "string") {
+    return data.detail[0].trim();
+  }
+
+  const priorityKeys = ["payment_proof", "non_field_errors", "error"];
+  for (const key of priorityKeys) {
+    const value = data?.[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
+    if (Array.isArray(value) && typeof value[0] === "string" && value[0].trim()) return value[0].trim();
+  }
+
+  for (const value of Object.values(data || {})) {
+    if (typeof value === "string" && value.trim()) return value.trim();
+    if (Array.isArray(value) && typeof value[0] === "string" && value[0].trim()) return value[0].trim();
+  }
+  return "";
+}
+
 function resolvePaymentUploadError(error) {
   const statusCode = error?.response?.status;
-  const rawDetail = error?.response?.data?.detail;
+  const rawDetail = extractApiErrorText(error?.response?.data);
   const detail = normalizeRuText(
-    typeof rawDetail === "string" && rawDetail.trim()
+    rawDetail
       ? rawDetail
       : "Не удалось загрузить чек. Проверьте файл и попробуйте снова."
   );
 
+  if (!error?.response) {
+    return "Нет соединения с сервером. Проверьте интернет и повторите загрузку.";
+  }
   if (statusCode === 413) {
     return "Файл слишком большой. Максимальный размер чека 100 МБ.";
   }

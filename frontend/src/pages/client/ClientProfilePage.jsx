@@ -87,8 +87,6 @@ export default function ClientProfilePage() {
     wholesale_company_name: user?.wholesale_company_name || "",
     wholesale_city: user?.wholesale_city || "",
     wholesale_address: user?.wholesale_address || "",
-    wholesale_comment: user?.wholesale_comment || "",
-    wholesale_service_details: user?.wholesale_service_details || "",
     wholesale_service_photo_1: null,
     wholesale_service_photo_2: null,
   });
@@ -166,7 +164,6 @@ export default function ClientProfilePage() {
     const company = (serviceForm.wholesale_company_name || "").trim();
     const city = (serviceForm.wholesale_city || "").trim();
     const address = (serviceForm.wholesale_address || "").trim();
-    const details = (serviceForm.wholesale_service_details || "").trim();
     if (!company) {
       setRequestError("Укажите название сервисного центра");
       return;
@@ -177,10 +174,6 @@ export default function ClientProfilePage() {
     }
     if (!address) {
       setRequestError("Укажите адрес сервисного центра");
-      return;
-    }
-    if (details.length < 20) {
-      setRequestError("Добавьте описание сервиса минимум 20 символов");
       return;
     }
     if (!serviceForm.wholesale_service_photo_1 && !serviceForm.wholesale_service_photo_2 && !hasExistingServicePhoto) {
@@ -197,8 +190,6 @@ export default function ClientProfilePage() {
       payload.append("wholesale_company_name", company);
       payload.append("wholesale_city", city);
       payload.append("wholesale_address", address);
-      payload.append("wholesale_comment", (serviceForm.wholesale_comment || "").trim());
-      payload.append("wholesale_service_details", details);
       if (serviceForm.wholesale_service_photo_1) payload.append("wholesale_service_photo_1", serviceForm.wholesale_service_photo_1);
       if (serviceForm.wholesale_service_photo_2) payload.append("wholesale_service_photo_2", serviceForm.wholesale_service_photo_2);
       await authApi.requestWholesale(payload);
@@ -215,8 +206,6 @@ export default function ClientProfilePage() {
           "wholesale_company_name",
           "wholesale_city",
           "wholesale_address",
-          "wholesale_service_details",
-          "wholesale_comment",
           "wholesale_service_photo_1",
           "wholesale_service_photo_2",
           "is_service_center",
@@ -431,22 +420,7 @@ export default function ClientProfilePage() {
                 onChange={(event) => updateServiceField("wholesale_address", event.target.value)}
                 helperText="Обязательно для заявки на оптовый статус"
               />
-              <TextField
-                label="Описание сервиса"
-                required
-                multiline
-                minRows={3}
-                value={serviceForm.wholesale_service_details}
-                onChange={(event) => updateServiceField("wholesale_service_details", event.target.value)}
-                helperText="Минимум 20 символов"
-              />
-              <TextField
-                label="Комментарий (опционально)"
-                multiline
-                minRows={2}
-                value={serviceForm.wholesale_comment}
-                onChange={(event) => updateServiceField("wholesale_comment", event.target.value)}
-              />
+              
               <Stack direction={{ xs: "column", sm: "row" }} spacing={1.1}>
                 <Button component="label" variant="outlined" startIcon={<AddPhotoAlternateRoundedIcon />}>
                   Фото сервиса 1

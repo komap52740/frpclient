@@ -187,8 +187,6 @@ export default function AdminClientsPage() {
         row.wholesale_company_name,
         row.wholesale_city,
         row.wholesale_address,
-        row.wholesale_comment,
-        row.wholesale_service_details,
         row.wholesale_priority_note,
       ]
         .filter(Boolean)
@@ -340,17 +338,6 @@ export default function AdminClientsPage() {
                       label={`SLA нарушено: ${row.appointments_sla_breached || 0}`}
                     />
                   </Stack>
-
-                  {row.wholesale_service_details ? (
-                    <Paper variant="outlined" sx={{ p: 1.2, borderRadius: 1.4 }}>
-                      <Typography variant="caption" color="text.secondary">
-                        Описание сервиса
-                      </Typography>
-                      <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>
-                        {row.wholesale_service_details}
-                      </Typography>
-                    </Paper>
-                  ) : null}
 
                   <Paper variant="outlined" sx={{ p: 1.2, borderRadius: 1.4 }}>
                     <Stack spacing={0.5}>

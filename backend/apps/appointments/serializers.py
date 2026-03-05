@@ -210,8 +210,6 @@ class AppointmentCreateSerializer(serializers.ModelSerializer):
     is_wholesale_request = serializers.BooleanField(write_only=True, required=False, default=False)
     is_service_center = serializers.BooleanField(write_only=True, required=False, default=False)
     wholesale_company_name = serializers.CharField(write_only=True, required=False, allow_blank=True, max_length=255)
-    wholesale_comment = serializers.CharField(write_only=True, required=False, allow_blank=True, max_length=500)
-    wholesale_service_details = serializers.CharField(write_only=True, required=False, allow_blank=True, max_length=2000)
     wholesale_service_photo_1 = serializers.FileField(write_only=True, required=False, allow_null=True)
     wholesale_service_photo_2 = serializers.FileField(write_only=True, required=False, allow_null=True)
 
@@ -221,8 +219,6 @@ class AppointmentCreateSerializer(serializers.ModelSerializer):
                 bool(attrs.get("is_wholesale_request")),
                 bool(attrs.get("is_service_center")),
                 bool((attrs.get("wholesale_company_name") or "").strip()),
-                bool((attrs.get("wholesale_comment") or "").strip()),
-                bool((attrs.get("wholesale_service_details") or "").strip()),
                 bool(attrs.get("wholesale_service_photo_1")),
                 bool(attrs.get("wholesale_service_photo_2")),
             )
@@ -254,8 +250,6 @@ class AppointmentCreateSerializer(serializers.ModelSerializer):
         validated_data.pop("is_wholesale_request", None)
         validated_data.pop("is_service_center", None)
         validated_data.pop("wholesale_company_name", None)
-        validated_data.pop("wholesale_comment", None)
-        validated_data.pop("wholesale_service_details", None)
         validated_data.pop("wholesale_service_photo_1", None)
         validated_data.pop("wholesale_service_photo_2", None)
         return super().create(validated_data)
@@ -275,8 +269,6 @@ class AppointmentCreateSerializer(serializers.ModelSerializer):
             "is_wholesale_request",
             "is_service_center",
             "wholesale_company_name",
-            "wholesale_comment",
-            "wholesale_service_details",
             "wholesale_service_photo_1",
             "wholesale_service_photo_2",
         )

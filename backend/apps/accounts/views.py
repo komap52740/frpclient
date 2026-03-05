@@ -1080,8 +1080,6 @@ def serialize_wholesale_status(user: User, request=None) -> dict:
             "wholesale_company_name": user.wholesale_company_name,
             "wholesale_city": user.wholesale_city,
             "wholesale_address": user.wholesale_address,
-            "wholesale_comment": user.wholesale_comment,
-            "wholesale_service_details": user.wholesale_service_details,
             "wholesale_service_photo_1_url": file_url(user.wholesale_service_photo_1),
             "wholesale_service_photo_2_url": file_url(user.wholesale_service_photo_2),
             "wholesale_requested_at": user.wholesale_requested_at,
@@ -1122,8 +1120,6 @@ class WholesaleRequestView(APIView):
         service_name = (payload.get("wholesale_company_name") or "").strip()
         service_city = (payload.get("wholesale_city") or "").strip()
         service_address = (payload.get("wholesale_address") or "").strip()
-        comment = (payload.get("wholesale_comment") or "").strip()
-        service_details = (payload.get("wholesale_service_details") or "").strip()
         service_photo_1 = payload.get("wholesale_service_photo_1")
         service_photo_2 = payload.get("wholesale_service_photo_2")
         effective_photo_1 = service_photo_1 if service_photo_1 is not None else user.wholesale_service_photo_1
@@ -1134,8 +1130,8 @@ class WholesaleRequestView(APIView):
         user.wholesale_company_name = service_name
         user.wholesale_city = service_city
         user.wholesale_address = service_address
-        user.wholesale_comment = comment
-        user.wholesale_service_details = service_details
+        user.wholesale_comment = ""
+        user.wholesale_service_details = ""
         update_fields.extend(
             [
                 "is_service_center",
@@ -1148,11 +1144,6 @@ class WholesaleRequestView(APIView):
         )
 
         if is_service_center:
-            if len(service_details) < 20:
-                return Response(
-                    {"detail": "Добавьте подробное описание сервиса (минимум 20 символов)"},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
             if not effective_photo_1 and not effective_photo_2:
                 return Response(
                     {"detail": "Добавьте хотя бы одно фото сервиса"},
@@ -1179,6 +1170,7 @@ class WholesaleRequestView(APIView):
             user.wholesale_priority_updated_at = None
             user.wholesale_city = ""
             user.wholesale_address = ""
+            user.wholesale_comment = ""
             user.wholesale_service_details = ""
             user.wholesale_service_photo_1 = None
             user.wholesale_service_photo_2 = None
@@ -1196,6 +1188,7 @@ class WholesaleRequestView(APIView):
                     "wholesale_priority_updated_at",
                     "wholesale_city",
                     "wholesale_address",
+                    "wholesale_comment",
                     "wholesale_service_details",
                     "wholesale_service_photo_1",
                     "wholesale_service_photo_2",
@@ -1238,7 +1231,6 @@ class WholesaleRequestView(APIView):
                     "company": service_name,
                     "city": service_city,
                     "address": service_address,
-                    "comment": comment,
                     "has_photo_1": bool(user.wholesale_service_photo_1),
                     "has_photo_2": bool(user.wholesale_service_photo_2),
                 },
@@ -1250,7 +1242,7 @@ class WholesaleRequestView(APIView):
                     type="system",
                     title="Новая оптовая заявка",
                     message=f"Клиент @{user.username} запросил оптовый статус",
-                    payload={"client_id": user.id},
+                    payload={"client_id": user.id, "target_role": RoleChoices.ADMIN, "admin_id": admin.id},
                 )
 
         return Response(serialize_wholesale_status(user, request=request), status=status.HTTP_200_OK)

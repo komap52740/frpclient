@@ -21,8 +21,22 @@ def validate_image_file(value):
 def validate_payment_proof(value):
     if not value:
         return
-    ext = os.path.splitext(value.name.lower())[1]
-    if ext not in {".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif", ".pdf"}:
+    ext = os.path.splitext((value.name or "").lower())[1]
+    allowed_extensions = {".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif", ".pdf"}
+    content_type = (getattr(value, "content_type", "") or "").lower().strip()
+    allowed_content_types = {
+        "image/jpeg",
+        "image/png",
+        "image/webp",
+        "image/heic",
+        "image/heif",
+        "image/heic-sequence",
+        "image/heif-sequence",
+        "application/pdf",
+    }
+    has_allowed_extension = ext in allowed_extensions
+    has_allowed_content_type = content_type in allowed_content_types
+    if not has_allowed_extension and not has_allowed_content_type:
         raise ValidationError("Чек должен быть jpg/jpeg/png/webp/heic/heif/pdf")
     if value.size > 100 * 1024 * 1024:
         raise ValidationError("Максимальный размер файла 100MB")

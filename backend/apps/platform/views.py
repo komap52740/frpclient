@@ -23,27 +23,30 @@ from .models import DailyMetrics, PlatformEvent, Rule
 
 def _notification_queryset_for_user(user):
     queryset = Notification.objects.filter(user=user)
+    user_role = user.role or (RoleChoices.ADMIN if getattr(user, "is_superuser", False) else "")
 
-    # Hide stale admin-only wholesale alerts for non-admin roles.
-    if user.role != RoleChoices.ADMIN:
+    # Optional explicit scoping flags in payload.
+    queryset = queryset.filter(Q(payload__target_user_id__isnull=True) | Q(payload__target_user_id=user.id))
+    queryset = queryset.filter(Q(payload__target_role__isnull=True) | Q(payload__target_role=user_role))
+    if user_role != RoleChoices.ADMIN:
         queryset = queryset.exclude(title__iexact="Новая оптовая заявка")
 
-    # Additional client scoping for mixed payloads.
-    if user.role == RoleChoices.CLIENT:
+    if user_role == RoleChoices.CLIENT:
+        appointment_ids = Appointment.objects.filter(client=user).values_list("id", flat=True)
+        queryset = queryset.filter(
+            Q(payload__appointment_id__isnull=True) | Q(payload__appointment_id__in=appointment_ids)
+        )
         queryset = queryset.filter(Q(payload__client_id__isnull=True) | Q(payload__client_id=user.id))
-        appointment_ids = list(
-            Appointment.objects.filter(client=user).values_list("id", flat=True)
-        )
+    elif user_role == RoleChoices.MASTER:
+        appointment_ids = Appointment.objects.filter(assigned_master=user).values_list("id", flat=True)
         queryset = queryset.filter(
             Q(payload__appointment_id__isnull=True) | Q(payload__appointment_id__in=appointment_ids)
         )
-    elif user.role == RoleChoices.MASTER:
-        appointment_ids = list(
-            Appointment.objects.filter(assigned_master=user).values_list("id", flat=True)
-        )
-        queryset = queryset.filter(
-            Q(payload__appointment_id__isnull=True) | Q(payload__appointment_id__in=appointment_ids)
-        )
+        queryset = queryset.filter(Q(payload__master_id__isnull=True) | Q(payload__master_id=user.id))
+    elif user_role == RoleChoices.ADMIN:
+        queryset = queryset.filter(Q(payload__admin_id__isnull=True) | Q(payload__admin_id=user.id))
+    else:
+        queryset = queryset.filter(payload__appointment_id__isnull=True)
 
     return queryset
 

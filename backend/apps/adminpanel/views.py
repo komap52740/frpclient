@@ -301,7 +301,7 @@ class AdminWholesaleReviewView(APIView):
                 if decision == "approve"
                 else "Оптовый статус отклонен. Уточните детали в чате с поддержкой."
             ),
-            payload={"decision": decision},
+            payload={"decision": decision, "client_id": user.id, "target_role": RoleChoices.CLIENT},
         )
         emit_event(
             "wholesale.reviewed",

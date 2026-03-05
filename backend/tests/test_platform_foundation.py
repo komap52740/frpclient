@@ -102,3 +102,62 @@ def test_notification_unread_count_and_mark_read():
     assert unread_response_after.status_code == 200
     assert unread_response_after.data["unread_count"] == 0
 
+
+@pytest.mark.django_db
+def test_notification_list_scopes_by_role_and_related_appointment():
+    client_user = User.objects.create_user(username="notif-client", password="x", role=RoleChoices.CLIENT)
+    other_client = User.objects.create_user(username="notif-client-2", password="x", role=RoleChoices.CLIENT)
+    viewer = auth_as(client_user)
+
+    own_appointment = Appointment.objects.create(
+        client=client_user,
+        brand="Samsung",
+        model="A50",
+        lock_type="PIN",
+        has_pc=True,
+        description="desc",
+    )
+    foreign_appointment = Appointment.objects.create(
+        client=other_client,
+        brand="Xiaomi",
+        model="Note",
+        lock_type="PIN",
+        has_pc=True,
+        description="desc",
+    )
+
+    visible = Notification.objects.create(
+        user=client_user,
+        type="appointment",
+        title="visible",
+        payload={
+            "appointment_id": own_appointment.id,
+            "target_role": RoleChoices.CLIENT,
+            "client_id": client_user.id,
+        },
+    )
+    Notification.objects.create(
+        user=client_user,
+        type="appointment",
+        title="foreign-appointment",
+        payload={"appointment_id": foreign_appointment.id, "target_role": RoleChoices.CLIENT, "client_id": client_user.id},
+    )
+    Notification.objects.create(
+        user=client_user,
+        type="system",
+        title="wrong-role",
+        payload={"target_role": RoleChoices.ADMIN},
+    )
+    Notification.objects.create(
+        user=client_user,
+        type="system",
+        title="wrong-client",
+        payload={"target_role": RoleChoices.CLIENT, "client_id": other_client.id},
+    )
+
+    response = viewer.get("/api/notifications/")
+    assert response.status_code == 200
+    ids = [item["id"] for item in response.data]
+    assert visible.id in ids
+    assert len(ids) == 1
+

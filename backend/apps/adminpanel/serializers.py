@@ -53,8 +53,6 @@ class AdminUserSerializer(serializers.ModelSerializer):
             "wholesale_company_name",
             "wholesale_city",
             "wholesale_address",
-            "wholesale_comment",
-            "wholesale_service_details",
             "wholesale_service_photo_1_url",
             "wholesale_service_photo_2_url",
             "wholesale_requested_at",

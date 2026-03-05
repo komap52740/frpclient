@@ -221,17 +221,31 @@ def _execute_action(rule: Rule, action: dict[str, Any], event, entity, context: 
             return
         title = action.get("title") or f"Правило: {rule.name}"
         message = action.get("message") or f"Сработало правило для события {event.event_type}"
+        base_payload = {
+            "rule_id": rule.id,
+            "event_id": event.id,
+            **(action.get("payload") or {}),
+        }
+        if appointment is not None and "appointment_id" not in base_payload:
+            base_payload["appointment_id"] = appointment.id
         for recipient in recipients:
+            payload = {
+                **base_payload,
+                "target_user_id": recipient.id,
+                "target_role": recipient.role,
+            }
+            if recipient.role == RoleChoices.CLIENT:
+                payload.setdefault("client_id", recipient.id)
+            elif recipient.role == RoleChoices.MASTER:
+                payload.setdefault("master_id", recipient.id)
+            elif recipient.role == RoleChoices.ADMIN:
+                payload.setdefault("admin_id", recipient.id)
             create_notification(
                 user=recipient,
                 type=action.get("notification_type", "system"),
                 title=title,
                 message=message,
-                payload={
-                    "rule_id": rule.id,
-                    "event_id": event.id,
-                    **(action.get("payload") or {}),
-                },
+                payload=payload,
             )
         return
 
@@ -271,7 +285,14 @@ def _execute_action(rule: Rule, action: dict[str, Any], event, entity, context: 
                 type="system",
                 title=title,
                 message=message,
-                payload={"rule_id": rule.id, "event_id": event.id},
+                payload={
+                    "rule_id": rule.id,
+                    "event_id": event.id,
+                    "target_role": RoleChoices.ADMIN,
+                    "target_user_id": admin_user.id,
+                    "admin_id": admin_user.id,
+                    **({"appointment_id": appointment.id} if appointment is not None else {}),
+                },
             )
 
 

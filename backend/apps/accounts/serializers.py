@@ -78,8 +78,6 @@ class MeSerializer(serializers.ModelSerializer):
             "wholesale_company_name",
             "wholesale_city",
             "wholesale_address",
-            "wholesale_comment",
-            "wholesale_service_details",
             "wholesale_service_photo_1_url",
             "wholesale_service_photo_2_url",
             "wholesale_requested_at",
@@ -234,8 +232,6 @@ class WholesaleRequestSerializer(serializers.Serializer):
     wholesale_company_name = serializers.CharField(max_length=255, required=False, allow_blank=True)
     wholesale_city = serializers.CharField(max_length=128, required=False, allow_blank=True)
     wholesale_address = serializers.CharField(max_length=255, required=False, allow_blank=True)
-    wholesale_comment = serializers.CharField(max_length=500, required=False, allow_blank=True)
-    wholesale_service_details = serializers.CharField(max_length=2000, required=False, allow_blank=True)
     wholesale_service_photo_1 = serializers.FileField(required=False, allow_null=True)
     wholesale_service_photo_2 = serializers.FileField(required=False, allow_null=True)
 
@@ -256,8 +252,6 @@ class WholesaleStatusSerializer(serializers.Serializer):
     wholesale_company_name = serializers.CharField(allow_blank=True)
     wholesale_city = serializers.CharField(allow_blank=True)
     wholesale_address = serializers.CharField(allow_blank=True)
-    wholesale_comment = serializers.CharField(allow_blank=True)
-    wholesale_service_details = serializers.CharField(allow_blank=True)
     wholesale_service_photo_1_url = serializers.CharField(allow_blank=True, allow_null=True)
     wholesale_service_photo_2_url = serializers.CharField(allow_blank=True, allow_null=True)
     wholesale_requested_at = serializers.DateTimeField(allow_null=True)
@@ -299,8 +293,6 @@ class ClientProfileDetailSerializer(serializers.ModelSerializer):
             "wholesale_company_name",
             "wholesale_city",
             "wholesale_address",
-            "wholesale_comment",
-            "wholesale_service_details",
             "wholesale_service_photo_1_url",
             "wholesale_service_photo_2_url",
             "wholesale_requested_at",

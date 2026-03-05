@@ -75,7 +75,12 @@ def create_client_signal(
             type="appointment",
             title=f"Сигнал по заявке #{appointment.id}",
             message=signal_meta["message"],
-            payload={"appointment_id": appointment.id, "signal": signal_code},
+            payload={
+                "appointment_id": appointment.id,
+                "signal": signal_code,
+                "target_role": "master",
+                "master_id": appointment.assigned_master_id,
+            },
         )
 
 
