@@ -16,6 +16,24 @@ const STEPS = [
   },
 ];
 
+const PRICING = [
+  { title: "Базовая разблокировка", price: "от 1 500 ₽", eta: "10-30 минут" },
+  { title: "Сложный кейс", price: "от 3 500 ₽", eta: "30-90 минут" },
+  { title: "Сервисный центр PRO", price: "индивидуально", eta: "SLA и приоритет" },
+];
+
+const WORK_EXAMPLES = [
+  { title: "Samsung A54", text: "FRP после сброса • 18 минут • 2 000 ₽" },
+  { title: "Xiaomi Redmi Note", text: "Google-аккаунт • 42 минуты • 3 200 ₽" },
+  { title: "Honor / Huawei", text: "Сложный вход • сессия с мастером • 4 500 ₽" },
+];
+
+const REVIEWS = [
+  { source: "Яндекс Карты", text: "Все этапы в одном окне. Цена согласована заранее, без сюрпризов." },
+  { source: "2ГИС", text: "Для сервисного центра удобно: поток заявок, понятные статусы, быстрый чат." },
+  { source: "VK отзывы", text: "Удаленно разблокировали в день обращения. История действий сохранилась." },
+];
+
 export default function RemoteUnlockLandingPage() {
   return (
     <Box
@@ -23,7 +41,7 @@ export default function RemoteUnlockLandingPage() {
         minHeight: "100vh",
         py: { xs: 3, md: 5 },
         background:
-          "radial-gradient(1100px 640px at -5% -15%, rgba(70,145,255,0.18) 0%, rgba(6,11,23,0) 55%), radial-gradient(800px 540px at 105% 0%, rgba(49,189,142,0.16) 0%, rgba(6,11,23,0) 58%), linear-gradient(170deg, #050a14 0%, #071225 46%, #060d1c 100%)",
+          "radial-gradient(1100px 640px at -5% -15%, rgba(70,145,255,0.18) 0%, rgba(6,11,23,0) 55%), radial-gradient(800px 540px at 105% 0%, rgba(90,132,255,0.16) 0%, rgba(6,11,23,0) 58%), linear-gradient(170deg, #050a14 0%, #071225 46%, #060d1c 100%)",
       }}
     >
       <Container maxWidth="lg">
@@ -129,6 +147,97 @@ export default function RemoteUnlockLandingPage() {
                   </Typography>
                 </Paper>
               ))}
+            </Box>
+
+            <Box
+              sx={{
+                display: "grid",
+                gap: 1.2,
+                gridTemplateColumns: { xs: "1fr", md: "repeat(3, minmax(0, 1fr))" },
+              }}
+            >
+              {PRICING.map((item) => (
+                <Paper
+                  key={item.title}
+                  elevation={0}
+                  sx={{
+                    p: 1.5,
+                    borderRadius: 2.2,
+                    border: "1px solid rgba(119,166,236,0.3)",
+                    bgcolor: "rgba(10,20,40,0.72)",
+                  }}
+                >
+                  <Typography sx={{ color: "#e5f2ff", fontWeight: 800, fontSize: 15 }}>{item.title}</Typography>
+                  <Typography sx={{ color: "#9ed0ff", fontWeight: 800, mt: 0.4 }}>{item.price}</Typography>
+                  <Typography sx={{ color: "rgba(205,224,247,0.86)", mt: 0.4, fontSize: 13.6 }}>{item.eta}</Typography>
+                </Paper>
+              ))}
+            </Box>
+
+            <Box
+              sx={{
+                display: "grid",
+                gap: 1.2,
+                gridTemplateColumns: { xs: "1fr", md: "repeat(2, minmax(0, 1fr))" },
+              }}
+            >
+              <Paper
+                elevation={0}
+                sx={{
+                  p: 1.7,
+                  borderRadius: 2.2,
+                  border: "1px solid rgba(119,166,236,0.3)",
+                  bgcolor: "rgba(10,20,40,0.72)",
+                }}
+              >
+                <Typography sx={{ color: "#e5f2ff", fontWeight: 800, mb: 0.9 }}>Примеры работ</Typography>
+                <Stack spacing={0.75}>
+                  {WORK_EXAMPLES.map((item) => (
+                    <Box
+                      key={item.title}
+                      sx={{
+                        p: 1,
+                        borderRadius: 1.7,
+                        border: "1px solid rgba(116,160,228,0.28)",
+                        bgcolor: "rgba(11,22,44,0.66)",
+                      }}
+                    >
+                      <Typography sx={{ color: "#e0efff", fontWeight: 700, fontSize: 13.5 }}>{item.title}</Typography>
+                      <Typography sx={{ color: "rgba(206,224,248,0.84)", mt: 0.35, fontSize: 13 }}>{item.text}</Typography>
+                    </Box>
+                  ))}
+                </Stack>
+              </Paper>
+
+              <Paper
+                elevation={0}
+                sx={{
+                  p: 1.7,
+                  borderRadius: 2.2,
+                  border: "1px solid rgba(119,166,236,0.3)",
+                  bgcolor: "rgba(10,20,40,0.72)",
+                }}
+              >
+                <Typography sx={{ color: "#e5f2ff", fontWeight: 800, mb: 0.9 }}>Независимые отзывы</Typography>
+                <Stack spacing={0.75}>
+                  {REVIEWS.map((item) => (
+                    <Box
+                      key={item.source}
+                      sx={{
+                        p: 1,
+                        borderRadius: 1.7,
+                        border: "1px solid rgba(116,160,228,0.28)",
+                        bgcolor: "rgba(11,22,44,0.66)",
+                      }}
+                    >
+                      <Typography sx={{ color: "#9ed0ff", fontWeight: 700, fontSize: 13 }}>{item.source}</Typography>
+                      <Typography sx={{ color: "rgba(206,224,248,0.84)", mt: 0.35, fontSize: 13, lineHeight: 1.42 }}>
+                        {item.text}
+                      </Typography>
+                    </Box>
+                  ))}
+                </Stack>
+              </Paper>
             </Box>
           </Stack>
         </Paper>

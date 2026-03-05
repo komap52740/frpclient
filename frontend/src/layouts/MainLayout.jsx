@@ -84,7 +84,7 @@ function buildWholesaleBadge(user) {
   if (status === "approved") {
     return {
       label: "Оптовый сервис",
-      color: "success",
+      color: "primary",
       variant: "filled",
     };
   }
@@ -362,17 +362,17 @@ export default function MainLayout({ children }) {
                 sx={{
                   ...chipControlSx,
                   display: { xs: "none", md: "inline-flex" },
-                  ...(wholesaleBadge.color === "success"
+                  ...(wholesaleBadge.color === "primary"
                     ? {
                         bgcolor: (themeValue) =>
                           themeValue.palette.mode === "dark"
-                            ? alpha(themeValue.palette.success.main, 0.2)
-                            : alpha(themeValue.palette.success.main, 0.12),
+                            ? alpha(themeValue.palette.primary.main, 0.2)
+                            : alpha(themeValue.palette.primary.main, 0.12),
                         color: (themeValue) =>
                           themeValue.palette.mode === "dark"
-                            ? alpha(themeValue.palette.success.light, 0.96)
-                            : alpha(themeValue.palette.success.dark, 0.95),
-                        borderColor: (themeValue) => alpha(themeValue.palette.success.main, 0.45),
+                            ? alpha(themeValue.palette.primary.light, 0.96)
+                            : alpha(themeValue.palette.primary.dark, 0.95),
+                        borderColor: (themeValue) => alpha(themeValue.palette.primary.main, 0.45),
                       }
                     : {}),
                 }}
@@ -472,5 +472,4 @@ export default function MainLayout({ children }) {
     </Box>
   );
 }
-
 
