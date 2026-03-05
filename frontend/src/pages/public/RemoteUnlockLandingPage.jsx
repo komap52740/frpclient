@@ -28,12 +28,6 @@ const WORK_EXAMPLES = [
   { title: "Honor / Huawei", text: "Сложный вход • сессия с мастером • 4 500 ₽" },
 ];
 
-const REVIEWS = [
-  { source: "Яндекс Карты", text: "Все этапы в одном окне. Цена согласована заранее, без сюрпризов." },
-  { source: "2ГИС", text: "Для сервисного центра удобно: поток заявок, понятные статусы, быстрый чат." },
-  { source: "VK отзывы", text: "Удаленно разблокировали в день обращения. История действий сохранилась." },
-];
-
 export default function RemoteUnlockLandingPage() {
   return (
     <Box
@@ -178,7 +172,7 @@ export default function RemoteUnlockLandingPage() {
               sx={{
                 display: "grid",
                 gap: 1.2,
-                gridTemplateColumns: { xs: "1fr", md: "repeat(2, minmax(0, 1fr))" },
+                gridTemplateColumns: "1fr",
               }}
             >
               <Paper
@@ -204,36 +198,6 @@ export default function RemoteUnlockLandingPage() {
                     >
                       <Typography sx={{ color: "#e0efff", fontWeight: 700, fontSize: 13.5 }}>{item.title}</Typography>
                       <Typography sx={{ color: "rgba(206,224,248,0.84)", mt: 0.35, fontSize: 13 }}>{item.text}</Typography>
-                    </Box>
-                  ))}
-                </Stack>
-              </Paper>
-
-              <Paper
-                elevation={0}
-                sx={{
-                  p: 1.7,
-                  borderRadius: 2.2,
-                  border: "1px solid rgba(119,166,236,0.3)",
-                  bgcolor: "rgba(10,20,40,0.72)",
-                }}
-              >
-                <Typography sx={{ color: "#e5f2ff", fontWeight: 800, mb: 0.9 }}>Независимые отзывы</Typography>
-                <Stack spacing={0.75}>
-                  {REVIEWS.map((item) => (
-                    <Box
-                      key={item.source}
-                      sx={{
-                        p: 1,
-                        borderRadius: 1.7,
-                        border: "1px solid rgba(116,160,228,0.28)",
-                        bgcolor: "rgba(11,22,44,0.66)",
-                      }}
-                    >
-                      <Typography sx={{ color: "#9ed0ff", fontWeight: 700, fontSize: 13 }}>{item.source}</Typography>
-                      <Typography sx={{ color: "rgba(206,224,248,0.84)", mt: 0.35, fontSize: 13, lineHeight: 1.42 }}>
-                        {item.text}
-                      </Typography>
                     </Box>
                   ))}
                 </Stack>

@@ -254,24 +254,6 @@ const LANDING_CASE_ITEMS = [
   },
 ];
 
-const LANDING_REVIEW_ITEMS = [
-  {
-    author: "Клиент, Москва",
-    source: "Яндекс Карты",
-    text: "Сделали удаленно в день обращения. По статусам сразу было видно, что и когда делают.",
-  },
-  {
-    author: "Сервисный центр, Казань",
-    source: "2ГИС",
-    text: "Отправляем поток заявок. Удобно, что есть чат и понятный контроль этапов.",
-  },
-  {
-    author: "Клиент, Новосибирск",
-    source: "VK отзывы",
-    text: "Без поездки в сервис, все закрыли через RuDesktop. Итог и история сохранились в карточке.",
-  },
-];
-
 export default function LoginPage() {
   const { loginWithTelegram, loginWithAccessToken, loginWithPassword } = useAuth();
   const navigate = useNavigate();
@@ -759,52 +741,6 @@ export default function LoginPage() {
                         fontWeight: 700,
                       }}
                     />
-                  </Box>
-                ))}
-              </Stack>
-            </Box>
-
-            <Box
-              sx={{
-                p: 1.4,
-                borderRadius: 2.2,
-                border: "1px solid rgba(120,170,255,0.28)",
-                background: "rgba(10,20,40,0.74)",
-              }}
-            >
-              <Stack direction="row" justifyContent="space-between" alignItems="center" flexWrap="wrap" useFlexGap sx={{ mb: 0.85 }}>
-                <Typography sx={{ fontWeight: 800, color: "#d6e9ff" }}>Независимые отзывы</Typography>
-                <Typography sx={{ color: "rgba(190,214,245,0.74)", fontSize: 12.6 }}>
-                  С внешних площадок
-                </Typography>
-              </Stack>
-              <Stack spacing={0.75}>
-                {LANDING_REVIEW_ITEMS.map((item) => (
-                  <Box
-                    key={`${item.author}-${item.source}`}
-                    sx={{
-                      p: 0.95,
-                      borderRadius: 1.7,
-                      border: "1px solid rgba(118,164,236,0.26)",
-                      background: "rgba(11,22,44,0.66)",
-                    }}
-                  >
-                    <Stack direction="row" spacing={0.8} alignItems="center" flexWrap="wrap" useFlexGap>
-                      <Typography sx={{ color: "#e0efff", fontWeight: 700, fontSize: 13 }}>{item.author}</Typography>
-                      <Chip
-                        size="small"
-                        label={item.source}
-                        sx={{
-                          color: "#d9ecff",
-                          bgcolor: "rgba(76,133,226,0.22)",
-                          border: "1px solid rgba(133,183,250,0.45)",
-                          fontWeight: 700,
-                        }}
-                      />
-                    </Stack>
-                    <Typography sx={{ color: "rgba(206,224,248,0.86)", fontSize: 12.6, mt: 0.45, lineHeight: 1.45 }}>
-                      {item.text}
-                    </Typography>
                   </Box>
                 ))}
               </Stack>
