@@ -1,0 +1,11 @@
+﻿User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /client/
+Disallow: /master/
+Disallow: /admin/
+Disallow: /appointments/
+Disallow: /clients/
+Disallow: /django-admin/
+
+Sitemap: https://client.androidmultitool.ru/sitemap.xml

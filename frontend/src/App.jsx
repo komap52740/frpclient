@@ -5,6 +5,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { useAuth } from "./auth/AuthContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import RoleHomeRedirect from "./components/RoleHomeRedirect";
+import SeoMeta from "./components/SeoMeta";
 import MainLayout from "./layouts/MainLayout";
 
 function isChunkLoadError(error) {
@@ -314,6 +315,7 @@ export default function App() {
   return (
     <RouteErrorBoundary>
       <Suspense fallback={<RouteFallback />}>
+        <SeoMeta />
         <Routes>
           <Route path="/login" element={user ? <Navigate to={isBannedClient ? "/banned" : "/"} replace /> : <LoginPage />} />
           <Route

@@ -197,6 +197,21 @@ const providerBadgeSx = {
   boxShadow: "inset 0 1px 0 rgba(255,255,255,0.24), 0 6px 14px rgba(0,0,0,0.28)",
 };
 
+const LOGIN_FAQ_ITEMS = [
+  {
+    question: "Можно ли работать полностью удаленно?",
+    answer: "Да. Все этапы ведутся онлайн: заявка, чат, оплата и сопровождение мастером.",
+  },
+  {
+    question: "Когда давать RuDesktop-данные?",
+    answer: "Можно сразу при создании заявки или позже в карточке, когда мастер запросит подключение.",
+  },
+  {
+    question: "Как контролировать процесс?",
+    answer: "В карточке заявки видны статусы и сообщения. Никаких скрытых этапов.",
+  },
+];
+
 export default function LoginPage() {
   const { loginWithTelegram, loginWithAccessToken, loginWithPassword } = useAuth();
   const navigate = useNavigate();
@@ -618,6 +633,35 @@ export default function LoginPage() {
                 <li>логин/ID и пароль RuDesktop для подключения;</li>
                 <li>подтверждение оплаты в карточке заявки.</li>
               </Box>
+            </Box>
+
+            <Box
+              sx={{
+                p: 1.4,
+                borderRadius: 2.2,
+                border: "1px solid rgba(120,170,255,0.28)",
+                background: "rgba(10,19,38,0.72)",
+              }}
+            >
+              <Typography sx={{ fontWeight: 800, color: "#d6e9ff", mb: 0.9 }}>Частые вопросы</Typography>
+              <Stack spacing={0.9}>
+                {LOGIN_FAQ_ITEMS.map((item) => (
+                  <Box
+                    key={item.question}
+                    sx={{
+                      p: 1,
+                      borderRadius: 1.7,
+                      border: "1px solid rgba(118,164,236,0.26)",
+                      background: "rgba(11,22,44,0.66)",
+                    }}
+                  >
+                    <Typography sx={{ color: "#e0efff", fontWeight: 700, fontSize: 13.3 }}>{item.question}</Typography>
+                    <Typography sx={{ color: "rgba(202,220,246,0.85)", fontSize: 12.9, lineHeight: 1.45, mt: 0.4 }}>
+                      {item.answer}
+                    </Typography>
+                  </Box>
+                ))}
+              </Stack>
             </Box>
 
             <Button
