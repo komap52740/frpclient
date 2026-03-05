@@ -158,11 +158,19 @@ const oauthTelegramShellSx = {
   border: "1.3px solid rgba(139,188,248,0.62)",
   background: "linear-gradient(145deg, rgba(28,53,96,0.9) 0%, rgba(17,34,67,0.92) 100%)",
   minHeight: AUTH_PROVIDER_BUTTON_HEIGHT,
-  px: 0.75,
-  py: 0.72,
+  px: 1.2,
+  py: 0.8,
   display: "flex",
   alignItems: "center",
+  justifyContent: "center",
   boxShadow: "0 12px 24px rgba(5,12,28,0.35), inset 0 1px 0 rgba(255,255,255,0.12)",
+  transition: "all .18s ease",
+  "&:hover": {
+    borderColor: "rgba(159,208,255,0.92)",
+    background: "linear-gradient(145deg, rgba(36,66,116,0.95) 0%, rgba(23,45,86,0.95) 100%)",
+    boxShadow: "0 16px 30px rgba(19,59,122,0.34)",
+    transform: "translateY(-1px)",
+  },
 };
 
 const oauthTelegramFallbackButtonSx = {
@@ -778,13 +786,7 @@ export default function LoginPage() {
               </Box>
             ) : (
               <Stack spacing={1.4}>
-                <Box
-                  sx={{
-                    display: "grid",
-                    gap: 1.2,
-                    gridTemplateColumns: { xs: "1fr", sm: "repeat(2, minmax(0, 1fr))" },
-                  }}
-                >
+                <Stack spacing={1.2}>
                   <Button
                     fullWidth
                     variant="outlined"
@@ -818,7 +820,7 @@ export default function LoginPage() {
                     variant="outlined"
                     disabled={loading}
                     onClick={() => startOAuthLogin("vk")}
-                    sx={{ ...oauthServiceButtonSx, gridColumn: { xs: "1", sm: "1 / -1" } }}
+                    sx={oauthServiceButtonSx}
                     startIcon={
                       <Box sx={providerBadgeSx}>
                         VK
@@ -827,7 +829,7 @@ export default function LoginPage() {
                   >
                     Войти через VK
                   </Button>
-                </Box>
+                </Stack>
 
                 {!BOT_USERNAME ? (
                   <Typography
@@ -845,24 +847,24 @@ export default function LoginPage() {
                         ref={telegramContainerRef}
                         sx={{
                           width: "100%",
-                          minHeight: AUTH_PROVIDER_BUTTON_HEIGHT - 8,
+                          minHeight: AUTH_PROVIDER_BUTTON_HEIGHT - 10,
                           display: "flex",
                           alignItems: "center",
+                          justifyContent: "center",
                           borderRadius: 2.2,
                           overflow: "hidden",
                           "& > *": {
-                            width: "100% !important",
                             maxWidth: "100% !important",
                           },
                           "& iframe": {
-                            width: "100% !important",
-                            minWidth: "100% !important",
-                            maxWidth: "100% !important",
-                            minHeight: `${AUTH_PROVIDER_BUTTON_HEIGHT - 8}px !important`,
+                            display: "block",
+                            margin: "0 auto",
+                            minHeight: `${AUTH_PROVIDER_BUTTON_HEIGHT - 10}px !important`,
+                            borderRadius: "10px !important",
                           },
                           "& a": {
-                            width: "100% !important",
-                            maxWidth: "100% !important",
+                            display: "inline-flex !important",
+                            margin: "0 auto !important",
                           },
                         }}
                       />
