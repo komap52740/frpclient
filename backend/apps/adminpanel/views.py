@@ -2,14 +2,17 @@ from __future__ import annotations
 
 import io
 import time
+from datetime import timedelta
 
 from django.conf import settings
 from django.core.mail import get_connection, send_mail
 from django.core.management import call_command
 from django.db import connection
-from django.db.models import Count, Q
+from django.db.models import Avg, Count, DurationField, ExpressionWrapper, F, Q, Sum
+from django.db.models.functions import TruncDate
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
+from django.utils.dateparse import parse_date
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import generics, permissions, status
 from rest_framework.exceptions import PermissionDenied
@@ -51,6 +54,16 @@ def _master_level_to_tier(level: str) -> str:
 
 def _master_tier_to_level(tier: str) -> str:
     return MasterLevelChoices.SENIOR if tier == "senior" else MasterLevelChoices.JUNIOR
+
+
+def _can_view_staff_tools(user) -> bool:
+    return bool(user and (user.is_superuser or user.role in {RoleChoices.ADMIN, RoleChoices.MASTER}))
+
+
+def _scoped_appointments_for_report(user):
+    if user.is_superuser or user.role == RoleChoices.ADMIN:
+        return Appointment.objects.all()
+    return Appointment.objects.filter(assigned_master=user)
 
 
 class AdminAppointmentListView(generics.ListAPIView):
@@ -137,6 +150,7 @@ class AdminClientsView(generics.ListAPIView):
         )
         return (
             User.objects.filter(role=RoleChoices.CLIENT)
+            .select_related("wholesale_verified_by")
             .annotate(
                 appointments_total=Count("client_appointments", distinct=True),
                 appointments_active=Count(
@@ -208,6 +222,8 @@ class AdminWholesaleReviewView(APIView):
             "wholesale_requested_at",
             "wholesale_reviewed_at",
             "wholesale_review_comment",
+            "wholesale_verified_at",
+            "wholesale_verified_by",
             "is_service_center",
             "updated_at",
         ]
@@ -218,10 +234,14 @@ class AdminWholesaleReviewView(APIView):
 
         if decision == "approve":
             user.wholesale_status = WholesaleStatusChoices.APPROVED
+            user.wholesale_verified_at = reviewed_at
+            user.wholesale_verified_by = request.user
             if not user.wholesale_priority:
                 user.wholesale_priority = WholesalePriorityChoices.STANDARD
         else:
             user.wholesale_status = WholesaleStatusChoices.REJECTED
+            user.wholesale_verified_at = None
+            user.wholesale_verified_by = None
             user.wholesale_priority = WholesalePriorityChoices.STANDARD
             user.wholesale_priority_note = ""
             user.wholesale_priority_updated_at = None
@@ -254,7 +274,7 @@ class AdminWholesaleReviewView(APIView):
             "wholesale.reviewed",
             user,
             actor=request.user,
-            payload={"decision": decision},
+            payload={"decision": decision, "verified_by": request.user.id if decision == "approve" else None},
         )
 
         return Response(AdminUserSerializer(user).data, status=status.HTTP_200_OK)
@@ -298,6 +318,123 @@ class AdminWholesalePriorityView(APIView):
             payload={"priority": priority, "note": note},
         )
         return Response(AdminUserSerializer(user).data, status=status.HTTP_200_OK)
+
+
+class AdminFinanceSummaryView(APIView):
+    permission_classes = (IsAuthenticatedAndNotBanned,)
+
+    def get(self, request):
+        if not _can_view_staff_tools(request.user):
+            return Response({"detail": "Недостаточно прав"}, status=status.HTTP_403_FORBIDDEN)
+
+        queryset = _scoped_appointments_for_report(request.user)
+
+        today = timezone.localdate()
+        date_from = parse_date(request.query_params.get("from") or "") or (today - timedelta(days=6))
+        date_to = parse_date(request.query_params.get("to") or "") or today
+        if date_from > date_to:
+            date_from, date_to = date_to, date_from
+
+        paid_queryset = queryset.filter(payment_confirmed_at__isnull=False)
+        in_work_queryset = queryset.filter(status__in=[AppointmentStatusChoices.PAID, AppointmentStatusChoices.IN_PROGRESS])
+        period_queryset = paid_queryset.filter(
+            payment_confirmed_at__date__gte=date_from,
+            payment_confirmed_at__date__lte=date_to,
+        )
+
+        payload = {
+            "scope": "admin" if (request.user.is_superuser or request.user.role == RoleChoices.ADMIN) else "master",
+            "currency": "RUB",
+            "date_from": str(date_from),
+            "date_to": str(date_to),
+            "paid_total": int(paid_queryset.aggregate(v=Sum("total_price"))["v"] or 0),
+            "paid_count": paid_queryset.count(),
+            "in_work_total": int(in_work_queryset.aggregate(v=Sum("total_price"))["v"] or 0),
+            "in_work_count": in_work_queryset.count(),
+            "period_total": int(period_queryset.aggregate(v=Sum("total_price"))["v"] or 0),
+            "period_count": period_queryset.count(),
+        }
+        return Response(payload, status=status.HTTP_200_OK)
+
+
+class WeeklyPerformanceReportView(APIView):
+    permission_classes = (IsAuthenticatedAndNotBanned,)
+
+    def get(self, request):
+        if not _can_view_staff_tools(request.user):
+            return Response({"detail": "Недостаточно прав"}, status=status.HTTP_403_FORBIDDEN)
+
+        queryset = _scoped_appointments_for_report(request.user)
+        now = timezone.now()
+        week_start = now - timedelta(days=7)
+
+        weekly_queryset = queryset.filter(created_at__gte=week_start, created_at__lte=now)
+        closed_queryset = queryset.filter(
+            completed_at__isnull=False,
+            completed_at__gte=week_start,
+            completed_at__lte=now,
+        )
+        first_response_agg = (
+            queryset.filter(
+                taken_at__isnull=False,
+                taken_at__gte=week_start,
+                taken_at__lte=now,
+            )
+            .annotate(
+                response_time=ExpressionWrapper(F("taken_at") - F("created_at"), output_field=DurationField())
+            )
+            .aggregate(avg=Avg("response_time"))
+        )
+        completion_agg = (
+            closed_queryset.annotate(
+                completion_time=ExpressionWrapper(F("completed_at") - F("created_at"), output_field=DurationField())
+            ).aggregate(avg=Avg("completion_time"))
+        )
+
+        def _seconds(duration):
+            return round(duration.total_seconds(), 2) if duration else 0.0
+
+        problematic_count = (
+            weekly_queryset.filter(
+                Q(sla_breached=True)
+                | Q(status__in=[AppointmentStatusChoices.CANCELLED, AppointmentStatusChoices.DECLINED_BY_MASTER])
+                | Q(client__client_stats__risk_level__in=["high", "critical"])
+            )
+            .distinct()
+            .count()
+        )
+
+        daily_rows = (
+            weekly_queryset.annotate(day=TruncDate("created_at"))
+            .values("day")
+            .annotate(
+                total=Count("id"),
+                closed=Count("id", filter=Q(status=AppointmentStatusChoices.COMPLETED)),
+                sla_breached=Count("id", filter=Q(sla_breached=True)),
+            )
+            .order_by("day")
+        )
+
+        payload = {
+            "scope": "admin" if (request.user.is_superuser or request.user.role == RoleChoices.ADMIN) else "master",
+            "date_from": week_start.date().isoformat(),
+            "date_to": now.date().isoformat(),
+            "sla_breached_count": weekly_queryset.filter(sla_breached=True).count(),
+            "avg_first_response_seconds": _seconds(first_response_agg.get("avg")),
+            "avg_completion_seconds": _seconds(completion_agg.get("avg")),
+            "closed_count": closed_queryset.count(),
+            "problematic_cases_count": problematic_count,
+            "daily": [
+                {
+                    "date": row["day"].isoformat() if row.get("day") else "",
+                    "total": row.get("total", 0),
+                    "closed": row.get("closed", 0),
+                    "sla_breached": row.get("sla_breached", 0),
+                }
+                for row in daily_rows
+            ],
+        }
+        return Response(payload, status=status.HTTP_200_OK)
 
 
 class AdminMastersView(generics.ListAPIView):

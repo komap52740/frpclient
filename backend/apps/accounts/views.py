@@ -1058,7 +1058,7 @@ class ClientProfileDetailView(APIView):
             return Response({"detail": "Недостаточно прав"}, status=status.HTTP_403_FORBIDDEN)
 
         client_user = get_object_or_404(
-            User.objects.select_related("client_stats"),
+            User.objects.select_related("client_stats", "wholesale_verified_by"),
             id=user_id,
             role=RoleChoices.CLIENT,
         )
@@ -1087,6 +1087,9 @@ def serialize_wholesale_status(user: User, request=None) -> dict:
             "wholesale_requested_at": user.wholesale_requested_at,
             "wholesale_reviewed_at": user.wholesale_reviewed_at,
             "wholesale_review_comment": user.wholesale_review_comment,
+            "wholesale_verified_at": user.wholesale_verified_at,
+            "wholesale_verified_by": user.wholesale_verified_by_id,
+            "wholesale_verified_by_username": user.wholesale_verified_by.username if user.wholesale_verified_by_id else "",
             "wholesale_priority_note": user.wholesale_priority_note,
             "wholesale_priority_updated_at": user.wholesale_priority_updated_at,
         }
@@ -1169,6 +1172,8 @@ class WholesaleRequestView(APIView):
             user.wholesale_requested_at = None
             user.wholesale_reviewed_at = None
             user.wholesale_review_comment = ""
+            user.wholesale_verified_at = None
+            user.wholesale_verified_by = None
             user.wholesale_priority = WholesalePriorityChoices.STANDARD
             user.wholesale_priority_note = ""
             user.wholesale_priority_updated_at = None
@@ -1184,6 +1189,8 @@ class WholesaleRequestView(APIView):
                     "wholesale_requested_at",
                     "wholesale_reviewed_at",
                     "wholesale_review_comment",
+                    "wholesale_verified_at",
+                    "wholesale_verified_by",
                     "wholesale_priority",
                     "wholesale_priority_note",
                     "wholesale_priority_updated_at",
@@ -1200,6 +1207,8 @@ class WholesaleRequestView(APIView):
                 user.wholesale_requested_at = timezone.now()
                 user.wholesale_reviewed_at = None
                 user.wholesale_review_comment = ""
+                user.wholesale_verified_at = None
+                user.wholesale_verified_by = None
                 if previous_status != WholesaleStatusChoices.APPROVED:
                     user.wholesale_priority = WholesalePriorityChoices.STANDARD
                     user.wholesale_priority_note = ""
@@ -1210,6 +1219,8 @@ class WholesaleRequestView(APIView):
                         "wholesale_requested_at",
                         "wholesale_reviewed_at",
                         "wholesale_review_comment",
+                        "wholesale_verified_at",
+                        "wholesale_verified_by",
                         "wholesale_priority",
                         "wholesale_priority_note",
                         "wholesale_priority_updated_at",

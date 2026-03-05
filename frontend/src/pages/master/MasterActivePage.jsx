@@ -8,10 +8,15 @@ import {
   Alert,
   Box,
   Button,
+  Checkbox,
   Chip,
   Divider,
+  FormControl,
+  InputLabel,
+  MenuItem,
   InputAdornment,
   Paper,
+  Select,
   Stack,
   TextField,
   Typography,
@@ -20,7 +25,7 @@ import dayjs from "dayjs";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { appointmentsApi, authApi } from "../../api/client";
+import { adminApi, appointmentsApi, authApi } from "../../api/client";
 import AppointmentCardSkeleton from "../../components/ui/skeletons/AppointmentCardSkeleton";
 import { getStatusLabel } from "../../constants/labels";
 import useAutoRefresh from "../../hooks/useAutoRefresh";
@@ -32,6 +37,12 @@ const FILTERS = [
   { key: "sla", label: "SLA", hotkey: "Alt+4" },
   { key: "pro", label: "Service PRO", hotkey: "Alt+5" },
   { key: "all", label: "Все", hotkey: "Alt+6" },
+];
+
+const BULK_ACTION_OPTIONS = [
+  { value: "send_template", label: "Шаблонный ответ" },
+  { value: "start_work", label: "Старт работы (PAID -> IN_PROGRESS)" },
+  { value: "complete_work", label: "Завершить работу (IN_PROGRESS -> COMPLETED)" },
 ];
 
 function computeUrgencyScore(item) {
@@ -80,6 +91,18 @@ function getPriorityUi(priority) {
   return { color: "default", label: "PRO: стандарт" };
 }
 
+function formatRub(value) {
+  const amount = Number(value || 0);
+  return `${amount.toLocaleString("ru-RU")} ₽`;
+}
+
+function formatDuration(valueSeconds) {
+  const seconds = Number(valueSeconds || 0);
+  if (!seconds) return "—";
+  const minutes = Math.round(seconds / 60);
+  return `${minutes} мин`;
+}
+
 function matchFilter(item, filterKey) {
   const unread = item.unread_count || 0;
   const deadline = item.completion_deadline_at || item.response_deadline_at;
@@ -114,19 +137,37 @@ export default function MasterActivePage() {
   const [filterKey, setFilterKey] = useState("urgent");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedId, setSelectedId] = useState(null);
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [bulkAction, setBulkAction] = useState("send_template");
+  const [bulkMessage, setBulkMessage] = useState("");
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [bulkResult, setBulkResult] = useState(null);
+  const [financeSummary, setFinanceSummary] = useState(null);
+  const [weeklyReport, setWeeklyReport] = useState(null);
 
   const load = useCallback(async ({ silent = false, withLoading = true } = {}) => {
     if (withLoading) {
       setLoading(true);
     }
     try {
-      const [appointmentsResponse, summaryData] = await Promise.all([
+      const [appointmentsResponse, summaryData, financeResponse, weeklyResponse] = await Promise.allSettled([
         appointmentsApi.activeList(),
         authApi.dashboardSummary(),
+        adminApi.financeSummary(),
+        adminApi.weeklyReport(),
       ]);
-      const ordered = sortByUrgency(appointmentsResponse.data || []);
+      if (appointmentsResponse.status !== "fulfilled" || summaryData.status !== "fulfilled") {
+        throw new Error("failed_to_load_master_dashboard");
+      }
+      const ordered = sortByUrgency(appointmentsResponse.value.data || []);
       setItems(ordered);
-      setSummary(summaryData.counts || {});
+      setSummary(summaryData.value.counts || {});
+      if (financeResponse.status === "fulfilled") {
+        setFinanceSummary(financeResponse.value.data || null);
+      }
+      if (weeklyResponse.status === "fulfilled") {
+        setWeeklyReport(weeklyResponse.value.data || null);
+      }
       setError("");
       setSelectedId((prev) => prev ?? ordered[0]?.id ?? null);
     } catch {
@@ -174,11 +215,13 @@ export default function MasterActivePage() {
   useEffect(() => {
     if (!visibleItems.length) {
       setSelectedId(null);
+      setSelectedIds([]);
       return;
     }
     if (!visibleItems.some((item) => item.id === selectedId)) {
       setSelectedId(visibleItems[0].id);
     }
+    setSelectedIds((prev) => prev.filter((id) => visibleItems.some((item) => item.id === id)));
   }, [selectedId, visibleItems]);
 
   useEffect(() => {
@@ -230,6 +273,55 @@ export default function MasterActivePage() {
     return () => window.removeEventListener("keydown", handler);
   }, [navigate, selectedItem, visibleItems]);
 
+  const selectedCount = selectedIds.length;
+  const allVisibleSelected = visibleItems.length > 0 && visibleItems.every((item) => selectedIds.includes(item.id));
+
+  const toggleSelectAllVisible = () => {
+    if (allVisibleSelected) {
+      setSelectedIds((prev) => prev.filter((id) => !visibleItems.some((item) => item.id === id)));
+      return;
+    }
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      visibleItems.forEach((item) => next.add(item.id));
+      return Array.from(next);
+    });
+  };
+
+  const toggleSelectOne = (appointmentId) => {
+    setSelectedIds((prev) => {
+      if (prev.includes(appointmentId)) {
+        return prev.filter((id) => id !== appointmentId);
+      }
+      return [...prev, appointmentId];
+    });
+  };
+
+  const runBulkAction = async () => {
+    if (!selectedCount || bulkBusy) return;
+    setBulkBusy(true);
+    setBulkResult(null);
+    try {
+      const payload = {
+        appointment_ids: selectedIds,
+        action: bulkAction,
+        message_text: bulkMessage,
+      };
+      const response = await appointmentsApi.bulkAction(payload);
+      setBulkResult(response.data || null);
+      if (bulkAction === "send_template") {
+        setBulkMessage("");
+      }
+      await load({ silent: true, withLoading: false });
+    } catch (requestError) {
+      setBulkResult({
+        error: requestError?.response?.data?.detail || "Не удалось выполнить bulk-действие",
+      });
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+
   return (
     <Stack spacing={2}>
       <Stack direction={{ xs: "column", md: "row" }} spacing={1} justifyContent="space-between" alignItems={{ xs: "flex-start", md: "center" }}>
@@ -246,6 +338,98 @@ export default function MasterActivePage() {
           </Button>
         </Stack>
       </Stack>
+
+      {financeSummary ? (
+        <Paper sx={{ p: 1.2, borderRadius: 2 }}>
+          <Stack direction={{ xs: "column", md: "row" }} spacing={1} alignItems={{ xs: "flex-start", md: "center" }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
+              Финансовый блок
+            </Typography>
+            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+              <Chip size="small" color="success" variant="outlined" label={`Оплачено: ${formatRub(financeSummary.paid_total)}`} />
+              <Chip size="small" color="info" variant="outlined" label={`В работе: ${formatRub(financeSummary.in_work_total)}`} />
+              <Chip size="small" color="primary" variant="outlined" label={`За период: ${formatRub(financeSummary.period_total)}`} />
+            </Stack>
+          </Stack>
+        </Paper>
+      ) : null}
+
+      {weeklyReport ? (
+        <Paper sx={{ p: 1.2, borderRadius: 2 }}>
+          <Stack direction={{ xs: "column", md: "row" }} spacing={1} alignItems={{ xs: "flex-start", md: "center" }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
+              Еженедельный отчет
+            </Typography>
+            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+              <Chip size="small" variant="outlined" label={`SLA нарушено: ${weeklyReport.sla_breached_count || 0}`} />
+              <Chip size="small" variant="outlined" label={`Ответ: ${formatDuration(weeklyReport.avg_first_response_seconds)}`} />
+              <Chip size="small" variant="outlined" label={`Закрыто: ${weeklyReport.closed_count || 0}`} />
+              <Chip
+                size="small"
+                color={(weeklyReport.problematic_cases_count || 0) > 0 ? "warning" : "default"}
+                variant={(weeklyReport.problematic_cases_count || 0) > 0 ? "filled" : "outlined"}
+                label={`Проблемные кейсы: ${weeklyReport.problematic_cases_count || 0}`}
+              />
+            </Stack>
+          </Stack>
+        </Paper>
+      ) : null}
+
+      <Paper sx={{ p: 1.4, borderRadius: 2 }}>
+        <Stack spacing={1}>
+          <Stack direction={{ xs: "column", md: "row" }} spacing={1} alignItems={{ xs: "flex-start", md: "center" }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
+              Bulk-действия по очереди
+            </Typography>
+            <Chip
+              size="small"
+              variant={selectedCount ? "filled" : "outlined"}
+              color={selectedCount ? "primary" : "default"}
+              label={`Выбрано: ${selectedCount}`}
+            />
+            <Button size="small" variant="outlined" onClick={toggleSelectAllVisible}>
+              {allVisibleSelected ? "Снять выделение" : "Выбрать все в фильтре"}
+            </Button>
+          </Stack>
+          <Stack direction={{ xs: "column", md: "row" }} spacing={1}>
+            <FormControl size="small" sx={{ minWidth: { xs: "100%", md: 300 } }}>
+              <InputLabel id="bulk-action-label">Действие</InputLabel>
+              <Select
+                labelId="bulk-action-label"
+                label="Действие"
+                value={bulkAction}
+                onChange={(event) => setBulkAction(event.target.value)}
+              >
+                {BULK_ACTION_OPTIONS.map((option) => (
+                  <MenuItem key={option.value} value={option.value}>
+                    {option.label}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <TextField
+              size="small"
+              fullWidth
+              label="Текст сообщения (для шаблонного ответа)"
+              value={bulkMessage}
+              onChange={(event) => setBulkMessage(event.target.value)}
+            />
+            <Button
+              variant="contained"
+              disabled={bulkBusy || !selectedCount || (bulkAction === "send_template" && !bulkMessage.trim())}
+              onClick={runBulkAction}
+            >
+              {bulkBusy ? "Выполняем..." : "Применить"}
+            </Button>
+          </Stack>
+          {bulkResult?.error ? <Alert severity="error">{bulkResult.error}</Alert> : null}
+          {bulkResult?.processed_count != null ? (
+            <Alert severity="success">
+              Обработано: {bulkResult.processed_count}. Пропущено: {bulkResult.skipped?.length || 0}.
+            </Alert>
+          ) : null}
+        </Stack>
+      </Paper>
 
       <Paper sx={{ p: 1.5, borderRadius: 2 }}>
         <Stack spacing={1}>
@@ -324,6 +508,7 @@ export default function MasterActivePage() {
             <Stack divider={<Divider />}>
               {visibleItems.map((item) => {
                 const selected = selectedItem?.id === item.id;
+                const selectedInBulk = selectedIds.includes(item.id);
                 const priorityUi = getPriorityUi(item.client_wholesale_priority);
                 return (
                   <Box
@@ -341,6 +526,12 @@ export default function MasterActivePage() {
                     <Stack direction={{ xs: "column", md: "row" }} spacing={1} justifyContent="space-between">
                       <Stack spacing={0.45} sx={{ minWidth: 0 }}>
                         <Stack direction="row" spacing={0.7} alignItems="center" flexWrap="wrap" useFlexGap>
+                          <Checkbox
+                            size="small"
+                            checked={selectedInBulk}
+                            onClick={(event) => event.stopPropagation()}
+                            onChange={() => toggleSelectOne(item.id)}
+                          />
                           <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
                             #{item.id} • {item.brand} {item.model}
                           </Typography>

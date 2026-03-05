@@ -53,6 +53,7 @@ class MeSerializer(serializers.ModelSerializer):
     profile_photo_url = serializers.SerializerMethodField()
     wholesale_service_photo_1_url = serializers.SerializerMethodField()
     wholesale_service_photo_2_url = serializers.SerializerMethodField()
+    wholesale_verified_by_username = serializers.SerializerMethodField()
 
     class Meta:
         model = User
@@ -84,6 +85,9 @@ class MeSerializer(serializers.ModelSerializer):
             "wholesale_requested_at",
             "wholesale_reviewed_at",
             "wholesale_review_comment",
+            "wholesale_verified_at",
+            "wholesale_verified_by",
+            "wholesale_verified_by_username",
             "wholesale_priority",
             "wholesale_priority_note",
             "wholesale_priority_updated_at",
@@ -114,6 +118,10 @@ class MeSerializer(serializers.ModelSerializer):
 
     def get_profile_photo_url(self, obj: User):
         return self._build_file_url(obj, "profile_photo")
+
+    def get_wholesale_verified_by_username(self, obj: User):
+        verifier = getattr(obj, "wholesale_verified_by", None)
+        return getattr(verifier, "username", "") if verifier else ""
 
 
 class MasterStatsSerializer(serializers.ModelSerializer):
@@ -255,6 +263,9 @@ class WholesaleStatusSerializer(serializers.Serializer):
     wholesale_requested_at = serializers.DateTimeField(allow_null=True)
     wholesale_reviewed_at = serializers.DateTimeField(allow_null=True)
     wholesale_review_comment = serializers.CharField(allow_blank=True)
+    wholesale_verified_at = serializers.DateTimeField(allow_null=True)
+    wholesale_verified_by = serializers.IntegerField(allow_null=True)
+    wholesale_verified_by_username = serializers.CharField(allow_blank=True)
     wholesale_priority_note = serializers.CharField(allow_blank=True)
     wholesale_priority_updated_at = serializers.DateTimeField(allow_null=True)
 
@@ -269,6 +280,7 @@ class ClientProfileDetailSerializer(serializers.ModelSerializer):
     appointments_completed = serializers.SerializerMethodField()
     last_appointment_at = serializers.SerializerMethodField()
     master_behavior_reviews = serializers.SerializerMethodField()
+    wholesale_verified_by_username = serializers.SerializerMethodField()
 
     class Meta:
         model = User
@@ -294,6 +306,9 @@ class ClientProfileDetailSerializer(serializers.ModelSerializer):
             "wholesale_requested_at",
             "wholesale_reviewed_at",
             "wholesale_review_comment",
+            "wholesale_verified_at",
+            "wholesale_verified_by",
+            "wholesale_verified_by_username",
             "wholesale_priority",
             "wholesale_priority_note",
             "wholesale_priority_updated_at",
@@ -321,6 +336,10 @@ class ClientProfileDetailSerializer(serializers.ModelSerializer):
 
     def get_profile_photo_url(self, obj: User):
         return self._build_file_url(obj, "profile_photo")
+
+    def get_wholesale_verified_by_username(self, obj: User):
+        verifier = getattr(obj, "wholesale_verified_by", None)
+        return getattr(verifier, "username", "") if verifier else ""
 
     def _queryset(self, obj: User):
         return Appointment.objects.filter(client_id=obj.id)

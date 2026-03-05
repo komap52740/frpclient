@@ -105,6 +105,14 @@ class User(AbstractUser, TimeStampedModel):
     wholesale_requested_at = models.DateTimeField(null=True, blank=True)
     wholesale_reviewed_at = models.DateTimeField(null=True, blank=True)
     wholesale_review_comment = models.CharField(max_length=255, blank=True)
+    wholesale_verified_at = models.DateTimeField(null=True, blank=True)
+    wholesale_verified_by = models.ForeignKey(
+        "accounts.User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="verified_service_centers",
+    )
     wholesale_priority = models.CharField(
         max_length=20,
         choices=WholesalePriorityChoices.choices,

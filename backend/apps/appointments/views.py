@@ -13,6 +13,7 @@ from apps.accounts.permissions import IsAdminRole, IsAuthenticatedAndNotBanned
 from apps.accounts.services import recalculate_client_stats
 from apps.appointments.access import get_appointment_for_user
 from apps.chat.models import Message
+from apps.chat.services import notify_client_about_chat_message
 from apps.platform.services import emit_event
 
 from .client_actions import can_client_signal, create_client_signal, repeat_client_appointment
@@ -25,6 +26,7 @@ from .serializers import (
     AppointmentEventSerializer,
     AppointmentSerializer,
     MarkPaidSerializer,
+    MasterBulkActionSerializer,
     SetPriceSerializer,
     UploadPaymentProofSerializer,
 )
@@ -319,6 +321,74 @@ class MasterActiveAppointmentsView(APIView):
         )
         data = AppointmentSerializer(queryset, many=True, context={"request": request}).data
         return Response(data)
+
+
+class MasterBulkActionView(APIView):
+    permission_classes = (IsAuthenticatedAndNotBanned,)
+
+    def post(self, request):
+        if request.user.role != RoleChoices.MASTER:
+            return Response({"detail": "Только для мастеров"}, status=status.HTTP_403_FORBIDDEN)
+
+        serializer = MasterBulkActionSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        ids = data["appointment_ids"]
+        action = data["action"]
+        message_text = (data.get("message_text") or "").strip()
+
+        appointments = {
+            item.id: item
+            for item in Appointment.objects.filter(id__in=ids, assigned_master=request.user).select_related("client", "assigned_master")
+        }
+
+        processed = []
+        skipped = []
+
+        for appointment_id in ids:
+            appointment = appointments.get(appointment_id)
+            if not appointment:
+                skipped.append({"appointment_id": appointment_id, "reason": "no_access_or_not_found"})
+                continue
+
+            if action == MasterBulkActionSerializer.ACTION_START_WORK:
+                if appointment.status != AppointmentStatusChoices.PAID:
+                    skipped.append({"appointment_id": appointment_id, "reason": "status_must_be_paid"})
+                    continue
+                transition_status(appointment, request.user, AppointmentStatusChoices.IN_PROGRESS, note="Bulk action: start work")
+            elif action == MasterBulkActionSerializer.ACTION_COMPLETE_WORK:
+                if appointment.status != AppointmentStatusChoices.IN_PROGRESS:
+                    skipped.append({"appointment_id": appointment_id, "reason": "status_must_be_in_progress"})
+                    continue
+                transition_status(appointment, request.user, AppointmentStatusChoices.COMPLETED, note="Bulk action: complete work")
+                recalculate_client_stats(appointment.client)
+
+            if message_text:
+                message = Message.objects.create(
+                    appointment=appointment,
+                    sender=request.user,
+                    text=message_text,
+                )
+                emit_event(
+                    "chat.message_sent",
+                    message,
+                    actor=request.user,
+                    payload={"appointment_id": appointment.id, "bulk": True},
+                )
+                notify_client_about_chat_message(message)
+
+            processed.append(appointment_id)
+
+        return Response(
+            {
+                "action": action,
+                "processed_count": len(processed),
+                "processed_ids": processed,
+                "skipped": skipped,
+            },
+            status=status.HTTP_200_OK,
+        )
 
 
 class MasterTakeView(APIView):

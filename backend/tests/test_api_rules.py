@@ -1,14 +1,17 @@
 ﻿from __future__ import annotations
 
 from unittest.mock import patch
+from datetime import timedelta
 
 import pytest
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.utils import timezone
 from rest_framework.test import APIClient
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from apps.accounts.models import MasterLevelChoices, RoleChoices, User, WholesalePriorityChoices, WholesaleStatusChoices
 from apps.accounts.notifications import notify_masters_about_new_appointment
+from apps.accounts.services import recalculate_client_stats
 from apps.appointments.models import Appointment, AppointmentStatusChoices
 from apps.chat.models import Message
 from apps.platform.models import Notification
@@ -1135,5 +1138,148 @@ def test_master_can_set_wholesale_priority_for_client(master_user, client_user):
     assert client_user.wholesale_priority == WholesalePriorityChoices.PRIORITY
     assert client_user.wholesale_priority_note == "Срочные заявки по SLA"
     assert client_user.is_service_center is True
+
+
+@pytest.mark.django_db
+def test_admin_approve_wholesale_sets_verification_fields(admin_user, client_user):
+    client_user.is_service_center = True
+    client_user.wholesale_status = WholesaleStatusChoices.PENDING
+    client_user.wholesale_company_name = "FixLab"
+    client_user.wholesale_city = "Москва"
+    client_user.wholesale_address = "ул. Тестовая, 10"
+    client_user.save(
+        update_fields=[
+            "is_service_center",
+            "wholesale_status",
+            "wholesale_company_name",
+            "wholesale_city",
+            "wholesale_address",
+            "updated_at",
+        ]
+    )
+
+    response = auth_as(admin_user).post(
+        f"/api/admin/wholesale-requests/{client_user.id}/review/",
+        {"decision": "approve"},
+        format="json",
+    )
+    assert response.status_code == 200
+    assert response.data["wholesale_status"] == WholesaleStatusChoices.APPROVED
+    assert response.data["wholesale_verified_at"] is not None
+    assert response.data["wholesale_verified_by"] == admin_user.id
+    assert response.data["wholesale_verified_by_username"] == admin_user.username
+
+
+@pytest.mark.django_db
+def test_finance_summary_for_master_scope(master_user, client_user):
+    now = timezone.now()
+    Appointment.objects.create(
+        client=client_user,
+        assigned_master=master_user,
+        brand="Samsung",
+        model="A50",
+        lock_type="PIN",
+        has_pc=True,
+        description="desc",
+        status=AppointmentStatusChoices.IN_PROGRESS,
+        total_price=7000,
+        payment_confirmed_at=now,
+    )
+    Appointment.objects.create(
+        client=client_user,
+        assigned_master=master_user,
+        brand="Samsung",
+        model="A51",
+        lock_type="PIN",
+        has_pc=True,
+        description="desc",
+        status=AppointmentStatusChoices.COMPLETED,
+        total_price=5000,
+        payment_confirmed_at=now - timedelta(days=1),
+    )
+
+    response = auth_as(master_user).get("/api/admin/finance/summary/")
+    assert response.status_code == 200
+    assert response.data["scope"] == "master"
+    assert response.data["paid_total"] == 12000
+    assert response.data["in_work_total"] == 7000
+    assert response.data["period_total"] >= 12000
+
+
+@pytest.mark.django_db
+def test_weekly_report_for_master(master_user, client_user):
+    created_at = timezone.now() - timedelta(days=1)
+    appointment = Appointment.objects.create(
+        client=client_user,
+        assigned_master=master_user,
+        brand="Xiaomi",
+        model="Note 12",
+        lock_type="PIN",
+        has_pc=True,
+        description="desc",
+        status=AppointmentStatusChoices.COMPLETED,
+        total_price=9000,
+        taken_at=created_at + timedelta(minutes=5),
+        completed_at=created_at + timedelta(hours=2),
+    )
+    Appointment.objects.filter(id=appointment.id).update(created_at=created_at)
+
+    response = auth_as(master_user).get("/api/admin/reports/weekly/")
+    assert response.status_code == 200
+    assert response.data["scope"] == "master"
+    assert response.data["closed_count"] >= 1
+    assert "avg_first_response_seconds" in response.data
+    assert "problematic_cases_count" in response.data
+
+
+@pytest.mark.django_db
+def test_master_bulk_send_template_message(master_user, client_user):
+    appointment = Appointment.objects.create(
+        client=client_user,
+        assigned_master=master_user,
+        brand="Honor",
+        model="X",
+        lock_type="PIN",
+        has_pc=True,
+        description="desc",
+        status=AppointmentStatusChoices.IN_PROGRESS,
+    )
+
+    response = auth_as(master_user).post(
+        "/api/appointments/bulk-action/",
+        {
+            "appointment_ids": [appointment.id],
+            "action": "send_template",
+            "message_text": "Проверил данные, продолжаю работу.",
+        },
+        format="json",
+    )
+    assert response.status_code == 200
+    assert response.data["processed_count"] == 1
+    assert Message.objects.filter(appointment=appointment, sender=master_user, text__contains="продолжаю").exists()
+
+
+@pytest.mark.django_db
+def test_auto_wholesale_priority_from_client_stats(client_user):
+    client_user.is_service_center = True
+    client_user.wholesale_status = WholesaleStatusChoices.APPROVED
+    client_user.wholesale_priority = WholesalePriorityChoices.STANDARD
+    client_user.save(update_fields=["is_service_center", "wholesale_status", "wholesale_priority", "updated_at"])
+
+    for index in range(10):
+        Appointment.objects.create(
+            client=client_user,
+            brand="Samsung",
+            model=f"A{index}",
+            lock_type="PIN",
+            has_pc=True,
+            description="desc",
+            status=AppointmentStatusChoices.COMPLETED,
+        )
+
+    recalculate_client_stats(client_user)
+    client_user.refresh_from_db()
+    assert client_user.wholesale_priority in {WholesalePriorityChoices.PRIORITY, WholesalePriorityChoices.CRITICAL}
+    assert (client_user.wholesale_priority_note or "").startswith("AUTO:")
 
 

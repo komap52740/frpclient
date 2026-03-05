@@ -23,6 +23,7 @@ class AdminUserSerializer(serializers.ModelSerializer):
     profile_photo_url = serializers.SerializerMethodField()
     wholesale_service_photo_1_url = serializers.SerializerMethodField()
     wholesale_service_photo_2_url = serializers.SerializerMethodField()
+    wholesale_verified_by_username = serializers.SerializerMethodField()
     appointments_total = serializers.IntegerField(read_only=True, default=0)
     appointments_active = serializers.IntegerField(read_only=True, default=0)
     appointments_sla_breached = serializers.IntegerField(read_only=True, default=0)
@@ -59,6 +60,9 @@ class AdminUserSerializer(serializers.ModelSerializer):
             "wholesale_requested_at",
             "wholesale_reviewed_at",
             "wholesale_review_comment",
+            "wholesale_verified_at",
+            "wholesale_verified_by",
+            "wholesale_verified_by_username",
             "wholesale_priority",
             "wholesale_priority_note",
             "wholesale_priority_updated_at",
@@ -86,6 +90,10 @@ class AdminUserSerializer(serializers.ModelSerializer):
 
     def get_profile_photo_url(self, obj: User):
         return self._build_file_url(obj, "profile_photo")
+
+    def get_wholesale_verified_by_username(self, obj: User):
+        verifier = getattr(obj, "wholesale_verified_by", None)
+        return getattr(verifier, "username", "") if verifier else ""
 
     def get_master_tier(self, obj: User) -> str:
         return "senior" if obj.master_level == MasterLevelChoices.SENIOR else "regular"

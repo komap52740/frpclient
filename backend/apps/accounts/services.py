@@ -3,7 +3,15 @@ from __future__ import annotations
 from django.db.models import Avg, Count, DurationField, ExpressionWrapper, F
 from django.utils import timezone
 
-from .models import ClientStats, MasterStats, RiskLevelChoices, User
+from .models import (
+    ClientLevelChoices,
+    ClientStats,
+    MasterStats,
+    RiskLevelChoices,
+    User,
+    WholesalePriorityChoices,
+    WholesaleStatusChoices,
+)
 
 
 def _risk_level_from_score(score: int) -> str:
@@ -68,7 +76,62 @@ def recalculate_client_stats(client: User) -> ClientStats:
     stats.risk_level = risk_level
     stats.risk_updated_at = timezone.now()
     stats.save()
+    _recalculate_wholesale_priority(client=client, stats=stats)
     return stats
+
+
+def _resolve_wholesale_priority(stats: ClientStats) -> tuple[str, str]:
+    # Stable high-volume clients are raised automatically.
+    if (
+        stats.completed_orders_count >= 30
+        and stats.cancellation_rate <= 0.08
+        and stats.risk_score <= 30
+        and stats.average_rating >= 4.5
+    ):
+        return WholesalePriorityChoices.CRITICAL, "AUTO: stable high-volume service center"
+
+    if (
+        stats.completed_orders_count >= 10
+        and stats.cancellation_rate <= 0.16
+        and stats.risk_score <= 45
+        and stats.average_rating >= 4.0
+    ):
+        return WholesalePriorityChoices.PRIORITY, "AUTO: stable flow without conflicts"
+
+    # Any signs of conflict/risk downgrade back to standard.
+    if (
+        stats.cancellation_rate >= 0.28
+        or stats.risk_score >= 65
+        or stats.level == ClientLevelChoices.PROBLEMATIC
+    ):
+        return WholesalePriorityChoices.STANDARD, "AUTO: conflicts/risk increased"
+
+    return WholesalePriorityChoices.STANDARD, "AUTO: insufficient stable flow for raised priority"
+
+
+def _recalculate_wholesale_priority(*, client: User, stats: ClientStats) -> None:
+    if client.role != "client":
+        return
+    if not client.is_service_center:
+        return
+    if client.wholesale_status != WholesaleStatusChoices.APPROVED:
+        return
+
+    next_priority, next_note = _resolve_wholesale_priority(stats)
+    if client.wholesale_priority == next_priority and (client.wholesale_priority_note or "") == next_note:
+        return
+
+    client.wholesale_priority = next_priority
+    client.wholesale_priority_note = next_note
+    client.wholesale_priority_updated_at = timezone.now()
+    client.save(
+        update_fields=[
+            "wholesale_priority",
+            "wholesale_priority_note",
+            "wholesale_priority_updated_at",
+            "updated_at",
+        ]
+    )
 
 
 def compute_master_score(

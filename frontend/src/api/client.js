@@ -222,6 +222,9 @@ export const appointmentsApi = {
   activeList() {
     return api.get("/appointments/active/");
   },
+  bulkAction(payload) {
+    return api.post("/appointments/bulk-action/", payload);
+  },
   take(id) {
     return api.post(`/appointments/${id}/take/`);
   },
@@ -317,6 +320,12 @@ export const adminApi = {
   },
   reviewWholesale(userId, payload) {
     return api.post(`/admin/wholesale-requests/${userId}/review/`, payload);
+  },
+  financeSummary(params = {}) {
+    return api.get("/admin/finance/summary/", { params });
+  },
+  weeklyReport(params = {}) {
+    return api.get("/admin/reports/weekly/", { params });
   },
   updateWholesalePriority(userId, payload) {
     return api.post(`/admin/users/${userId}/wholesale-priority/`, payload);

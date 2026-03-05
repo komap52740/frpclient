@@ -16,6 +16,7 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
+import dayjs from "dayjs";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -44,6 +45,13 @@ function WholesalePriorityChip({ value }) {
     return <Chip size="small" color="warning" label={`PRO: ${item.label}`} />;
   }
   return <Chip size="small" variant="outlined" label={`PRO: ${item.label}`} />;
+}
+
+function formatDateTime(value) {
+  if (!value) return "—";
+  const parsed = dayjs(value);
+  if (!parsed.isValid()) return "—";
+  return parsed.format("DD.MM.YYYY HH:mm");
 }
 
 export default function AdminClientsPage() {
@@ -343,6 +351,41 @@ export default function AdminClientsPage() {
                       </Typography>
                     </Paper>
                   ) : null}
+
+                  <Paper variant="outlined" sx={{ p: 1.2, borderRadius: 1.4 }}>
+                    <Stack spacing={0.5}>
+                      <Typography variant="caption" color="text.secondary">
+                        Карточка сервисного центра
+                      </Typography>
+                      <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                        <Chip
+                          size="small"
+                          color={row.wholesale_verified_at ? "success" : "default"}
+                          variant={row.wholesale_verified_at ? "filled" : "outlined"}
+                          label={row.wholesale_verified_at ? "Верифицирован" : "Не верифицирован"}
+                        />
+                        <Chip
+                          size="small"
+                          variant="outlined"
+                          label={`Проверен: ${formatDateTime(row.wholesale_verified_at)}`}
+                        />
+                        <Chip
+                          size="small"
+                          variant="outlined"
+                          label={`Кем проверен: ${row.wholesale_verified_by_username || "—"}`}
+                        />
+                      </Stack>
+                      <Typography variant="body2">
+                        Название: <b>{row.wholesale_company_name || "—"}</b>
+                      </Typography>
+                      <Typography variant="body2">
+                        Город: <b>{row.wholesale_city || "—"}</b>
+                      </Typography>
+                      <Typography variant="body2">
+                        Адрес: <b>{row.wholesale_address || "—"}</b>
+                      </Typography>
+                    </Stack>
+                  </Paper>
 
                   {row.wholesale_service_photo_1_url || row.wholesale_service_photo_2_url ? (
                     <Stack direction="row" spacing={1}>

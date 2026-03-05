@@ -349,3 +349,43 @@ class AppointmentEventSerializer(serializers.ModelSerializer):
 class AdminManualStatusSerializer(serializers.Serializer):
     status = serializers.ChoiceField(choices=AppointmentStatusChoices.choices)
     note = serializers.CharField(required=False, allow_blank=True)
+
+
+class MasterBulkActionSerializer(serializers.Serializer):
+    ACTION_SEND_TEMPLATE = "send_template"
+    ACTION_START_WORK = "start_work"
+    ACTION_COMPLETE_WORK = "complete_work"
+
+    ACTION_CHOICES = (
+        (ACTION_SEND_TEMPLATE, "send_template"),
+        (ACTION_START_WORK, "start_work"),
+        (ACTION_COMPLETE_WORK, "complete_work"),
+    )
+
+    appointment_ids = serializers.ListField(
+        child=serializers.IntegerField(min_value=1),
+        allow_empty=False,
+        max_length=50,
+    )
+    action = serializers.ChoiceField(choices=ACTION_CHOICES)
+    message_text = serializers.CharField(required=False, allow_blank=True, max_length=2000)
+
+    def validate_appointment_ids(self, value):
+        unique_ids = list(dict.fromkeys(value))
+        if not unique_ids:
+            raise serializers.ValidationError("Передайте хотя бы одну заявку.")
+        return unique_ids
+
+    def validate(self, attrs):
+        action = attrs["action"]
+        message = (attrs.get("message_text") or "").strip()
+
+        if action == self.ACTION_SEND_TEMPLATE and not message:
+            raise serializers.ValidationError({"message_text": "Добавьте текст шаблонного сообщения."})
+        if action in {self.ACTION_START_WORK, self.ACTION_COMPLETE_WORK} and not message:
+            # Message is optional for pure status bulk-actions.
+            attrs["message_text"] = ""
+            return attrs
+
+        attrs["message_text"] = message
+        return attrs

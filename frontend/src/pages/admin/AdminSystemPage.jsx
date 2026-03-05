@@ -88,6 +88,8 @@ export default function AdminSystemPage() {
 
   const [metricsRows, setMetricsRows] = useState([]);
   const [metricsError, setMetricsError] = useState("");
+  const [financeSummary, setFinanceSummary] = useState(null);
+  const [weeklyReport, setWeeklyReport] = useState(null);
 
   const [unreadNotifications, setUnreadNotifications] = useState([]);
   const [wholesalePendingCount, setWholesalePendingCount] = useState(0);
@@ -128,6 +130,24 @@ export default function AdminSystemPage() {
     }
   };
 
+  const loadFinanceSummary = async () => {
+    try {
+      const response = await adminApi.financeSummary();
+      setFinanceSummary(response.data || null);
+    } catch {
+      // Keep dashboard stable on finance API hiccups.
+    }
+  };
+
+  const loadWeeklyReport = async () => {
+    try {
+      const response = await adminApi.weeklyReport();
+      setWeeklyReport(response.data || null);
+    } catch {
+      // Keep dashboard stable on report API hiccups.
+    }
+  };
+
   const loadUnreadNotifications = async () => {
     try {
       const response = await notificationsApi.list({ is_read: 0 });
@@ -151,6 +171,8 @@ export default function AdminSystemPage() {
     loadStatus();
     loadSettings();
     loadMetrics();
+    loadFinanceSummary();
+    loadWeeklyReport();
     loadUnreadNotifications();
     loadWholesalePending();
   }, []);
@@ -248,6 +270,8 @@ export default function AdminSystemPage() {
           onClick={() => {
             loadStatus();
             loadMetrics();
+            loadFinanceSummary();
+            loadWeeklyReport();
             loadUnreadNotifications();
             loadWholesalePending();
           }}
@@ -279,6 +303,38 @@ export default function AdminSystemPage() {
             Начинайте работу с этого блока: он показывает, где сейчас самое узкое место по сервису.
           </Typography>
         </Stack>
+      </Paper>
+
+      <Paper sx={{ p: 2 }}>
+        <Typography variant="h3" sx={{ mb: 1 }}>Финансовый блок</Typography>
+        {financeSummary ? (
+          <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+            <Chip size="small" color="success" variant="outlined" label={`Оплачено: ${(financeSummary.paid_total || 0).toLocaleString("ru-RU")} ₽`} />
+            <Chip size="small" color="info" variant="outlined" label={`В работе: ${(financeSummary.in_work_total || 0).toLocaleString("ru-RU")} ₽`} />
+            <Chip size="small" color="primary" variant="outlined" label={`За период: ${(financeSummary.period_total || 0).toLocaleString("ru-RU")} ₽`} />
+          </Stack>
+        ) : (
+          <Typography variant="body2" color="text.secondary">Финансовая сводка недоступна.</Typography>
+        )}
+      </Paper>
+
+      <Paper sx={{ p: 2 }}>
+        <Typography variant="h3" sx={{ mb: 1 }}>Еженедельный отчет</Typography>
+        {weeklyReport ? (
+          <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+            <Chip size="small" variant="outlined" label={`SLA нарушено: ${weeklyReport.sla_breached_count || 0}`} />
+            <Chip size="small" variant="outlined" label={`Средний ответ: ${Math.round((weeklyReport.avg_first_response_seconds || 0) / 60) || 0} мин`} />
+            <Chip size="small" variant="outlined" label={`Закрытые заявки: ${weeklyReport.closed_count || 0}`} />
+            <Chip
+              size="small"
+              color={(weeklyReport.problematic_cases_count || 0) > 0 ? "warning" : "default"}
+              variant={(weeklyReport.problematic_cases_count || 0) > 0 ? "filled" : "outlined"}
+              label={`Проблемные кейсы: ${weeklyReport.problematic_cases_count || 0}`}
+            />
+          </Stack>
+        ) : (
+          <Typography variant="body2" color="text.secondary">Недельный отчет недоступен.</Typography>
+        )}
       </Paper>
 
       <Paper sx={{ p: 2 }}>
