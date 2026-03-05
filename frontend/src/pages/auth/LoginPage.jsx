@@ -12,7 +12,6 @@
 } from "@mui/material";
 import GoogleIcon from "@mui/icons-material/Google";
 import TelegramIcon from "@mui/icons-material/Telegram";
-import { alpha } from "@mui/material/styles";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -136,88 +135,42 @@ const oauthButtonBaseSx = {
   },
 };
 
-const oauthGoogleButtonSx = {
+const oauthServiceButtonSx = {
   ...oauthButtonBaseSx,
-  color: "#1f2328",
-  borderColor: "rgba(255,255,255,0.95)",
-  background: "linear-gradient(180deg, #ffffff 0%, #eef5ff 100%)",
+  color: "#e9f4ff",
+  borderColor: "rgba(139,188,248,0.62)",
+  background: "linear-gradient(145deg, rgba(28,53,96,0.9) 0%, rgba(17,34,67,0.92) 100%)",
   "&:hover": {
-    borderColor: "#ffffff",
-    background: "linear-gradient(180deg, #ffffff 0%, #e5efff 100%)",
-    boxShadow: "0 16px 30px rgba(0,0,0,0.24)",
+    borderColor: "rgba(159,208,255,0.92)",
+    background: "linear-gradient(145deg, rgba(36,66,116,0.95) 0%, rgba(23,45,86,0.95) 100%)",
+    boxShadow: "0 16px 30px rgba(19,59,122,0.34)",
     transform: "translateY(-1px)",
   },
   "&.Mui-disabled": {
-    color: "rgba(31,35,40,0.55)",
-    background: "rgba(255,255,255,0.62)",
-    borderColor: "rgba(255,255,255,0.45)",
-  },
-};
-
-const oauthYandexButtonSx = {
-  ...oauthButtonBaseSx,
-  color: "#f8fbff",
-  borderColor: "rgba(255,86,86,0.6)",
-  background: "linear-gradient(155deg, #26171f 0%, #19121a 100%)",
-  "&:hover": {
-    borderColor: "rgba(255,110,110,0.9)",
-    background: "linear-gradient(155deg, #32202a 0%, #241722 100%)",
-    boxShadow: "0 16px 30px rgba(146,44,60,0.3)",
-    transform: "translateY(-1px)",
-  },
-  "&.Mui-disabled": {
-    color: "rgba(244,248,255,0.55)",
-    background: "rgba(32,23,30,0.7)",
-    borderColor: "rgba(255,91,91,0.3)",
-  },
-};
-
-const oauthVkButtonSx = {
-  ...oauthButtonBaseSx,
-  color: "#edf6ff",
-  borderColor: "rgba(144,200,255,0.82)",
-  background: "linear-gradient(135deg, #3282ff 0%, #215fdb 100%)",
-  "&:hover": {
-    borderColor: "rgba(166,214,255,0.95)",
-    background: "linear-gradient(135deg, #428fff 0%, #2f6ee6 100%)",
-    boxShadow: "0 16px 32px rgba(33,105,231,0.4)",
-    transform: "translateY(-1px)",
-  },
-  "&.Mui-disabled": {
-    color: "rgba(237,246,255,0.62)",
-    background: "rgba(41,103,198,0.7)",
-    borderColor: "rgba(122,185,255,0.35)",
+    color: "rgba(220,236,255,0.64)",
+    background: "linear-gradient(145deg, rgba(27,47,83,0.72) 0%, rgba(18,33,62,0.72) 100%)",
+    borderColor: "rgba(130,175,230,0.38)",
   },
 };
 
 const oauthTelegramShellSx = {
   borderRadius: 2.8,
-  border: `1.3px solid ${alpha("#89c7ff", 0.78)}`,
-  background: "linear-gradient(140deg, rgba(33,97,177,0.5) 0%, rgba(27,72,142,0.46) 100%)",
+  border: "1.3px solid rgba(139,188,248,0.62)",
+  background: "linear-gradient(145deg, rgba(28,53,96,0.9) 0%, rgba(17,34,67,0.92) 100%)",
   minHeight: AUTH_PROVIDER_BUTTON_HEIGHT,
   px: 0.75,
   py: 0.72,
   display: "flex",
   alignItems: "center",
-  boxShadow: "0 12px 26px rgba(14,55,114,0.34), inset 0 1px 0 rgba(255,255,255,0.14)",
+  boxShadow: "0 12px 24px rgba(5,12,28,0.35), inset 0 1px 0 rgba(255,255,255,0.12)",
 };
 
 const oauthTelegramFallbackButtonSx = {
-  ...oauthButtonBaseSx,
+  ...oauthServiceButtonSx,
   minHeight: AUTH_PROVIDER_BUTTON_HEIGHT - 8,
   borderRadius: 2.5,
   fontSize: { xs: 15, sm: 16 },
   px: 1.5,
-  color: "#eaf6ff",
-  borderColor: "rgba(148,206,255,0.85)",
-  background: "linear-gradient(135deg, #2ea3f2 0%, #247fe0 52%, #1f66cb 100%)",
-  boxShadow: "0 12px 24px rgba(20,88,175,0.32)",
-  "&:hover": {
-    borderColor: "rgba(168,219,255,0.95)",
-    background: "linear-gradient(135deg, #3ab0ff 0%, #2d8bed 52%, #2872da 100%)",
-    boxShadow: "0 14px 28px rgba(26,96,188,0.42)",
-    transform: "translateY(-1px)",
-  },
 };
 
 const providerBadgeSx = {
@@ -230,8 +183,10 @@ const providerBadgeSx = {
   fontSize: 13,
   fontWeight: 900,
   flexShrink: 0,
-  border: "1px solid rgba(255,255,255,0.28)",
-  boxShadow: "inset 0 1px 0 rgba(255,255,255,0.4), 0 6px 14px rgba(0,0,0,0.28)",
+  color: "#d9ecff",
+  border: "1px solid rgba(169,208,255,0.42)",
+  background: "rgba(16,36,70,0.72)",
+  boxShadow: "inset 0 1px 0 rgba(255,255,255,0.24), 0 6px 14px rgba(0,0,0,0.28)",
 };
 
 export default function LoginPage() {
@@ -835,9 +790,9 @@ export default function LoginPage() {
                     variant="outlined"
                     disabled={loading}
                     onClick={() => startOAuthLogin("google")}
-                    sx={oauthGoogleButtonSx}
+                    sx={oauthServiceButtonSx}
                     startIcon={
-                      <Box sx={{ ...providerBadgeSx, color: "#4285f4", bgcolor: "rgba(255,255,255,0.98)" }}>
+                      <Box sx={providerBadgeSx}>
                         <GoogleIcon sx={{ fontSize: 19 }} />
                       </Box>
                     }
@@ -849,18 +804,9 @@ export default function LoginPage() {
                     variant="outlined"
                     disabled={loading}
                     onClick={() => startOAuthLogin("yandex")}
-                    sx={oauthYandexButtonSx}
+                    sx={oauthServiceButtonSx}
                     startIcon={
-                      <Box
-                        sx={{
-                          ...providerBadgeSx,
-                          color: "#ff3d3d",
-                          bgcolor: "rgba(255,255,255,0.96)",
-                          borderColor: "rgba(255,95,95,0.46)",
-                          fontSize: 16,
-                          fontWeight: 900,
-                        }}
-                      >
+                      <Box sx={providerBadgeSx}>
                         Я
                       </Box>
                     }
@@ -872,16 +818,9 @@ export default function LoginPage() {
                     variant="outlined"
                     disabled={loading}
                     onClick={() => startOAuthLogin("vk")}
-                    sx={{ ...oauthVkButtonSx, gridColumn: { xs: "1", sm: "1 / -1" } }}
+                    sx={{ ...oauthServiceButtonSx, gridColumn: { xs: "1", sm: "1 / -1" } }}
                     startIcon={
-                      <Box
-                        sx={{
-                          ...providerBadgeSx,
-                          color: "#ffffff",
-                          bgcolor: "rgba(17,77,173,0.9)",
-                          borderColor: "rgba(174,214,255,0.45)",
-                        }}
-                      >
+                      <Box sx={providerBadgeSx}>
                         VK
                       </Box>
                     }
