@@ -163,6 +163,40 @@ def test_admin_can_update_master_quality(admin_user):
 
 
 @pytest.mark.django_db
+def test_admin_can_delete_appointment(admin_user, client_user):
+    appointment = Appointment.objects.create(
+        client=client_user,
+        brand="Samsung",
+        model="A54",
+        lock_type="PIN",
+        has_pc=True,
+        description="desc",
+    )
+
+    response = auth_as(admin_user).delete(f"/api/admin/appointments/{appointment.id}/")
+    assert response.status_code == 200
+    assert response.data["status"] == "deleted"
+    assert response.data["appointment_id"] == appointment.id
+    assert not Appointment.objects.filter(id=appointment.id).exists()
+
+
+@pytest.mark.django_db
+def test_master_cannot_delete_appointment_via_admin_endpoint(master_user, client_user):
+    appointment = Appointment.objects.create(
+        client=client_user,
+        brand="Samsung",
+        model="A55",
+        lock_type="PIN",
+        has_pc=True,
+        description="desc",
+    )
+
+    response = auth_as(master_user).delete(f"/api/admin/appointments/{appointment.id}/")
+    assert response.status_code == 403
+    assert Appointment.objects.filter(id=appointment.id).exists()
+
+
+@pytest.mark.django_db
 def test_notify_new_appointment_targets_active_masters_with_telegram(client_user):
     master_allowed = User.objects.create_user(
         username="master_allowed",

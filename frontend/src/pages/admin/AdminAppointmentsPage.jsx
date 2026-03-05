@@ -53,6 +53,7 @@ export default function AdminAppointmentsPage() {
   const [filters, setFilters] = useState({ status: "", master: "", client: "", date_from: "", date_to: "" });
   const [error, setError] = useState("");
   const [viewMode, setViewMode] = useState("urgent");
+  const [deletingId, setDeletingId] = useState(null);
 
   const load = useCallback(async ({ silent = false } = {}) => {
     try {
@@ -80,6 +81,25 @@ export default function AdminAppointmentsPage() {
   const urgentRows = useMemo(() => rows.filter(isUrgent), [rows]);
   const visibleRows = useMemo(() => (viewMode === "urgent" ? urgentRows : rows), [rows, urgentRows, viewMode]);
   const focusRow = visibleRows[0] || rows[0] || null;
+
+  const handleDeleteAppointment = async (row) => {
+    if (!row?.id || deletingId) return;
+    const shouldDelete = window.confirm(
+      `Удалить заявку #${row.id}? Это действие нельзя отменить.`
+    );
+    if (!shouldDelete) return;
+
+    setDeletingId(row.id);
+    setError("");
+    try {
+      await adminApi.deleteAppointment(row.id);
+      await load({ silent: true });
+    } catch {
+      setError("Не удалось удалить заявку. Попробуйте снова.");
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   return (
     <Stack spacing={2}>
@@ -199,9 +219,20 @@ export default function AdminAppointmentsPage() {
                   </TableCell>
                   <TableCell>{row.total_price ? `${row.total_price} ₽` : "-"}</TableCell>
                   <TableCell>
-                    <Button component={RouterLink} to={`/appointments/${row.id}`} size="small">
-                      Открыть
-                    </Button>
+                    <Stack direction="row" spacing={1}>
+                      <Button component={RouterLink} to={`/appointments/${row.id}`} size="small">
+                        Открыть
+                      </Button>
+                      <Button
+                        size="small"
+                        color="error"
+                        variant="outlined"
+                        disabled={deletingId === row.id}
+                        onClick={() => handleDeleteAppointment(row)}
+                      >
+                        {deletingId === row.id ? "Удаляем..." : "Удалить"}
+                      </Button>
+                    </Stack>
                   </TableCell>
                 </TableRow>
               ))

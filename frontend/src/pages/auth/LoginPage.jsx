@@ -112,24 +112,24 @@ const authPrimaryButtonSx = {
   },
 };
 
-const AUTH_PROVIDER_BUTTON_HEIGHT = 52;
+const AUTH_PROVIDER_BUTTON_HEIGHT = 56;
 
 const oauthButtonBaseSx = {
   minHeight: AUTH_PROVIDER_BUTTON_HEIGHT,
-  borderRadius: 3,
-  px: 1.7,
+  borderRadius: 2.8,
+  px: 1.9,
   textTransform: "none",
   fontWeight: 800,
-  letterSpacing: 0.1,
-  fontSize: 18,
+  letterSpacing: 0.12,
+  fontSize: { xs: 16, sm: 17 },
   fontFamily: "'Sora', 'Manrope', sans-serif",
   lineHeight: 1.2,
-  borderWidth: 1.2,
+  borderWidth: 1.3,
   justifyContent: "center",
-  transition: "all .2s ease",
-  boxShadow: "0 8px 20px rgba(5,12,28,0.35)",
+  transition: "all .18s ease",
+  boxShadow: "0 12px 24px rgba(5,12,28,0.35), inset 0 1px 0 rgba(255,255,255,0.12)",
   "& .MuiButton-startIcon": {
-    mr: 0.9,
+    mr: 1,
   },
   "&:active": {
     transform: "translateY(0)",
@@ -139,12 +139,12 @@ const oauthButtonBaseSx = {
 const oauthGoogleButtonSx = {
   ...oauthButtonBaseSx,
   color: "#1f2328",
-  borderColor: "rgba(255,255,255,0.92)",
-  background: "linear-gradient(180deg, #ffffff 0%, #f2f7ff 100%)",
+  borderColor: "rgba(255,255,255,0.95)",
+  background: "linear-gradient(180deg, #ffffff 0%, #eef5ff 100%)",
   "&:hover": {
     borderColor: "#ffffff",
-    background: "linear-gradient(180deg, #ffffff 0%, #e7f0ff 100%)",
-    boxShadow: "0 14px 28px rgba(0,0,0,0.24)",
+    background: "linear-gradient(180deg, #ffffff 0%, #e5efff 100%)",
+    boxShadow: "0 16px 30px rgba(0,0,0,0.24)",
     transform: "translateY(-1px)",
   },
   "&.Mui-disabled": {
@@ -157,12 +157,12 @@ const oauthGoogleButtonSx = {
 const oauthYandexButtonSx = {
   ...oauthButtonBaseSx,
   color: "#f8fbff",
-  borderColor: "rgba(255,71,71,0.52)",
-  background: "linear-gradient(155deg, #211820 0%, #16111a 100%)",
+  borderColor: "rgba(255,86,86,0.6)",
+  background: "linear-gradient(155deg, #26171f 0%, #19121a 100%)",
   "&:hover": {
-    borderColor: "rgba(255,102,102,0.84)",
-    background: "linear-gradient(155deg, #2d1f29 0%, #1f1622 100%)",
-    boxShadow: "0 14px 28px rgba(146,44,60,0.28)",
+    borderColor: "rgba(255,110,110,0.9)",
+    background: "linear-gradient(155deg, #32202a 0%, #241722 100%)",
+    boxShadow: "0 16px 30px rgba(146,44,60,0.3)",
     transform: "translateY(-1px)",
   },
   "&.Mui-disabled": {
@@ -175,12 +175,12 @@ const oauthYandexButtonSx = {
 const oauthVkButtonSx = {
   ...oauthButtonBaseSx,
   color: "#edf6ff",
-  borderColor: "rgba(134,191,255,0.78)",
-  background: "linear-gradient(135deg, #2f7bff 0%, #1e63e0 100%)",
+  borderColor: "rgba(144,200,255,0.82)",
+  background: "linear-gradient(135deg, #3282ff 0%, #215fdb 100%)",
   "&:hover": {
-    borderColor: "rgba(153,204,255,0.95)",
-    background: "linear-gradient(135deg, #3f8bff 0%, #2c70eb 100%)",
-    boxShadow: "0 14px 30px rgba(33,105,231,0.36)",
+    borderColor: "rgba(166,214,255,0.95)",
+    background: "linear-gradient(135deg, #428fff 0%, #2f6ee6 100%)",
+    boxShadow: "0 16px 32px rgba(33,105,231,0.4)",
     transform: "translateY(-1px)",
   },
   "&.Mui-disabled": {
@@ -191,23 +191,23 @@ const oauthVkButtonSx = {
 };
 
 const oauthTelegramShellSx = {
-  borderRadius: 3,
-  border: `1.2px solid ${alpha("#89c7ff", 0.76)}`,
-  background: "linear-gradient(135deg, rgba(32,96,176,0.48) 0%, rgba(27,72,142,0.44) 100%)",
+  borderRadius: 2.8,
+  border: `1.3px solid ${alpha("#89c7ff", 0.78)}`,
+  background: "linear-gradient(140deg, rgba(33,97,177,0.5) 0%, rgba(27,72,142,0.46) 100%)",
   minHeight: AUTH_PROVIDER_BUTTON_HEIGHT,
-  px: 0.72,
-  py: 0.68,
+  px: 0.75,
+  py: 0.72,
   display: "flex",
   alignItems: "center",
-  boxShadow: "0 10px 24px rgba(14,55,114,0.3)",
+  boxShadow: "0 12px 26px rgba(14,55,114,0.34), inset 0 1px 0 rgba(255,255,255,0.14)",
 };
 
 const oauthTelegramFallbackButtonSx = {
   ...oauthButtonBaseSx,
-  minHeight: AUTH_PROVIDER_BUTTON_HEIGHT - 10,
-  borderRadius: 2.4,
-  fontSize: 17,
-  px: 1.4,
+  minHeight: AUTH_PROVIDER_BUTTON_HEIGHT - 8,
+  borderRadius: 2.5,
+  fontSize: { xs: 15, sm: 16 },
+  px: 1.5,
   color: "#eaf6ff",
   borderColor: "rgba(148,206,255,0.85)",
   background: "linear-gradient(135deg, #2ea3f2 0%, #247fe0 52%, #1f66cb 100%)",
@@ -823,7 +823,13 @@ export default function LoginPage() {
               </Box>
             ) : (
               <Stack spacing={1.4}>
-                <Stack direction={{ xs: "column", sm: "row" }} spacing={1.2}>
+                <Box
+                  sx={{
+                    display: "grid",
+                    gap: 1.2,
+                    gridTemplateColumns: { xs: "1fr", sm: "repeat(2, minmax(0, 1fr))" },
+                  }}
+                >
                   <Button
                     fullWidth
                     variant="outlined"
@@ -861,28 +867,28 @@ export default function LoginPage() {
                   >
                     Войти через Яндекс
                   </Button>
-                </Stack>
-                <Button
-                  fullWidth
-                  variant="outlined"
-                  disabled={loading}
-                  onClick={() => startOAuthLogin("vk")}
-                  sx={oauthVkButtonSx}
-                  startIcon={
-                    <Box
-                      sx={{
-                        ...providerBadgeSx,
-                        color: "#ffffff",
-                        bgcolor: "rgba(17,77,173,0.9)",
-                        borderColor: "rgba(174,214,255,0.45)",
-                      }}
-                    >
-                      VK
-                    </Box>
-                  }
-                >
-                  Войти через VK
-                </Button>
+                  <Button
+                    fullWidth
+                    variant="outlined"
+                    disabled={loading}
+                    onClick={() => startOAuthLogin("vk")}
+                    sx={{ ...oauthVkButtonSx, gridColumn: { xs: "1", sm: "1 / -1" } }}
+                    startIcon={
+                      <Box
+                        sx={{
+                          ...providerBadgeSx,
+                          color: "#ffffff",
+                          bgcolor: "rgba(17,77,173,0.9)",
+                          borderColor: "rgba(174,214,255,0.45)",
+                        }}
+                      >
+                        VK
+                      </Box>
+                    }
+                  >
+                    Войти через VK
+                  </Button>
+                </Box>
 
                 {!BOT_USERNAME ? (
                   <Typography

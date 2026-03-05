@@ -7,6 +7,7 @@ from .views import (
     AdminBanUserView,
     AdminClientsView,
     AdminConfirmPaymentView,
+    AdminDeleteAppointmentView,
     AdminFinanceSummaryView,
     AdminMastersView,
     AdminMasterQualityUpdateView,
@@ -25,6 +26,7 @@ from .views import (
 urlpatterns = [
     path("admin/appointments/", AdminAppointmentListView.as_view(), name="admin-appointments-list"),
     path("admin/appointments/<int:appointment_id>/confirm-payment/", AdminConfirmPaymentView.as_view(), name="admin-appointments-confirm-payment-2"),
+    path("admin/appointments/<int:appointment_id>/", AdminDeleteAppointmentView.as_view(), name="admin-appointments-delete"),
     path("admin/finance/summary/", AdminFinanceSummaryView.as_view(), name="admin-finance-summary"),
     path("admin/reports/weekly/", WeeklyPerformanceReportView.as_view(), name="admin-reports-weekly"),
     path("admin/users/", AdminClientsView.as_view(), name="admin-users-list"),

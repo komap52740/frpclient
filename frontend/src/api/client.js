@@ -309,6 +309,9 @@ export const adminApi = {
   confirmPayment(id) {
     return api.post(`/admin/appointments/${id}/confirm-payment/`);
   },
+  deleteAppointment(id) {
+    return api.delete(`/admin/appointments/${id}/`);
+  },
   setStatus(id, payload) {
     return api.post(`/admin/appointments/${id}/set-status/`, payload);
   },

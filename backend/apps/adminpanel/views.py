@@ -83,6 +83,39 @@ class AdminConfirmPaymentView(APIView, ConfirmPaymentMixin):
         return self.confirm_payment(request, appointment_id)
 
 
+class AdminDeleteAppointmentView(APIView):
+    permission_classes = (IsAuthenticatedAndNotBanned, IsAdminRole)
+
+    def delete(self, request, appointment_id: int):
+        appointment = get_object_or_404(
+            Appointment.objects.select_related("client", "assigned_master"),
+            id=appointment_id,
+        )
+
+        payload = {
+            "appointment_id": appointment.id,
+            "status": appointment.status,
+            "client_id": appointment.client_id,
+            "master_id": appointment.assigned_master_id,
+            "total_price": appointment.total_price,
+        }
+        emit_event(
+            "appointment.deleted_by_admin",
+            appointment,
+            actor=request.user,
+            payload=payload,
+        )
+        appointment.delete()
+
+        return Response(
+            {
+                "status": "deleted",
+                "appointment_id": appointment_id,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
 class AdminBanUserView(APIView):
     permission_classes = (IsAuthenticatedAndNotBanned, IsAdminRole)
 
