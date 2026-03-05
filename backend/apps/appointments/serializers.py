@@ -2,7 +2,8 @@
 
 from rest_framework import serializers
 
-from apps.chat.models import ReadState
+from apps.accounts.models import WholesalePriorityChoices, WholesaleStatusChoices
+from apps.chat.models import Message, ReadState
 
 from .client_actions import CLIENT_SIGNAL_META
 from .models import (
@@ -21,6 +22,12 @@ class AppointmentSerializer(serializers.ModelSerializer):
     payment_proof_url = serializers.SerializerMethodField()
     client_risk_score = serializers.SerializerMethodField()
     client_risk_level = serializers.SerializerMethodField()
+    latest_message_text = serializers.SerializerMethodField()
+    latest_message_created_at = serializers.SerializerMethodField()
+    latest_message_sender_username = serializers.SerializerMethodField()
+    latest_message_sender_role = serializers.SerializerMethodField()
+    client_service_center_pro = serializers.SerializerMethodField()
+    client_wholesale_priority = serializers.SerializerMethodField()
 
     class Meta:
         model = Appointment
@@ -55,6 +62,12 @@ class AppointmentSerializer(serializers.ModelSerializer):
             "master_username",
             "client_risk_score",
             "client_risk_level",
+            "client_service_center_pro",
+            "client_wholesale_priority",
+            "latest_message_text",
+            "latest_message_created_at",
+            "latest_message_sender_username",
+            "latest_message_sender_role",
             "taken_at",
             "started_at",
             "completed_at",
@@ -129,6 +142,68 @@ class AppointmentSerializer(serializers.ModelSerializer):
             return None
         stats = getattr(obj.client, "client_stats", None)
         return getattr(stats, "risk_level", None)
+
+    def _get_latest_message(self, obj: Appointment):
+        if hasattr(obj, "_latest_message_cached"):
+            return getattr(obj, "_latest_message_cached")
+        latest = (
+            Message.objects.filter(appointment=obj, is_deleted=False)
+            .select_related("sender")
+            .order_by("-id")
+            .first()
+        )
+        setattr(obj, "_latest_message_cached", latest)
+        return latest
+
+    def get_latest_message_text(self, obj: Appointment) -> str:
+        annotated = getattr(obj, "latest_message_text", None)
+        if annotated is not None:
+            return annotated
+        latest = self._get_latest_message(obj)
+        if not latest:
+            return ""
+        if (latest.text or "").strip():
+            return latest.text
+        if latest.file:
+            return "Файл"
+        return ""
+
+    def get_latest_message_created_at(self, obj: Appointment):
+        annotated = getattr(obj, "latest_message_created_at", None)
+        if annotated is not None:
+            return annotated
+        latest = self._get_latest_message(obj)
+        return getattr(latest, "created_at", None)
+
+    def get_latest_message_sender_username(self, obj: Appointment) -> str:
+        annotated = getattr(obj, "latest_message_sender_username", None)
+        if annotated:
+            return annotated
+        latest = self._get_latest_message(obj)
+        if not latest:
+            return ""
+        return getattr(latest.sender, "username", "") if latest.sender_id else ""
+
+    def get_latest_message_sender_role(self, obj: Appointment) -> str:
+        annotated = getattr(obj, "latest_message_sender_role", None)
+        if annotated:
+            return annotated
+        latest = self._get_latest_message(obj)
+        if not latest or not latest.sender_id:
+            return ""
+        return getattr(latest.sender, "role", "") or ""
+
+    def get_client_service_center_pro(self, obj: Appointment) -> bool:
+        client = getattr(obj, "client", None)
+        if not client:
+            return False
+        return bool(client.is_service_center and client.wholesale_status == WholesaleStatusChoices.APPROVED)
+
+    def get_client_wholesale_priority(self, obj: Appointment) -> str:
+        client = getattr(obj, "client", None)
+        if not client:
+            return WholesalePriorityChoices.STANDARD
+        return client.wholesale_priority or WholesalePriorityChoices.STANDARD
 
 
 class AppointmentCreateSerializer(serializers.ModelSerializer):

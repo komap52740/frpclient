@@ -9,7 +9,14 @@ from rest_framework import serializers
 from apps.appointments.models import Appointment, AppointmentStatusChoices
 from apps.reviews.models import Review, ReviewTypeChoices
 
-from .models import ClientStats, MasterStats, SiteSettings, User, WholesaleStatusChoices
+from .models import (
+    ClientStats,
+    MasterStats,
+    SiteSettings,
+    User,
+    WholesalePriorityChoices,
+    WholesaleStatusChoices,
+)
 from .telegram import verify_telegram_login
 
 
@@ -77,6 +84,9 @@ class MeSerializer(serializers.ModelSerializer):
             "wholesale_requested_at",
             "wholesale_reviewed_at",
             "wholesale_review_comment",
+            "wholesale_priority",
+            "wholesale_priority_note",
+            "wholesale_priority_updated_at",
             "is_banned",
             "ban_reason",
             "client_stats",
@@ -234,6 +244,7 @@ class WholesaleRequestSerializer(serializers.Serializer):
 class WholesaleStatusSerializer(serializers.Serializer):
     is_service_center = serializers.BooleanField()
     wholesale_status = serializers.ChoiceField(choices=WholesaleStatusChoices.choices)
+    wholesale_priority = serializers.ChoiceField(choices=WholesalePriorityChoices.choices)
     wholesale_company_name = serializers.CharField(allow_blank=True)
     wholesale_city = serializers.CharField(allow_blank=True)
     wholesale_address = serializers.CharField(allow_blank=True)
@@ -244,6 +255,8 @@ class WholesaleStatusSerializer(serializers.Serializer):
     wholesale_requested_at = serializers.DateTimeField(allow_null=True)
     wholesale_reviewed_at = serializers.DateTimeField(allow_null=True)
     wholesale_review_comment = serializers.CharField(allow_blank=True)
+    wholesale_priority_note = serializers.CharField(allow_blank=True)
+    wholesale_priority_updated_at = serializers.DateTimeField(allow_null=True)
 
 
 class ClientProfileDetailSerializer(serializers.ModelSerializer):
@@ -281,6 +294,9 @@ class ClientProfileDetailSerializer(serializers.ModelSerializer):
             "wholesale_requested_at",
             "wholesale_reviewed_at",
             "wholesale_review_comment",
+            "wholesale_priority",
+            "wholesale_priority_note",
+            "wholesale_priority_updated_at",
             "created_at",
             "client_stats",
             "appointments_total",

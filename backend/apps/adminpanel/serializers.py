@@ -2,7 +2,13 @@
 
 from rest_framework import serializers
 
-from apps.accounts.models import MasterLevelChoices, RoleChoices, SiteSettings, User
+from apps.accounts.models import (
+    MasterLevelChoices,
+    RoleChoices,
+    SiteSettings,
+    User,
+    WholesalePriorityChoices,
+)
 from apps.accounts.serializers import ClientStatsSerializer, MasterStatsSerializer
 
 
@@ -17,6 +23,9 @@ class AdminUserSerializer(serializers.ModelSerializer):
     profile_photo_url = serializers.SerializerMethodField()
     wholesale_service_photo_1_url = serializers.SerializerMethodField()
     wholesale_service_photo_2_url = serializers.SerializerMethodField()
+    appointments_total = serializers.IntegerField(read_only=True, default=0)
+    appointments_active = serializers.IntegerField(read_only=True, default=0)
+    appointments_sla_breached = serializers.IntegerField(read_only=True, default=0)
 
     class Meta:
         model = User
@@ -50,6 +59,12 @@ class AdminUserSerializer(serializers.ModelSerializer):
             "wholesale_requested_at",
             "wholesale_reviewed_at",
             "wholesale_review_comment",
+            "wholesale_priority",
+            "wholesale_priority_note",
+            "wholesale_priority_updated_at",
+            "appointments_total",
+            "appointments_active",
+            "appointments_sla_breached",
             "is_staff",
             "is_superuser",
             "client_stats",
@@ -93,6 +108,11 @@ class AdminWholesaleReviewSerializer(serializers.Serializer):
     decision = serializers.ChoiceField(choices=(("approve", "approve"), ("reject", "reject")))
     discount_percent = serializers.IntegerField(min_value=0, max_value=100, required=False)
     review_comment = serializers.CharField(max_length=255, required=False, allow_blank=True)
+
+
+class AdminWholesalePrioritySerializer(serializers.Serializer):
+    wholesale_priority = serializers.ChoiceField(choices=WholesalePriorityChoices.choices)
+    wholesale_priority_note = serializers.CharField(max_length=255, required=False, allow_blank=True)
 
 
 class AdminSystemSettingsSerializer(serializers.ModelSerializer):

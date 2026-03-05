@@ -30,6 +30,12 @@ class WholesaleStatusChoices(models.TextChoices):
     REJECTED = "rejected", "Отклонено"
 
 
+class WholesalePriorityChoices(models.TextChoices):
+    STANDARD = "standard", "Стандарт"
+    PRIORITY = "priority", "Приоритет"
+    CRITICAL = "critical", "Критический"
+
+
 def validate_service_photo(value):
     if not value:
         return
@@ -99,6 +105,14 @@ class User(AbstractUser, TimeStampedModel):
     wholesale_requested_at = models.DateTimeField(null=True, blank=True)
     wholesale_reviewed_at = models.DateTimeField(null=True, blank=True)
     wholesale_review_comment = models.CharField(max_length=255, blank=True)
+    wholesale_priority = models.CharField(
+        max_length=20,
+        choices=WholesalePriorityChoices.choices,
+        default=WholesalePriorityChoices.STANDARD,
+        db_index=True,
+    )
+    wholesale_priority_note = models.CharField(max_length=255, blank=True)
+    wholesale_priority_updated_at = models.DateTimeField(null=True, blank=True)
 
     is_banned = models.BooleanField(default=False)
     ban_reason = models.TextField(blank=True)

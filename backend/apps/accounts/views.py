@@ -26,7 +26,14 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenRefreshView
 
-from .models import EmailVerificationToken, RoleChoices, SiteSettings, User, WholesaleStatusChoices
+from .models import (
+    EmailVerificationToken,
+    RoleChoices,
+    SiteSettings,
+    User,
+    WholesalePriorityChoices,
+    WholesaleStatusChoices,
+)
 from .permissions import IsAuthenticatedAndNotBanned
 from .services import recalculate_master_stats
 from apps.platform.services import create_notification, emit_event
@@ -1069,6 +1076,7 @@ def serialize_wholesale_status(user: User, request=None) -> dict:
         {
             "is_service_center": user.is_service_center,
             "wholesale_status": user.wholesale_status,
+            "wholesale_priority": user.wholesale_priority,
             "wholesale_company_name": user.wholesale_company_name,
             "wholesale_city": user.wholesale_city,
             "wholesale_address": user.wholesale_address,
@@ -1079,6 +1087,8 @@ def serialize_wholesale_status(user: User, request=None) -> dict:
             "wholesale_requested_at": user.wholesale_requested_at,
             "wholesale_reviewed_at": user.wholesale_reviewed_at,
             "wholesale_review_comment": user.wholesale_review_comment,
+            "wholesale_priority_note": user.wholesale_priority_note,
+            "wholesale_priority_updated_at": user.wholesale_priority_updated_at,
         }
     ).data
 
@@ -1159,6 +1169,9 @@ class WholesaleRequestView(APIView):
             user.wholesale_requested_at = None
             user.wholesale_reviewed_at = None
             user.wholesale_review_comment = ""
+            user.wholesale_priority = WholesalePriorityChoices.STANDARD
+            user.wholesale_priority_note = ""
+            user.wholesale_priority_updated_at = None
             user.wholesale_city = ""
             user.wholesale_address = ""
             user.wholesale_service_details = ""
@@ -1171,6 +1184,9 @@ class WholesaleRequestView(APIView):
                     "wholesale_requested_at",
                     "wholesale_reviewed_at",
                     "wholesale_review_comment",
+                    "wholesale_priority",
+                    "wholesale_priority_note",
+                    "wholesale_priority_updated_at",
                     "wholesale_city",
                     "wholesale_address",
                     "wholesale_service_details",
@@ -1184,12 +1200,19 @@ class WholesaleRequestView(APIView):
                 user.wholesale_requested_at = timezone.now()
                 user.wholesale_reviewed_at = None
                 user.wholesale_review_comment = ""
+                if previous_status != WholesaleStatusChoices.APPROVED:
+                    user.wholesale_priority = WholesalePriorityChoices.STANDARD
+                    user.wholesale_priority_note = ""
+                    user.wholesale_priority_updated_at = None
                 update_fields.extend(
                     [
                         "wholesale_status",
                         "wholesale_requested_at",
                         "wholesale_reviewed_at",
                         "wholesale_review_comment",
+                        "wholesale_priority",
+                        "wholesale_priority_note",
+                        "wholesale_priority_updated_at",
                     ]
                 )
 

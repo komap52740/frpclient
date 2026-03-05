@@ -7,6 +7,7 @@ from django.conf import settings
 from django.core.mail import get_connection, send_mail
 from django.core.management import call_command
 from django.db import connection
+from django.db.models import Count, Q
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
@@ -15,7 +16,14 @@ from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.accounts.models import MasterLevelChoices, RoleChoices, SiteSettings, User, WholesaleStatusChoices
+from apps.accounts.models import (
+    MasterLevelChoices,
+    RoleChoices,
+    SiteSettings,
+    User,
+    WholesalePriorityChoices,
+    WholesaleStatusChoices,
+)
 from apps.accounts.permissions import IsAdminRole, IsAuthenticatedAndNotBanned
 from apps.accounts.services import recalculate_client_stats
 from apps.appointments.models import Appointment, AppointmentStatusChoices
@@ -31,6 +39,7 @@ from .serializers import (
     AdminSystemSettingsSerializer,
     AdminUserRoleSerializer,
     AdminUserSerializer,
+    AdminWholesalePrioritySerializer,
     AdminWholesaleReviewSerializer,
     BanUserSerializer,
 )
@@ -118,7 +127,31 @@ class AdminClientsView(generics.ListAPIView):
         user = self.request.user
         if not (user.is_superuser or user.role in {RoleChoices.ADMIN, RoleChoices.MASTER}):
             raise PermissionDenied("Только для админа и мастера.")
-        return User.objects.filter(role=RoleChoices.CLIENT).order_by("-id")
+        active_statuses = (
+            AppointmentStatusChoices.NEW,
+            AppointmentStatusChoices.IN_REVIEW,
+            AppointmentStatusChoices.AWAITING_PAYMENT,
+            AppointmentStatusChoices.PAYMENT_PROOF_UPLOADED,
+            AppointmentStatusChoices.PAID,
+            AppointmentStatusChoices.IN_PROGRESS,
+        )
+        return (
+            User.objects.filter(role=RoleChoices.CLIENT)
+            .annotate(
+                appointments_total=Count("client_appointments", distinct=True),
+                appointments_active=Count(
+                    "client_appointments",
+                    filter=Q(client_appointments__status__in=active_statuses),
+                    distinct=True,
+                ),
+                appointments_sla_breached=Count(
+                    "client_appointments",
+                    filter=Q(client_appointments__sla_breached=True),
+                    distinct=True,
+                ),
+            )
+            .order_by("-id")
+        )
 
 
 class AdminWholesaleRequestsView(generics.ListAPIView):
@@ -185,12 +218,25 @@ class AdminWholesaleReviewView(APIView):
 
         if decision == "approve":
             user.wholesale_status = WholesaleStatusChoices.APPROVED
+            if not user.wholesale_priority:
+                user.wholesale_priority = WholesalePriorityChoices.STANDARD
         else:
             user.wholesale_status = WholesaleStatusChoices.REJECTED
+            user.wholesale_priority = WholesalePriorityChoices.STANDARD
+            user.wholesale_priority_note = ""
+            user.wholesale_priority_updated_at = None
         # Discount amount should not be shown in UI anymore.
         user.wholesale_discount_percent = 0
 
-        update_fields.extend(["wholesale_status", "wholesale_discount_percent"])
+        update_fields.extend(
+            [
+                "wholesale_status",
+                "wholesale_discount_percent",
+                "wholesale_priority",
+                "wholesale_priority_note",
+                "wholesale_priority_updated_at",
+            ]
+        )
         user.save(update_fields=sorted(set(update_fields)))
 
         create_notification(
@@ -211,6 +257,46 @@ class AdminWholesaleReviewView(APIView):
             payload={"decision": decision},
         )
 
+        return Response(AdminUserSerializer(user).data, status=status.HTTP_200_OK)
+
+
+class AdminWholesalePriorityView(APIView):
+    permission_classes = (IsAuthenticatedAndNotBanned,)
+
+    def post(self, request, user_id: int):
+        if not (request.user.is_superuser or request.user.role in {RoleChoices.ADMIN, RoleChoices.MASTER}):
+            return Response({"detail": "Недостаточно прав"}, status=status.HTTP_403_FORBIDDEN)
+
+        user = get_object_or_404(User, id=user_id, role=RoleChoices.CLIENT)
+        serializer = AdminWholesalePrioritySerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        priority = serializer.validated_data["wholesale_priority"]
+        note = (serializer.validated_data.get("wholesale_priority_note") or "").strip()
+        user.wholesale_priority = priority
+        user.wholesale_priority_note = note
+        user.wholesale_priority_updated_at = timezone.now()
+
+        update_fields = [
+            "wholesale_priority",
+            "wholesale_priority_note",
+            "wholesale_priority_updated_at",
+            "updated_at",
+        ]
+
+        # Priority is managed by master/admin manually and can also mark the user as service-center oriented.
+        if priority != WholesalePriorityChoices.STANDARD and not user.is_service_center:
+            user.is_service_center = True
+            update_fields.append("is_service_center")
+
+        user.save(update_fields=sorted(set(update_fields)))
+
+        emit_event(
+            "wholesale.priority_updated",
+            user,
+            actor=request.user,
+            payload={"priority": priority, "note": note},
+        )
         return Response(AdminUserSerializer(user).data, status=status.HTTP_200_OK)
 
 
@@ -546,5 +632,3 @@ class AdminSendClientEmailView(APIView):
             },
             status=status.HTTP_200_OK,
         )
-
-

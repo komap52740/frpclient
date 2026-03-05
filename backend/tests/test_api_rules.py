@@ -7,7 +7,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from rest_framework.test import APIClient
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from apps.accounts.models import MasterLevelChoices, RoleChoices, User, WholesaleStatusChoices
+from apps.accounts.models import MasterLevelChoices, RoleChoices, User, WholesalePriorityChoices, WholesaleStatusChoices
 from apps.accounts.notifications import notify_masters_about_new_appointment
 from apps.appointments.models import Appointment, AppointmentStatusChoices
 from apps.chat.models import Message
@@ -1081,5 +1081,59 @@ def test_set_price_does_not_apply_wholesale_discount_automatically(client_user, 
     assert appointment.wholesale_discount_percent_applied == 0
     assert appointment.total_price == 10000
     assert appointment.status == AppointmentStatusChoices.AWAITING_PAYMENT
+
+
+@pytest.mark.django_db
+def test_master_active_list_includes_chat_preview_and_service_center_pro_fields(client_user, master_user):
+    client_user.is_service_center = True
+    client_user.wholesale_status = WholesaleStatusChoices.APPROVED
+    client_user.wholesale_priority = WholesalePriorityChoices.CRITICAL
+    client_user.save(update_fields=["is_service_center", "wholesale_status", "wholesale_priority", "updated_at"])
+
+    appointment = Appointment.objects.create(
+        client=client_user,
+        assigned_master=master_user,
+        brand="Xiaomi",
+        model="Note 12",
+        lock_type="PIN",
+        has_pc=True,
+        description="desc",
+        status=AppointmentStatusChoices.IN_PROGRESS,
+    )
+    Message.objects.create(
+        appointment=appointment,
+        sender=client_user,
+        text="Нужна помощь в чате",
+    )
+
+    response = auth_as(master_user).get("/api/appointments/active/")
+    assert response.status_code == 200
+    assert len(response.data) == 1
+    payload = response.data[0]
+    assert payload["latest_message_text"] == "Нужна помощь в чате"
+    assert payload["latest_message_sender_username"] == client_user.username
+    assert payload["latest_message_sender_role"] == RoleChoices.CLIENT
+    assert payload["client_service_center_pro"] is True
+    assert payload["client_wholesale_priority"] == WholesalePriorityChoices.CRITICAL
+
+
+@pytest.mark.django_db
+def test_master_can_set_wholesale_priority_for_client(master_user, client_user):
+    response = auth_as(master_user).post(
+        f"/api/admin/users/{client_user.id}/wholesale-priority/",
+        {
+            "wholesale_priority": WholesalePriorityChoices.PRIORITY,
+            "wholesale_priority_note": "Срочные заявки по SLA",
+        },
+        format="json",
+    )
+    assert response.status_code == 200
+    assert response.data["wholesale_priority"] == WholesalePriorityChoices.PRIORITY
+    assert response.data["wholesale_priority_note"] == "Срочные заявки по SLA"
+
+    client_user.refresh_from_db()
+    assert client_user.wholesale_priority == WholesalePriorityChoices.PRIORITY
+    assert client_user.wholesale_priority_note == "Срочные заявки по SLA"
+    assert client_user.is_service_center is True
 
 

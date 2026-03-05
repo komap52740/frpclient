@@ -1,5 +1,6 @@
 ﻿from __future__ import annotations
 
+from django.db.models import OuterRef, Subquery
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import permissions, status
@@ -11,6 +12,7 @@ from apps.accounts.notifications import notify_masters_about_new_appointment
 from apps.accounts.permissions import IsAdminRole, IsAuthenticatedAndNotBanned
 from apps.accounts.services import recalculate_client_stats
 from apps.appointments.access import get_appointment_for_user
+from apps.chat.models import Message
 from apps.platform.services import emit_event
 
 from .client_actions import can_client_signal, create_client_signal, repeat_client_appointment
@@ -301,7 +303,20 @@ class MasterActiveAppointmentsView(APIView):
             AppointmentStatusChoices.PAID,
             AppointmentStatusChoices.IN_PROGRESS,
         )
-        queryset = Appointment.objects.filter(assigned_master=request.user, status__in=active_statuses).select_related("client")
+        latest_message_qs = Message.objects.filter(
+            appointment_id=OuterRef("pk"),
+            is_deleted=False,
+        ).order_by("-id")
+        queryset = (
+            Appointment.objects.filter(assigned_master=request.user, status__in=active_statuses)
+            .select_related("client", "assigned_master")
+            .annotate(
+                latest_message_text=Subquery(latest_message_qs.values("text")[:1]),
+                latest_message_created_at=Subquery(latest_message_qs.values("created_at")[:1]),
+                latest_message_sender_username=Subquery(latest_message_qs.values("sender__username")[:1]),
+                latest_message_sender_role=Subquery(latest_message_qs.values("sender__role")[:1]),
+            )
+        )
         data = AppointmentSerializer(queryset, many=True, context={"request": request}).data
         return Response(data)
 
@@ -469,6 +484,4 @@ class AdminManualStatusView(APIView):
         transition_status(appointment, request.user, to_status, serializer.validated_data.get("note", ""))
         recalculate_client_stats(appointment.client)
         return Response(AppointmentSerializer(appointment, context={"request": request}).data)
-
-
 

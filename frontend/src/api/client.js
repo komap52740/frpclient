@@ -318,6 +318,9 @@ export const adminApi = {
   reviewWholesale(userId, payload) {
     return api.post(`/admin/wholesale-requests/${userId}/review/`, payload);
   },
+  updateWholesalePriority(userId, payload) {
+    return api.post(`/admin/users/${userId}/wholesale-priority/`, payload);
+  },
   sendClientEmail(payload) {
     return api.post("/admin/clients/send-email/", payload);
   },

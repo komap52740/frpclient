@@ -29,15 +29,34 @@ function WholesaleStatusChip({ status }) {
   return <Chip size="small" variant="outlined" label="Опт: не запрошено" />;
 }
 
+const WHOLESALE_PRIORITY_OPTIONS = [
+  { value: "standard", label: "Стандарт" },
+  { value: "priority", label: "Приоритет" },
+  { value: "critical", label: "Критический" },
+];
+
+function WholesalePriorityChip({ value }) {
+  const item = WHOLESALE_PRIORITY_OPTIONS.find((option) => option.value === value) || WHOLESALE_PRIORITY_OPTIONS[0];
+  if (item.value === "critical") {
+    return <Chip size="small" color="error" label={`PRO: ${item.label}`} />;
+  }
+  if (item.value === "priority") {
+    return <Chip size="small" color="warning" label={`PRO: ${item.label}`} />;
+  }
+  return <Chip size="small" variant="outlined" label={`PRO: ${item.label}`} />;
+}
+
 export default function AdminClientsPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const canManage = user?.role === "admin";
+  const canReview = user?.role === "admin";
+  const canPriorityManage = user?.role === "admin" || user?.role === "master";
 
   const [rows, setRows] = useState([]);
   const [error, setError] = useState("");
   const [reasonById, setReasonById] = useState({});
   const [reviewDraftById, setReviewDraftById] = useState({});
+  const [priorityDraftById, setPriorityDraftById] = useState({});
   const [statusFilter, setStatusFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(false);
@@ -59,6 +78,18 @@ export default function AdminClientsPage() {
         });
         return next;
       });
+      setPriorityDraftById((prev) => {
+        const next = { ...prev };
+        items.forEach((row) => {
+          if (!next[row.id]) {
+            next[row.id] = {
+              wholesale_priority: row.wholesale_priority || "standard",
+              wholesale_priority_note: row.wholesale_priority_note || "",
+            };
+          }
+        });
+        return next;
+      });
     } catch {
       setError("Не удалось загрузить клиентов");
     } finally {
@@ -71,7 +102,7 @@ export default function AdminClientsPage() {
   }, []);
 
   const ban = async (id) => {
-    if (!canManage) return;
+    if (!canReview) return;
     setSavingId(id);
     try {
       await adminApi.ban(id, reasonById[id] || "");
@@ -82,7 +113,7 @@ export default function AdminClientsPage() {
   };
 
   const unban = async (id) => {
-    if (!canManage) return;
+    if (!canReview) return;
     setSavingId(id);
     try {
       await adminApi.unban(id);
@@ -93,7 +124,7 @@ export default function AdminClientsPage() {
   };
 
   const reviewWholesale = async (id, decision) => {
-    if (!canManage) return;
+    if (!canReview) return;
     const draft = reviewDraftById[id] || {};
     const payload = {
       decision,
@@ -116,6 +147,26 @@ export default function AdminClientsPage() {
     }
   };
 
+  const updateWholesalePriority = async (id) => {
+    if (!canPriorityManage) return;
+    const draft = priorityDraftById[id] || {};
+    const payload = {
+      wholesale_priority: draft.wholesale_priority || "standard",
+      wholesale_priority_note: (draft.wholesale_priority_note || "").trim(),
+    };
+
+    setSavingId(id);
+    try {
+      await adminApi.updateWholesalePriority(id, payload);
+      await load();
+    } catch (e) {
+      const detail = e?.response?.data?.detail;
+      setError(detail || "Не удалось обновить приоритет клиента");
+    } finally {
+      setSavingId(0);
+    }
+  };
+
   const filteredRows = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
     return rows.filter((row) => {
@@ -130,6 +181,7 @@ export default function AdminClientsPage() {
         row.wholesale_address,
         row.wholesale_comment,
         row.wholesale_service_details,
+        row.wholesale_priority_note,
       ]
         .filter(Boolean)
         .join(" ")
@@ -149,7 +201,7 @@ export default function AdminClientsPage() {
   return (
     <Stack spacing={2}>
       <Stack spacing={1}>
-        <Typography variant="h5">{canManage ? "Клиенты и оптовый статус" : "Клиенты"}</Typography>
+        <Typography variant="h5">{canPriorityManage ? "Клиенты и Service Center PRO" : "Клиенты"}</Typography>
         <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
           <Chip size="small" variant="outlined" label={`Всего: ${stats.total}`} />
           <Chip
@@ -226,9 +278,14 @@ export default function AdminClientsPage() {
         {filteredRows.map((row) => {
           const isSaving = savingId === row.id;
           const draft = reviewDraftById[row.id] || { review_comment: "" };
+          const priorityDraft = priorityDraftById[row.id] || {
+            wholesale_priority: row.wholesale_priority || "standard",
+            wholesale_priority_note: row.wholesale_priority_note || "",
+          };
           const company = (row.wholesale_company_name || "").trim();
           const city = (row.wholesale_city || "").trim();
           const address = (row.wholesale_address || "").trim();
+          const serviceCenterPro = row.wholesale_status === "approved" || row.is_service_center;
 
           return (
             <Accordion key={row.id} disableGutters>
@@ -246,6 +303,11 @@ export default function AdminClientsPage() {
                         {row.username}
                       </Typography>
                       <WholesaleStatusChip status={row.wholesale_status} />
+                      {serviceCenterPro ? <Chip size="small" color="success" label="Service Center PRO" /> : null}
+                      <WholesalePriorityChip value={row.wholesale_priority} />
+                      {row.appointments_sla_breached ? (
+                        <Chip size="small" color="error" variant="outlined" label={`SLA: ${row.appointments_sla_breached}`} />
+                      ) : null}
                       {row.is_banned ? <Chip size="small" color="error" variant="outlined" label="Заблокирован" /> : null}
                     </Stack>
                     <Typography variant="caption" color="text.secondary" sx={{ maxWidth: 560 }} noWrap>
@@ -260,6 +322,17 @@ export default function AdminClientsPage() {
               </AccordionSummary>
               <AccordionDetails>
                 <Stack spacing={1.2}>
+                  <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                    <Chip size="small" variant="outlined" label={`История: ${row.appointments_total || 0}`} />
+                    <Chip size="small" variant="outlined" label={`Активные: ${row.appointments_active || 0}`} />
+                    <Chip
+                      size="small"
+                      color={row.appointments_sla_breached ? "error" : "default"}
+                      variant={row.appointments_sla_breached ? "filled" : "outlined"}
+                      label={`SLA нарушено: ${row.appointments_sla_breached || 0}`}
+                    />
+                  </Stack>
+
                   {row.wholesale_service_details ? (
                     <Paper variant="outlined" sx={{ p: 1.2, borderRadius: 1.4 }}>
                       <Typography variant="caption" color="text.secondary">
@@ -286,9 +359,63 @@ export default function AdminClientsPage() {
                     </Stack>
                   ) : null}
 
-                  {canManage ? <Divider /> : null}
+                  {canPriorityManage ? (
+                    <Paper variant="outlined" sx={{ p: 1.2, borderRadius: 1.4 }}>
+                      <Stack spacing={1}>
+                        <Typography variant="caption" color="text.secondary">
+                          Ручной приоритет Service Center PRO
+                        </Typography>
+                        <TextField
+                          select
+                          size="small"
+                          label="Приоритет"
+                          value={priorityDraft.wholesale_priority}
+                          onChange={(event) =>
+                            setPriorityDraftById((prev) => ({
+                              ...prev,
+                              [row.id]: {
+                                ...priorityDraft,
+                                wholesale_priority: event.target.value,
+                              },
+                            }))
+                          }
+                        >
+                          {WHOLESALE_PRIORITY_OPTIONS.map((option) => (
+                            <MenuItem key={option.value} value={option.value}>
+                              {option.label}
+                            </MenuItem>
+                          ))}
+                        </TextField>
+                        <TextField
+                          size="small"
+                          label="Примечание к приоритету"
+                          value={priorityDraft.wholesale_priority_note}
+                          onChange={(event) =>
+                            setPriorityDraftById((prev) => ({
+                              ...prev,
+                              [row.id]: {
+                                ...priorityDraft,
+                                wholesale_priority_note: event.target.value,
+                              },
+                            }))
+                          }
+                          fullWidth
+                        />
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          disabled={isSaving}
+                          onClick={() => updateWholesalePriority(row.id)}
+                        >
+                          Сохранить приоритет
+                        </Button>
+                      </Stack>
+                    </Paper>
+                  ) : null}
 
-                  {canManage ? (
+                  {canPriorityManage || canReview ? <Divider /> : null}
+
+                  {canReview ? (
                     <TextField
                       size="small"
                       label="Причина бана"
@@ -297,7 +424,7 @@ export default function AdminClientsPage() {
                     />
                   ) : null}
 
-                  {canManage ? (
+                  {canReview ? (
                     <TextField
                       size="small"
                       label="Комментарий администратора"
@@ -312,7 +439,7 @@ export default function AdminClientsPage() {
                     />
                   ) : null}
 
-                  {canManage ? (
+                  {canReview ? (
                     <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
                       {row.is_banned ? (
                         <Button size="small" color="success" variant="outlined" disabled={isSaving} onClick={() => unban(row.id)}>
