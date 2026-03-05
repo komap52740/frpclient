@@ -10,6 +10,7 @@ from apps.accounts.models import (
     WholesalePriorityChoices,
 )
 from apps.accounts.serializers import ClientStatsSerializer, MasterStatsSerializer
+from apps.appointments.models import Appointment, AppointmentEvent, AppointmentEventType, PaymentMethodChoices
 
 
 class BanUserSerializer(serializers.Serializer):
@@ -147,6 +148,96 @@ class AdminSystemActionSerializer(serializers.Serializer):
     )
 
     action = serializers.ChoiceField(choices=ACTION_CHOICES)
+
+
+class PaymentRegistryHistoryItemSerializer(serializers.ModelSerializer):
+    actor_username = serializers.CharField(source="actor.username", read_only=True)
+    event_label = serializers.SerializerMethodField()
+
+    class Meta:
+        model = AppointmentEvent
+        fields = (
+            "id",
+            "event_type",
+            "event_label",
+            "created_at",
+            "actor",
+            "actor_username",
+            "note",
+            "metadata",
+        )
+
+    def get_event_label(self, obj: AppointmentEvent) -> str:
+        try:
+            return AppointmentEventType(obj.event_type).label
+        except Exception:  # pragma: no cover - defensive fallback
+            return obj.event_type
+
+
+class AdminPaymentRegistryRowSerializer(serializers.ModelSerializer):
+    appointment_id = serializers.IntegerField(source="id", read_only=True)
+    client_username = serializers.CharField(source="client.username", read_only=True)
+    master_username = serializers.CharField(source="assigned_master.username", read_only=True)
+    payment_confirmed_by_username = serializers.CharField(source="payment_confirmed_by.username", read_only=True)
+    payment_proof_url = serializers.SerializerMethodField()
+    payment_method_label = serializers.SerializerMethodField()
+    history = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Appointment
+        fields = (
+            "appointment_id",
+            "status",
+            "total_price",
+            "currency",
+            "created_at",
+            "updated_at",
+            "client_id",
+            "client_username",
+            "assigned_master_id",
+            "master_username",
+            "payment_method",
+            "payment_method_label",
+            "payment_requisites_note",
+            "payment_proof_url",
+            "payment_marked_at",
+            "payment_confirmed_at",
+            "payment_confirmed_by",
+            "payment_confirmed_by_username",
+            "history",
+        )
+
+    def get_payment_proof_url(self, obj: Appointment) -> str | None:
+        if not obj.payment_proof or not getattr(obj.payment_proof, "url", None):
+            return None
+        request = self.context.get("request")
+        return request.build_absolute_uri(obj.payment_proof.url) if request else obj.payment_proof.url
+
+    def get_payment_method_label(self, obj: Appointment) -> str:
+        if not obj.payment_method:
+            return ""
+        try:
+            return PaymentMethodChoices(obj.payment_method).label
+        except Exception:  # pragma: no cover - defensive fallback
+            return obj.payment_method
+
+    def get_history(self, obj: Appointment) -> list[dict]:
+        events = getattr(obj, "payment_history_events", None)
+        if events is None:
+            events = (
+                obj.events.filter(
+                    event_type__in=(
+                        AppointmentEventType.PAYMENT_PROOF_UPLOADED,
+                        AppointmentEventType.PAYMENT_MARKED,
+                        AppointmentEventType.PAYMENT_CONFIRMED,
+                    )
+                )
+                .select_related("actor")
+                .order_by("-id")
+            )
+        serializer = PaymentRegistryHistoryItemSerializer(events, many=True)
+        return serializer.data
+
 
 class AdminSendClientEmailSerializer(serializers.Serializer):
     subject = serializers.CharField(max_length=255)

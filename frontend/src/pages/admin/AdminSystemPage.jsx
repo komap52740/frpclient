@@ -1,4 +1,5 @@
 ﻿import AutorenewIcon from "@mui/icons-material/Autorenew";
+import FileDownloadRoundedIcon from "@mui/icons-material/FileDownloadRounded";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import SaveIcon from "@mui/icons-material/Save";
 import {
@@ -7,8 +8,18 @@ import {
   Button,
   Chip,
   Divider,
+  FormControl,
+  InputLabel,
+  MenuItem,
   Paper,
+  Select,
   Stack,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
   TextField,
   Typography,
 } from "@mui/material";
@@ -24,6 +35,18 @@ const ACTIONS = [
   { id: "migrate", label: "Применить миграции" },
   { id: "collectstatic", label: "Собрать статику" },
   { id: "clearsessions", label: "Очистить сессии" },
+];
+
+const PAYMENT_STATE_OPTIONS = [
+  { value: "all", label: "Все" },
+  { value: "pending", label: "Ждут проверки" },
+  { value: "confirmed", label: "Подтверждены" },
+];
+
+const PAYMENT_METHOD_OPTIONS = [
+  { value: "", label: "Все способы" },
+  { value: "bank_transfer", label: "Банковский перевод" },
+  { value: "crypto", label: "Криптовалюта" },
 ];
 
 function BoolChip({ value, trueLabel = "Готово", falseLabel = "Не настроено" }) {
@@ -93,6 +116,16 @@ export default function AdminSystemPage() {
 
   const [unreadNotifications, setUnreadNotifications] = useState([]);
   const [wholesalePendingCount, setWholesalePendingCount] = useState(0);
+  const [paymentRegistryRows, setPaymentRegistryRows] = useState([]);
+  const [paymentRegistryTotal, setPaymentRegistryTotal] = useState(0);
+  const [paymentRegistryLoading, setPaymentRegistryLoading] = useState(false);
+  const [paymentRegistryError, setPaymentRegistryError] = useState("");
+  const [paymentRegistryFilters, setPaymentRegistryFilters] = useState({
+    state: "all",
+    payment_method: "",
+    from: dayjs().subtract(30, "day").format("YYYY-MM-DD"),
+    to: dayjs().format("YYYY-MM-DD"),
+  });
 
   const loadStatus = async () => {
     setLoadingStatus(true);
@@ -167,6 +200,28 @@ export default function AdminSystemPage() {
     }
   };
 
+  const loadPaymentRegistry = async (filters = paymentRegistryFilters) => {
+    setPaymentRegistryLoading(true);
+    try {
+      const params = {
+        state: filters.state,
+        payment_method: filters.payment_method,
+        from: filters.from,
+        to: filters.to,
+        limit: 120,
+      };
+      const response = await adminApi.paymentRegistry(params);
+      const payload = response.data || {};
+      setPaymentRegistryRows(Array.isArray(payload.results) ? payload.results : []);
+      setPaymentRegistryTotal(Number(payload.count || 0));
+      setPaymentRegistryError("");
+    } catch (error) {
+      setPaymentRegistryError(error?.response?.data?.detail || "Не удалось загрузить реестр оплат");
+    } finally {
+      setPaymentRegistryLoading(false);
+    }
+  };
+
   useEffect(() => {
     loadStatus();
     loadSettings();
@@ -175,6 +230,7 @@ export default function AdminSystemPage() {
     loadWeeklyReport();
     loadUnreadNotifications();
     loadWholesalePending();
+    loadPaymentRegistry();
   }, []);
 
   const saveSettings = async () => {
@@ -203,6 +259,36 @@ export default function AdminSystemPage() {
       setActionResult(getActionError(error));
     } finally {
       setRunningAction("");
+    }
+  };
+
+  const updatePaymentFilter = (name, value) => {
+    setPaymentRegistryFilters((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const applyPaymentRegistryFilters = async () => {
+    await loadPaymentRegistry(paymentRegistryFilters);
+  };
+
+  const exportPaymentRegistryCsv = async () => {
+    try {
+      const response = await adminApi.paymentRegistryExport({
+        state: paymentRegistryFilters.state,
+        payment_method: paymentRegistryFilters.payment_method,
+        from: paymentRegistryFilters.from,
+        to: paymentRegistryFilters.to,
+      });
+      const blob = response.data instanceof Blob ? response.data : new Blob([response.data], { type: "text/csv;charset=utf-8" });
+      const url = window.URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `payment-registry-${dayjs().format("YYYY-MM-DD")}.csv`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      setPaymentRegistryError(error?.response?.data?.detail || "Не удалось выгрузить CSV");
     }
   };
 
@@ -274,6 +360,7 @@ export default function AdminSystemPage() {
             loadWeeklyReport();
             loadUnreadNotifications();
             loadWholesalePending();
+            loadPaymentRegistry();
           }}
           disabled={loadingStatus}
         >
@@ -316,6 +403,169 @@ export default function AdminSystemPage() {
         ) : (
           <Typography variant="body2" color="text.secondary">Финансовая сводка недоступна.</Typography>
         )}
+      </Paper>
+
+      <Paper sx={{ p: 2 }}>
+        <Stack
+          direction={{ xs: "column", md: "row" }}
+          spacing={1}
+          justifyContent="space-between"
+          alignItems={{ xs: "flex-start", md: "center" }}
+          sx={{ mb: 1.2 }}
+        >
+          <Stack spacing={0.2}>
+            <Typography variant="h3">Реестр оплат</Typography>
+            <Typography variant="caption" color="text.secondary">
+              Отдельный журнал: чек, способ оплаты, кто подтвердил, история правок.
+            </Typography>
+          </Stack>
+          <Stack direction="row" spacing={1}>
+            <Chip size="small" variant="outlined" label={`Записей: ${paymentRegistryTotal}`} />
+            <Button
+              size="small"
+              variant="outlined"
+              startIcon={<FileDownloadRoundedIcon />}
+              onClick={exportPaymentRegistryCsv}
+            >
+              Экспорт CSV
+            </Button>
+          </Stack>
+        </Stack>
+
+        <Stack direction={{ xs: "column", md: "row" }} spacing={1} sx={{ mb: 1.2 }}>
+          <FormControl size="small" sx={{ minWidth: { xs: "100%", md: 180 } }}>
+            <InputLabel id="payment-state-label">Статус</InputLabel>
+            <Select
+              labelId="payment-state-label"
+              value={paymentRegistryFilters.state}
+              label="Статус"
+              onChange={(event) => updatePaymentFilter("state", event.target.value)}
+            >
+              {PAYMENT_STATE_OPTIONS.map((option) => (
+                <MenuItem key={option.value} value={option.value}>
+                  {option.label}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <FormControl size="small" sx={{ minWidth: { xs: "100%", md: 220 } }}>
+            <InputLabel id="payment-method-label">Способ оплаты</InputLabel>
+            <Select
+              labelId="payment-method-label"
+              value={paymentRegistryFilters.payment_method}
+              label="Способ оплаты"
+              onChange={(event) => updatePaymentFilter("payment_method", event.target.value)}
+            >
+              {PAYMENT_METHOD_OPTIONS.map((option) => (
+                <MenuItem key={option.value} value={option.value}>
+                  {option.label}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <TextField
+            size="small"
+            type="date"
+            label="От"
+            InputLabelProps={{ shrink: true }}
+            value={paymentRegistryFilters.from}
+            onChange={(event) => updatePaymentFilter("from", event.target.value)}
+          />
+          <TextField
+            size="small"
+            type="date"
+            label="До"
+            InputLabelProps={{ shrink: true }}
+            value={paymentRegistryFilters.to}
+            onChange={(event) => updatePaymentFilter("to", event.target.value)}
+          />
+          <Button size="small" variant="contained" onClick={applyPaymentRegistryFilters} disabled={paymentRegistryLoading}>
+            Обновить реестр
+          </Button>
+        </Stack>
+
+        {paymentRegistryError ? <Alert severity="error" sx={{ mb: 1 }}>{paymentRegistryError}</Alert> : null}
+
+        <TableContainer sx={{ border: "1px solid", borderColor: "divider", borderRadius: 2 }}>
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell>Заявка</TableCell>
+                <TableCell>Клиент</TableCell>
+                <TableCell>Мастер</TableCell>
+                <TableCell>Способ</TableCell>
+                <TableCell>Чек</TableCell>
+                <TableCell>Подтвердил</TableCell>
+                <TableCell>История правок</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {paymentRegistryRows.map((row) => (
+                <TableRow key={row.appointment_id} hover>
+                  <TableCell>
+                    <Stack spacing={0.3}>
+                      <Typography variant="body2" sx={{ fontWeight: 700 }}>#{row.appointment_id}</Typography>
+                      <Typography variant="caption" color="text.secondary">{row.status}</Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {row.total_price ? `${Number(row.total_price).toLocaleString("ru-RU")} ₽` : "Цена не указана"}
+                      </Typography>
+                    </Stack>
+                  </TableCell>
+                  <TableCell>{row.client_username || "—"}</TableCell>
+                  <TableCell>{row.master_username || "—"}</TableCell>
+                  <TableCell>
+                    <Stack spacing={0.2}>
+                      <Typography variant="body2">{row.payment_method_label || row.payment_method || "—"}</Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {row.payment_requisites_note || "Реквизиты не указаны"}
+                      </Typography>
+                    </Stack>
+                  </TableCell>
+                  <TableCell>
+                    {row.payment_proof_url ? (
+                      <Button size="small" variant="text" href={row.payment_proof_url} target="_blank" rel="noreferrer">
+                        Открыть чек
+                      </Button>
+                    ) : (
+                      <Typography variant="caption" color="text.secondary">Нет файла</Typography>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <Stack spacing={0.2}>
+                      <Typography variant="body2">{row.payment_confirmed_by_username || "—"}</Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {row.payment_confirmed_at ? dayjs(row.payment_confirmed_at).format("DD.MM.YYYY HH:mm") : "Не подтверждено"}
+                      </Typography>
+                    </Stack>
+                  </TableCell>
+                  <TableCell sx={{ maxWidth: 300 }}>
+                    <Stack spacing={0.4}>
+                      {(row.history || []).slice(0, 3).map((eventItem) => (
+                        <Typography key={eventItem.id} variant="caption" color="text.secondary">
+                          {dayjs(eventItem.created_at).format("DD.MM HH:mm")} — {eventItem.event_label || eventItem.event_type}
+                          {" · "}
+                          {eventItem.actor_username || "система"}
+                        </Typography>
+                      ))}
+                      {!row.history?.length ? (
+                        <Typography variant="caption" color="text.secondary">История пустая</Typography>
+                      ) : null}
+                    </Stack>
+                  </TableCell>
+                </TableRow>
+              ))}
+              {!paymentRegistryRows.length && !paymentRegistryLoading ? (
+                <TableRow>
+                  <TableCell colSpan={7}>
+                    <Typography variant="body2" color="text.secondary">
+                      В реестре оплат пока нет записей по текущим фильтрам.
+                    </Typography>
+                  </TableCell>
+                </TableRow>
+              ) : null}
+            </TableBody>
+          </Table>
+        </TableContainer>
       </Paper>
 
       <Paper sx={{ p: 2 }}>

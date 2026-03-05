@@ -12,7 +12,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from apps.accounts.models import MasterLevelChoices, RoleChoices, User, WholesalePriorityChoices, WholesaleStatusChoices
 from apps.accounts.notifications import notify_masters_about_new_appointment
 from apps.accounts.services import recalculate_client_stats
-from apps.appointments.models import Appointment, AppointmentStatusChoices
+from apps.appointments.models import Appointment, AppointmentEvent, AppointmentEventType, AppointmentStatusChoices
 from apps.chat.models import Message
 from apps.platform.models import Notification
 from apps.reviews.models import Review, ReviewTypeChoices
@@ -1282,6 +1282,95 @@ def test_weekly_report_for_master(master_user, client_user):
     assert response.data["closed_count"] >= 1
     assert "avg_first_response_seconds" in response.data
     assert "problematic_cases_count" in response.data
+
+
+@pytest.mark.django_db
+def test_payment_registry_for_master_scope(master_user, master_user_2, client_user):
+    now = timezone.now()
+    own_appointment = Appointment.objects.create(
+        client=client_user,
+        assigned_master=master_user,
+        brand="Samsung",
+        model="A53",
+        lock_type="PIN",
+        has_pc=True,
+        description="desc",
+        status=AppointmentStatusChoices.PAYMENT_PROOF_UPLOADED,
+        payment_method="bank_transfer",
+        payment_requisites_note="СБП +7...",
+        payment_marked_at=now,
+    )
+    AppointmentEvent.objects.create(
+        appointment=own_appointment,
+        actor=client_user,
+        event_type=AppointmentEventType.PAYMENT_MARKED,
+        note="Оплатил по СБП",
+    )
+
+    Appointment.objects.create(
+        client=client_user,
+        assigned_master=master_user_2,
+        brand="Xiaomi",
+        model="Note 13",
+        lock_type="PIN",
+        has_pc=True,
+        description="desc",
+        status=AppointmentStatusChoices.PAID,
+        payment_method="crypto",
+        payment_requisites_note="USDT",
+        payment_marked_at=now,
+        payment_confirmed_at=now,
+    )
+
+    response = auth_as(master_user).get("/api/admin/payments/registry/")
+    assert response.status_code == 200
+    assert response.data["count"] == 1
+    assert len(response.data["results"]) == 1
+    row = response.data["results"][0]
+    assert row["appointment_id"] == own_appointment.id
+    assert row["payment_method"] == "bank_transfer"
+    assert row["history"][0]["event_type"] == AppointmentEventType.PAYMENT_MARKED
+
+
+@pytest.mark.django_db
+def test_payment_registry_csv_export(admin_user, master_user, client_user):
+    now = timezone.now()
+    appointment = Appointment.objects.create(
+        client=client_user,
+        assigned_master=master_user,
+        brand="Apple",
+        model="iPhone 14",
+        lock_type="APPLE_ID",
+        has_pc=True,
+        description="desc",
+        status=AppointmentStatusChoices.PAID,
+        payment_method="crypto",
+        payment_requisites_note="USDT TRC20",
+        payment_marked_at=now,
+        payment_confirmed_at=now,
+        payment_confirmed_by=admin_user,
+        total_price=12000,
+    )
+    AppointmentEvent.objects.create(
+        appointment=appointment,
+        actor=admin_user,
+        event_type=AppointmentEventType.PAYMENT_CONFIRMED,
+        note="Проверено вручную",
+    )
+
+    response = auth_as(admin_user).get("/api/admin/payments/registry/export/")
+    assert response.status_code == 200
+    assert "text/csv" in response["Content-Type"]
+    body = response.content.decode("utf-8")
+    assert "appointment_id" in body
+    assert str(appointment.id) in body
+    assert "USDT TRC20" in body
+
+
+@pytest.mark.django_db
+def test_payment_registry_requires_staff_role(client_user):
+    response = auth_as(client_user).get("/api/admin/payments/registry/")
+    assert response.status_code == 403
 
 
 @pytest.mark.django_db

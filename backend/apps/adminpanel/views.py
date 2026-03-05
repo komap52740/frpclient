@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import csv
 import io
 import time
 from datetime import timedelta
@@ -8,8 +9,9 @@ from django.conf import settings
 from django.core.mail import get_connection, send_mail
 from django.core.management import call_command
 from django.db import connection
-from django.db.models import Avg, Count, DurationField, ExpressionWrapper, F, Q, Sum
+from django.db.models import Avg, Count, DurationField, ExpressionWrapper, F, Prefetch, Q, Sum
 from django.db.models.functions import TruncDate
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.utils.dateparse import parse_date
@@ -29,13 +31,20 @@ from apps.accounts.models import (
 )
 from apps.accounts.permissions import IsAdminRole, IsAuthenticatedAndNotBanned
 from apps.accounts.services import recalculate_client_stats
-from apps.appointments.models import Appointment, AppointmentStatusChoices
+from apps.appointments.models import (
+    Appointment,
+    AppointmentEvent,
+    AppointmentEventType,
+    AppointmentStatusChoices,
+    PaymentMethodChoices,
+)
 from apps.appointments.serializers import AppointmentSerializer
 from apps.appointments.views import ConfirmPaymentMixin
 from apps.platform.services import create_notification, emit_event
 
 from .filters import AdminAppointmentFilter
 from .serializers import (
+    AdminPaymentRegistryRowSerializer,
     AdminSendClientEmailSerializer,
     AdminMasterQualitySerializer,
     AdminSystemActionSerializer,
@@ -64,6 +73,194 @@ def _scoped_appointments_for_report(user):
     if user.is_superuser or user.role == RoleChoices.ADMIN:
         return Appointment.objects.all()
     return Appointment.objects.filter(assigned_master=user)
+
+
+PAYMENT_HISTORY_EVENT_TYPES = (
+    AppointmentEventType.PAYMENT_PROOF_UPLOADED,
+    AppointmentEventType.PAYMENT_MARKED,
+    AppointmentEventType.PAYMENT_CONFIRMED,
+)
+
+
+def _payment_registry_queryset(user, query_params):
+    queryset = (
+        _scoped_appointments_for_report(user)
+        .select_related("client", "assigned_master", "payment_confirmed_by")
+        .prefetch_related(
+            Prefetch(
+                "events",
+                queryset=AppointmentEvent.objects.filter(event_type__in=PAYMENT_HISTORY_EVENT_TYPES)
+                .select_related("actor")
+                .order_by("-id"),
+                to_attr="payment_history_events",
+            )
+        )
+    )
+
+    queryset = queryset.filter(
+        Q(payment_marked_at__isnull=False)
+        | Q(payment_proof__isnull=False)
+        | Q(payment_confirmed_at__isnull=False)
+        | Q(
+            status__in=(
+                AppointmentStatusChoices.AWAITING_PAYMENT,
+                AppointmentStatusChoices.PAYMENT_PROOF_UPLOADED,
+                AppointmentStatusChoices.PAID,
+                AppointmentStatusChoices.IN_PROGRESS,
+                AppointmentStatusChoices.COMPLETED,
+            )
+        )
+    )
+
+    state_filter = (query_params.get("state") or "").strip().lower()
+    if state_filter == "confirmed":
+        queryset = queryset.filter(payment_confirmed_at__isnull=False)
+    elif state_filter == "pending":
+        queryset = queryset.filter(payment_confirmed_at__isnull=True).filter(
+            Q(payment_marked_at__isnull=False)
+            | Q(payment_proof__isnull=False)
+            | Q(status=AppointmentStatusChoices.PAYMENT_PROOF_UPLOADED)
+        )
+
+    payment_method = (query_params.get("payment_method") or "").strip()
+    if payment_method in PaymentMethodChoices.values:
+        queryset = queryset.filter(payment_method=payment_method)
+
+    appointment_id = (query_params.get("appointment_id") or "").strip()
+    if appointment_id.isdigit():
+        queryset = queryset.filter(id=int(appointment_id))
+
+    client_id = (query_params.get("client_id") or "").strip()
+    if client_id.isdigit():
+        queryset = queryset.filter(client_id=int(client_id))
+
+    master_id = (query_params.get("master_id") or "").strip()
+    if master_id.isdigit():
+        queryset = queryset.filter(assigned_master_id=int(master_id))
+
+    confirmed_by_id = (query_params.get("confirmed_by_id") or "").strip()
+    if confirmed_by_id.isdigit():
+        queryset = queryset.filter(payment_confirmed_by_id=int(confirmed_by_id))
+
+    date_from = parse_date(query_params.get("from") or "")
+    date_to = parse_date(query_params.get("to") or "")
+    if date_from and date_to and date_from > date_to:
+        date_from, date_to = date_to, date_from
+
+    if date_from:
+        queryset = queryset.filter(
+            Q(payment_marked_at__date__gte=date_from)
+            | Q(payment_confirmed_at__date__gte=date_from)
+            | Q(updated_at__date__gte=date_from)
+        )
+    if date_to:
+        queryset = queryset.filter(
+            Q(payment_marked_at__date__lte=date_to)
+            | Q(payment_confirmed_at__date__lte=date_to)
+            | Q(updated_at__date__lte=date_to)
+        )
+
+    return queryset.order_by("-payment_confirmed_at", "-payment_marked_at", "-updated_at", "-id")
+
+
+class AdminPaymentRegistryView(APIView):
+    permission_classes = (IsAuthenticatedAndNotBanned,)
+
+    def get(self, request):
+        if not _can_view_staff_tools(request.user):
+            return Response({"detail": "Недостаточно прав"}, status=status.HTTP_403_FORBIDDEN)
+
+        queryset = _payment_registry_queryset(request.user, request.query_params)
+
+        limit_raw = (request.query_params.get("limit") or "100").strip()
+        offset_raw = (request.query_params.get("offset") or "0").strip()
+        limit = int(limit_raw) if limit_raw.isdigit() else 100
+        offset = int(offset_raw) if offset_raw.isdigit() else 0
+        limit = max(1, min(limit, 500))
+        offset = max(0, offset)
+
+        total = queryset.count()
+        rows = queryset[offset : offset + limit]
+        serializer = AdminPaymentRegistryRowSerializer(rows, many=True, context={"request": request})
+        return Response(
+            {
+                "count": total,
+                "limit": limit,
+                "offset": offset,
+                "results": serializer.data,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class AdminPaymentRegistryExportCsvView(APIView):
+    permission_classes = (IsAuthenticatedAndNotBanned,)
+
+    def get(self, request):
+        if not _can_view_staff_tools(request.user):
+            return Response({"detail": "Недостаточно прав"}, status=status.HTTP_403_FORBIDDEN)
+
+        queryset = _payment_registry_queryset(request.user, request.query_params)
+
+        response = HttpResponse(content_type="text/csv; charset=utf-8")
+        filename = f"payment-registry-{timezone.localdate().isoformat()}.csv"
+        response["Content-Disposition"] = f'attachment; filename="{filename}"'
+        response.write("\ufeff")
+
+        writer = csv.writer(response)
+        writer.writerow(
+            [
+                "appointment_id",
+                "status",
+                "client_username",
+                "master_username",
+                "payment_method",
+                "payment_requisites_note",
+                "payment_proof_url",
+                "total_price",
+                "currency",
+                "payment_marked_at",
+                "payment_confirmed_at",
+                "payment_confirmed_by",
+                "history",
+            ]
+        )
+
+        for appointment in queryset:
+            proof_url = ""
+            if appointment.payment_proof and getattr(appointment.payment_proof, "url", None):
+                proof_url = request.build_absolute_uri(appointment.payment_proof.url)
+
+            history_rows = []
+            for event in getattr(appointment, "payment_history_events", []):
+                event_time = timezone.localtime(event.created_at).strftime("%Y-%m-%d %H:%M:%S")
+                actor_name = event.actor.username if event.actor_id else "-"
+                note = (event.note or "").replace("\n", " ").strip()
+                history_rows.append(f"{event_time} | {event.event_type} | {actor_name} | {note}")
+
+            writer.writerow(
+                [
+                    appointment.id,
+                    appointment.status,
+                    appointment.client.username if appointment.client_id else "",
+                    appointment.assigned_master.username if appointment.assigned_master_id else "",
+                    appointment.payment_method or "",
+                    appointment.payment_requisites_note or "",
+                    proof_url,
+                    int(appointment.total_price or 0),
+                    appointment.currency or "RUB",
+                    timezone.localtime(appointment.payment_marked_at).strftime("%Y-%m-%d %H:%M:%S")
+                    if appointment.payment_marked_at
+                    else "",
+                    timezone.localtime(appointment.payment_confirmed_at).strftime("%Y-%m-%d %H:%M:%S")
+                    if appointment.payment_confirmed_at
+                    else "",
+                    appointment.payment_confirmed_by.username if appointment.payment_confirmed_by_id else "",
+                    " || ".join(history_rows),
+                ]
+            )
+
+        return response
 
 
 class AdminAppointmentListView(generics.ListAPIView):

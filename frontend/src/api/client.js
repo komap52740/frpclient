@@ -327,6 +327,12 @@ export const adminApi = {
   financeSummary(params = {}) {
     return api.get("/admin/finance/summary/", { params });
   },
+  paymentRegistry(params = {}) {
+    return api.get("/admin/payments/registry/", { params });
+  },
+  paymentRegistryExport(params = {}) {
+    return api.get("/admin/payments/registry/export/", { params, responseType: "blob" });
+  },
   weeklyReport(params = {}) {
     return api.get("/admin/reports/weekly/", { params });
   },
