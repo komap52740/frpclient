@@ -57,6 +57,18 @@ function upsertCanonical(url) {
   node.setAttribute("href", url);
 }
 
+function upsertAlternateLink(hreflang, href) {
+  if (!hreflang) return;
+  let node = document.head.querySelector(`link[rel="alternate"][hreflang="${hreflang}"]`);
+  if (!node) {
+    node = document.createElement("link");
+    node.setAttribute("rel", "alternate");
+    node.setAttribute("hreflang", hreflang);
+    document.head.appendChild(node);
+  }
+  node.setAttribute("href", href);
+}
+
 function upsertJsonLd(payload) {
   let node = document.head.querySelector(`script#${SEO_JSONLD_ID}`);
   if (!payload) {
@@ -136,10 +148,12 @@ export default function SeoMeta() {
     const path = pathname || "/";
     const canonical = `${origin}${path}`;
     const routeMeta = getRouteMeta(path);
-    const ogImage = `${origin}/favicon.ico`;
+    const ogImage = `${origin}/og-image.svg`;
 
     document.title = routeMeta.title;
     upsertCanonical(canonical);
+    upsertAlternateLink("ru-RU", canonical);
+    upsertAlternateLink("x-default", canonical);
 
     upsertMetaByName("description", routeMeta.description);
     upsertMetaByName("robots", routeMeta.robots);
@@ -147,6 +161,7 @@ export default function SeoMeta() {
     upsertMetaByName("twitter:title", routeMeta.title);
     upsertMetaByName("twitter:description", routeMeta.description);
     upsertMetaByName("twitter:image", ogImage);
+    upsertMetaByName("twitter:image:alt", "FRP Client — удаленная разблокировка устройств");
 
     upsertMetaByProperty("og:type", "website");
     upsertMetaByProperty("og:site_name", SITE_NAME);
@@ -154,6 +169,7 @@ export default function SeoMeta() {
     upsertMetaByProperty("og:description", routeMeta.description);
     upsertMetaByProperty("og:url", canonical);
     upsertMetaByProperty("og:image", ogImage);
+    upsertMetaByProperty("og:image:alt", "FRP Client — удаленная разблокировка устройств");
     upsertMetaByProperty("og:locale", "ru_RU");
 
     upsertJsonLd(routeMeta.isPublic ? buildPublicJsonLd(origin) : null);

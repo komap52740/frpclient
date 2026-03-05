@@ -10,13 +10,17 @@
     <meta property="og:site_name" content="FRP Client" />
     <meta property="og:title" content="FRP Client — удаленная разблокировка устройств" />
     <meta property="og:description" content="Подавайте заявку онлайн, общайтесь с мастером в чате и отслеживайте этапы разблокировки в реальном времени." />
-    <meta property="og:url" content="/" />
+    <meta property="og:url" content="%VITE_SITE_URL%/" />
+    <meta property="og:image" content="/og-image.svg" />
+    <meta property="og:image:alt" content="FRP Client — удаленная разблокировка устройств" />
     <meta property="og:locale" content="ru_RU" />
     <meta name="twitter:card" content="summary" />
     <meta name="twitter:title" content="FRP Client — удаленная разблокировка устройств" />
     <meta name="twitter:description" content="Онлайн-заявка, чат с мастером и прозрачные статусы по каждому этапу работы." />
-    <link rel="canonical" href="/" />
+    <meta name="twitter:image" content="/og-image.svg" />
+    <link rel="canonical" href="%VITE_SITE_URL%/" />
     <link rel="icon" href="/favicon.ico" />
+    <link rel="manifest" href="/site.webmanifest" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
@@ -24,15 +28,55 @@
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
-        "@type": "WebSite",
-        "name": "FRP Client",
-        "url": "/",
-        "description": "Сервис удаленной разблокировки устройств с онлайн-заявкой и чатом с мастером.",
-        "inLanguage": "ru-RU"
+        "@graph": [
+          {
+            "@type": "WebSite",
+            "name": "FRP Client",
+            "url": "%VITE_SITE_URL%/",
+            "description": "Сервис удаленной разблокировки устройств с онлайн-заявкой и чатом с мастером.",
+            "inLanguage": "ru-RU"
+          },
+          {
+            "@type": "ProfessionalService",
+            "name": "FRP Client",
+            "serviceType": "Удаленная разблокировка устройств",
+            "areaServed": "RU",
+            "url": "%VITE_SITE_URL%/",
+            "description": "Онлайн-заявка, чат с мастером и прозрачные статусы всех этапов."
+          },
+          {
+            "@type": "FAQPage",
+            "mainEntity": [
+              {
+                "@type": "Question",
+                "name": "Сколько времени занимает разблокировка?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "Срок зависит от модели и этапа проверки, прогресс всегда виден в карточке заявки."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "Нужно ли ехать в сервис?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "Нет, подключение и сопровождение выполняются удаленно через RuDesktop."
+                }
+              }
+            ]
+          }
+        ]
       }
     </script>
   </head>
   <body>
+    <noscript>
+      <main>
+        <h1>FRP Client — удаленная разблокировка устройств</h1>
+        <p>Онлайн-заявка, чат с мастером, прозрачные статусы работ и удаленное подключение через RuDesktop.</p>
+        <p><a href="/login">Перейти ко входу в систему</a></p>
+      </main>
+    </noscript>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>

@@ -1,19 +1,21 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-
 const DEFAULT_SITE_URL = "https://client.androidmultitool.ru";
-const rawSiteUrl = (process.env.VITE_SITE_URL || DEFAULT_SITE_URL).trim();
-const normalizedBase = rawSiteUrl.replace(/\/+$/, "");
-const siteUrl = /^https?:\/\//i.test(normalizedBase) ? normalizedBase : `https://${normalizedBase}`;
 
-const publicDir = resolve(__dirname, "../public");
-const now = new Date().toISOString().slice(0, 10);
+export function resolveSiteUrl(rawValue = "") {
+  const normalizedBase = String(rawValue || DEFAULT_SITE_URL).trim().replace(/\/+$/, "");
+  return /^https?:\/\//i.test(normalizedBase) ? normalizedBase : `https://${normalizedBase}`;
+}
 
-const robots = `User-agent: *
+export async function generateSeoFiles(siteUrl) {
+  const publicDir = resolve(__dirname, "../public");
+  const now = new Date().toISOString().slice(0, 10);
+
+  const robots = `User-agent: *
 Allow: /
 Disallow: /api/
 Disallow: /client/
@@ -26,7 +28,7 @@ Disallow: /django-admin/
 Sitemap: ${siteUrl}/sitemap.xml
 `;
 
-const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
+  const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>${siteUrl}/</loc>
@@ -43,8 +45,13 @@ const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
 </urlset>
 `;
 
-await mkdir(publicDir, { recursive: true });
-await writeFile(resolve(publicDir, "robots.txt"), robots, "utf8");
-await writeFile(resolve(publicDir, "sitemap.xml"), sitemap, "utf8");
+  await mkdir(publicDir, { recursive: true });
+  await writeFile(resolve(publicDir, "robots.txt"), robots, "utf8");
+  await writeFile(resolve(publicDir, "sitemap.xml"), sitemap, "utf8");
+  console.log(`[seo] generated robots.txt and sitemap.xml for ${siteUrl}`);
+}
 
-console.log(`[seo] generated robots.txt and sitemap.xml for ${siteUrl}`);
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  const siteUrl = resolveSiteUrl(process.env.VITE_SITE_URL);
+  await generateSeoFiles(siteUrl);
+}

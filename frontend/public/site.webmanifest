@@ -1,0 +1,16 @@
+﻿{
+  "name": "FRP Client",
+  "short_name": "FRP",
+  "description": "Сервис удаленной разблокировки устройств",
+  "start_url": "/login",
+  "display": "standalone",
+  "background_color": "#08152f",
+  "theme_color": "#0b1530",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "48x48 32x32 16x16",
+      "type": "image/x-icon"
+    }
+  ]
+}

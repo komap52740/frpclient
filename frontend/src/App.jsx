@@ -1,4 +1,4 @@
-import { Component, lazy, Suspense } from "react";
+﻿import { Component, lazy, Suspense } from "react";
 import { Alert, Box, Button, CircularProgress, Stack, Typography } from "@mui/material";
 import { Navigate, Route, Routes } from "react-router-dom";
 
@@ -57,6 +57,7 @@ const MasterNewPage = lazyWithRetry(() => import("./pages/master/MasterNewPage")
 const MasterQuickRepliesPage = lazyWithRetry(() => import("./pages/master/MasterQuickRepliesPage"));
 const MasterReviewsPage = lazyWithRetry(() => import("./pages/master/MasterReviewsPage"));
 const RoleProfilePage = lazyWithRetry(() => import("./pages/RoleProfilePage"));
+const RemoteUnlockLandingPage = lazyWithRetry(() => import("./pages/public/RemoteUnlockLandingPage"));
 
 function RouteFallback() {
   return (
@@ -317,6 +318,7 @@ export default function App() {
       <Suspense fallback={<RouteFallback />}>
         <SeoMeta />
         <Routes>
+          <Route path="/remote-unlock" element={<RemoteUnlockLandingPage />} />
           <Route path="/login" element={user ? <Navigate to={isBannedClient ? "/banned" : "/"} replace /> : <LoginPage />} />
           <Route
             path="/banned"
@@ -328,3 +330,4 @@ export default function App() {
     </RouteErrorBoundary>
   );
 }
+
