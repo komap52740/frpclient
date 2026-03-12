@@ -380,11 +380,14 @@ nginx -t && systemctl reload nginx
 Если хотите включать admin host без ручного двухшагового переключения `HTTP -> certbot -> TLS`, используйте:
 
 ```bash
+sh ops/security/connect_tailscale.sh --check-only
+TAILSCALE_AUTH_KEY=tskey-... sh ops/security/connect_tailscale.sh --hostname frpclient-prod --advertise-tags tag:prod,tag:admin
 sh ops/nginx/enable_admin_host.sh --check-only --access-mode tailscale
 CERTBOT_EMAIL=you@example.com sh ops/nginx/enable_admin_host.sh --access-mode tailscale
 ```
 
 Скрипт:
+- `ops/security/connect_tailscale.sh` поднимает `tailscaled`, печатает текущий status и выполняет `tailscale up`;
 - проверяет, что `admin.frpclient.ru` уже резолвится;
 - ставит выбранный access snippet (`tailscale` или `cloudflare`);
 - временно включает HTTP-only vhost для ACME challenge;
