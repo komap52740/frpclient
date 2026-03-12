@@ -40,10 +40,12 @@ STATUS_LABELS = {
 }
 
 LOCK_TYPE_LABELS = {
-    "PIN": "PIN/пароль",
     "GOOGLE": "Google",
-    "APPLE_ID": "Apple ID",
+    "HUAWEI_ID": "Huawei ID",
+    "MI_ACC": "Mi Acc",
     "OTHER": "Другое",
+    "PIN": "PIN/пароль",
+    "APPLE_ID": "Apple ID",
 }
 
 SIGNAL_ALIASES = {
@@ -72,14 +74,18 @@ def parse_yes_no(value: str) -> bool | None:
 
 def parse_lock_type_input(value: str) -> str | None:
     normalized = (value or "").strip().lower()
-    if normalized in {"1", "pin", "пароль", "пин", "рїр°сђрѕр»сњ", "рїрёрЅ"}:
-        return "PIN"
-    if normalized in {"2", "google", "гугл", "ріѓріѓр»"}:
+    if normalized in {"1", "google", "гугл", "ріѓріѓр»"}:
         return "GOOGLE"
-    if normalized in {"3", "apple", "apple_id", "appleid"}:
-        return "APPLE_ID"
+    if normalized in {"2", "huawei", "huawei_id", "huawei id", "хуавей", "хуавей айди"}:
+        return "HUAWEI_ID"
+    if normalized in {"3", "mi", "mi_acc", "mi acc", "xiaomi", "mi account", "miaccount", "ми", "ми аккаунт"}:
+        return "MI_ACC"
     if normalized in {"4", "other", "другое", "рдсђсѓріѕрµ"}:
         return "OTHER"
+    if normalized in {"pin", "пароль", "пин", "рїр°сђрѕр»сњ", "рїрёрЅ"}:
+        return "PIN"
+    if normalized in {"apple", "apple_id", "appleid"}:
+        return "APPLE_ID"
     return None
 
 
@@ -407,7 +413,7 @@ class ClientTelegramBot:
             state["step"] = "lock_type"
             self.send_message(
                 chat_id,
-                "Шаг 3/5. Тип блокировки:\n1) PIN\n2) GOOGLE\n3) APPLE_ID\n4) OTHER",
+                "Шаг 3/5. Тип блокировки:\n1) GOOGLE\n2) HUAWEI ID\n3) MI ACC\n4) OTHER",
             )
             return True
 

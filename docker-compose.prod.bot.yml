@@ -1,0 +1,20 @@
+version: "2.4"
+
+services:
+  telegram-bot:
+    build:
+      context: ./backend
+    container_name: ${TELEGRAM_BOT_CONTAINER_NAME:-frp-telegram-bot}
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    env_file:
+      - ${BACKEND_ENV_FILE:-./backend/.env}
+      - ${BACKEND_SECRETS_FILE:-/etc/frpclient/backend.secrets.env}
+    depends_on:
+      backend:
+        condition: service_healthy
+    command: python manage.py run_client_telegram_bot

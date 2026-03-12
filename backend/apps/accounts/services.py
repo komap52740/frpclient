@@ -94,7 +94,7 @@ def _resolve_wholesale_priority(stats: ClientStats) -> tuple[str, str]:
         stats.completed_orders_count >= 10
         and stats.cancellation_rate <= 0.16
         and stats.risk_score <= 45
-        and stats.average_rating >= 4.0
+        and (stats.average_rating == 0 or stats.average_rating >= 4.0)
     ):
         return WholesalePriorityChoices.PRIORITY, "AUTO: stable flow without conflicts"
 

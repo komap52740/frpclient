@@ -2,10 +2,22 @@ import { Box, Paper, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 
 const toneStyles = {
-  default: { light: { bg: "#f7fafc", accent: "#0d6e9f" }, dark: { bg: "#152235", accent: "#8dc8ff" } },
-  success: { light: { bg: "#eefaf3", accent: "#1c9a4d" }, dark: { bg: "#163428", accent: "#7be3a7" } },
-  warning: { light: { bg: "#fff8ea", accent: "#b8740f" }, dark: { bg: "#3a2a12", accent: "#ffd186" } },
-  danger: { light: { bg: "#fdeff0", accent: "#c63f38" }, dark: { bg: "#3d1c20", accent: "#ff9f98" } },
+  default: {
+    light: { bg: "#f7fafc", accent: "#0d6e9f" },
+    dark: { bg: "#152235", accent: "#8dc8ff" },
+  },
+  success: {
+    light: { bg: "#eefaf3", accent: "#1c9a4d" },
+    dark: { bg: "#163428", accent: "#7be3a7" },
+  },
+  warning: {
+    light: { bg: "#fff8ea", accent: "#b8740f" },
+    dark: { bg: "#3a2a12", accent: "#ffd186" },
+  },
+  danger: {
+    light: { bg: "#fdeff0", accent: "#c63f38" },
+    dark: { bg: "#3d1c20", accent: "#ff9f98" },
+  },
   info: { light: { bg: "#edf4ff", accent: "#2678d8" }, dark: { bg: "#172a42", accent: "#8fbfff" } },
 };
 

@@ -13,13 +13,15 @@ import {
   Typography,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
+import { useQueryClient } from "@tanstack/react-query";
 import dayjs from "dayjs";
 import "dayjs/locale/ru";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useDeferredValue, useMemo, useState } from "react";
 
-import { adminApi } from "../../api/client";
 import EmptyState from "../../components/EmptyState";
-import useAutoRefresh from "../../hooks/useAutoRefresh";
+import { useMasterQueueRealtime } from "../../features/appointments/master-inbox/hooks/useMasterQueueRealtime";
+import { useAdminReviewsQuery } from "../../features/reviews/hooks/useReviewQueries";
+import { cleanQueryParams, queryKeys } from "../../shared/api/queryKeys";
 
 dayjs.locale("ru");
 
@@ -68,55 +70,61 @@ function applyClientFilters(rows, { query, minRating }) {
 
 export default function AdminReviewsPage() {
   const theme = useTheme();
+  const queryClient = useQueryClient();
   const isDark = theme.palette.mode === "dark";
-  const [rows, setRows] = useState([]);
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
   const [filters, setFilters] = useState({
     review_type: "",
     target_role: "",
     min_rating: "0",
     query: "",
   });
-
-  const load = useCallback(async ({ silent = false, withLoading = true } = {}) => {
-    if (withLoading) {
-      setLoading(true);
-    }
-    try {
-      const response = await adminApi.reviews({
+  const deferredQuery = useDeferredValue(filters.query);
+  const serverFilters = useMemo(
+    () =>
+      cleanQueryParams({
         review_type: filters.review_type || undefined,
         target_role: filters.target_role || undefined,
-      });
-      setRows(response.data || []);
-      setError("");
-    } catch {
-      if (!silent) {
-        setError("Не удалось загрузить отзывы");
-      }
-    } finally {
-      if (withLoading) {
-        setLoading(false);
-      }
-    }
-  }, [filters.review_type, filters.target_role]);
+      }),
+    [filters.review_type, filters.target_role]
+  );
+  const {
+    data: rows = [],
+    isPending,
+    isFetching,
+    error,
+    refetch,
+  } = useAdminReviewsQuery(serverFilters);
+  const loading = isPending;
+  const refreshing = isFetching;
+  const errorMessage = error ? "Не удалось загрузить отзывы" : "";
 
-  useEffect(() => {
-    load();
-  }, [load]);
+  const refreshData = useCallback(async () => {
+    await refetch();
+  }, [refetch]);
 
-  useAutoRefresh(() => load({ silent: true, withLoading: false }), { intervalMs: 18000 });
+  const invalidateData = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: queryKeys.reviews.adminRoot() });
+  }, [queryClient]);
+
+  useMasterQueueRealtime({
+    onConnected: invalidateData,
+    onQueueEvent: invalidateData,
+  });
 
   const filteredRows = useMemo(
-    () => applyClientFilters(rows, { query: filters.query, minRating: filters.min_rating }),
-    [filters.min_rating, filters.query, rows]
+    () => applyClientFilters(rows, { query: deferredQuery, minRating: filters.min_rating }),
+    [deferredQuery, filters.min_rating, rows]
   );
 
   const avg = filteredRows.length
-    ? (filteredRows.reduce((sum, row) => sum + (row.rating || 0), 0) / filteredRows.length).toFixed(1)
+    ? (filteredRows.reduce((sum, row) => sum + (row.rating || 0), 0) / filteredRows.length).toFixed(
+        1
+      )
     : null;
   const lowCount = filteredRows.filter((row) => (row.rating || 0) <= 2).length;
-  const todayCount = filteredRows.filter((row) => dayjs(row.created_at).isAfter(dayjs().startOf("day"))).length;
+  const todayCount = filteredRows.filter((row) =>
+    dayjs(row.created_at).isAfter(dayjs().startOf("day"))
+  ).length;
 
   return (
     <Stack spacing={2}>
@@ -127,7 +135,12 @@ export default function AdminReviewsPage() {
         alignItems={{ xs: "flex-start", sm: "center" }}
       >
         <Typography variant="h5">Отзывы платформы</Typography>
-        <Button variant="outlined" startIcon={<RefreshRoundedIcon />} onClick={() => load()} disabled={loading}>
+        <Button
+          variant="outlined"
+          startIcon={<RefreshRoundedIcon />}
+          onClick={refreshData}
+          disabled={refreshing}
+        >
           Обновить
         </Button>
       </Stack>
@@ -145,12 +158,18 @@ export default function AdminReviewsPage() {
           <Chip
             size="small"
             label={`Низкие (<=2): ${lowCount}`}
-            sx={{ bgcolor: isDark ? "rgba(101,31,35,0.45)" : "#fee4e2", color: isDark ? "#ff9a94" : "#b42318" }}
+            sx={{
+              bgcolor: isDark ? "rgba(101,31,35,0.45)" : "#fee4e2",
+              color: isDark ? "#ff9a94" : "#b42318",
+            }}
           />
           <Chip
             size="small"
             label={`Сегодня: ${todayCount}`}
-            sx={{ bgcolor: isDark ? "rgba(20,52,82,0.42)" : "#e9f2ff", color: isDark ? "#8ac8ff" : "#0f6ba8" }}
+            sx={{
+              bgcolor: isDark ? "rgba(20,52,82,0.42)" : "#e9f2ff",
+              color: isDark ? "#8ac8ff" : "#0f6ba8",
+            }}
           />
         </Stack>
       </Paper>
@@ -161,7 +180,9 @@ export default function AdminReviewsPage() {
             select
             label="Тип отзыва"
             value={filters.review_type}
-            onChange={(event) => setFilters((prev) => ({ ...prev, review_type: event.target.value }))}
+            onChange={(event) =>
+              setFilters((prev) => ({ ...prev, review_type: event.target.value }))
+            }
             sx={{ minWidth: { xs: "100%", md: 220 } }}
           >
             {REVIEW_TYPES.map((item) => (
@@ -175,7 +196,9 @@ export default function AdminReviewsPage() {
             select
             label="Кому адресован"
             value={filters.target_role}
-            onChange={(event) => setFilters((prev) => ({ ...prev, target_role: event.target.value }))}
+            onChange={(event) =>
+              setFilters((prev) => ({ ...prev, target_role: event.target.value }))
+            }
             sx={{ minWidth: { xs: "100%", md: 200 } }}
           >
             {TARGET_ROLES.map((item) => (
@@ -189,7 +212,9 @@ export default function AdminReviewsPage() {
             select
             label="Минимальная оценка"
             value={filters.min_rating}
-            onChange={(event) => setFilters((prev) => ({ ...prev, min_rating: event.target.value }))}
+            onChange={(event) =>
+              setFilters((prev) => ({ ...prev, min_rating: event.target.value }))
+            }
             sx={{ minWidth: { xs: "100%", md: 190 } }}
           >
             {MIN_RATINGS.map((item) => (
@@ -215,13 +240,17 @@ export default function AdminReviewsPage() {
               ),
             }}
           />
-          <Button variant="contained" onClick={() => load()} sx={{ alignSelf: { xs: "stretch", md: "center" } }}>
+          <Button
+            variant="contained"
+            onClick={refreshData}
+            sx={{ alignSelf: { xs: "stretch", md: "center" } }}
+          >
             Применить серверный фильтр
           </Button>
         </Stack>
       </Paper>
 
-      {error ? <Alert severity="error">{error}</Alert> : null}
+      {errorMessage ? <Alert severity="error">{errorMessage}</Alert> : null}
 
       {!filteredRows.length && !loading ? (
         <EmptyState
@@ -246,21 +275,29 @@ export default function AdminReviewsPage() {
               }}
             >
               <Stack spacing={0.6}>
-                <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={1}>
+                <Stack
+                  direction="row"
+                  justifyContent="space-between"
+                  alignItems="center"
+                  spacing={1}
+                >
                   <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
                     <Typography variant="subtitle2">Заявка #{row.appointment}</Typography>
                     <Typography variant="caption" color="text.secondary">
-                      {row.review_type === "master_review" ? "Клиент -> Мастер" : "Мастер -> Клиент"}
+                      {row.review_type === "master_review"
+                        ? "Клиент -> Мастер"
+                        : "Мастер -> Клиент"}
                     </Typography>
                   </Stack>
-                <Stack direction="row" spacing={0.6} alignItems="center">
+                  <Stack direction="row" spacing={0.6} alignItems="center">
                     <StarRoundedIcon sx={{ fontSize: 18, color: isDark ? "#ffd166" : "#f59e0b" }} />
                     <Typography variant="subtitle2">{row.rating}/5</Typography>
-                </Stack>
+                  </Stack>
                 </Stack>
 
                 <Typography variant="body2" color="text.secondary">
-                  От: {row.author_username || row.author} | Кому: {row.target_username || row.target}
+                  От: {row.author_username || row.author} | Кому:{" "}
+                  {row.target_username || row.target}
                 </Typography>
 
                 {row.comment ? (

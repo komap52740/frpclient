@@ -1,10 +1,11 @@
-﻿import DashboardRoundedIcon from "@mui/icons-material/DashboardRounded";
+﻿import BusinessCenterRoundedIcon from "@mui/icons-material/BusinessCenterRounded";
+import DashboardRoundedIcon from "@mui/icons-material/DashboardRounded";
 import GavelRoundedIcon from "@mui/icons-material/GavelRounded";
 import HomeRoundedIcon from "@mui/icons-material/HomeRounded";
 import ListAltRoundedIcon from "@mui/icons-material/ListAltRounded";
 import NewReleasesRoundedIcon from "@mui/icons-material/NewReleasesRounded";
-import PersonRoundedIcon from "@mui/icons-material/PersonRounded";
 import PeopleRoundedIcon from "@mui/icons-material/PeopleRounded";
+import PersonRoundedIcon from "@mui/icons-material/PersonRounded";
 import QuickreplyRoundedIcon from "@mui/icons-material/QuickreplyRounded";
 import ReviewsRoundedIcon from "@mui/icons-material/ReviewsRounded";
 import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
@@ -13,13 +14,17 @@ import { alpha } from "@mui/material/styles";
 import { useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
-function getActions(role) {
+function getActions(role, showB2BNav) {
   if (role === "client") {
-    return [
+    const actions = [
       { label: "Главная", to: "/client/home", icon: <HomeRoundedIcon /> },
       { label: "Заявки", to: "/client/my", icon: <ListAltRoundedIcon /> },
-      { label: "Профиль", to: "/client/profile", icon: <PersonRoundedIcon /> },
     ];
+    if (showB2BNav) {
+      actions.push({ label: "B2B", to: "/wholesale", icon: <BusinessCenterRoundedIcon /> });
+    }
+    actions.push({ label: "Профиль", to: "/client/profile", icon: <PersonRoundedIcon /> });
+    return actions;
   }
 
   if (role === "master") {
@@ -45,16 +50,17 @@ function getActions(role) {
   return [];
 }
 
-export default function AppBottomNav({ role }) {
+export default function AppBottomNav({ role, showB2BNav = false }) {
   const navigate = useNavigate();
   const location = useLocation();
-  const actions = useMemo(() => getActions(role), [role]);
+  const actions = useMemo(() => getActions(role, showB2BNav), [role, showB2BNav]);
 
   if (!actions.length) {
     return null;
   }
 
-  const selected = actions.find((action) => location.pathname.startsWith(action.to))?.to || actions[0].to;
+  const selected =
+    actions.find((action) => location.pathname.startsWith(action.to))?.to || actions[0].to;
 
   return (
     <Paper
@@ -70,9 +76,7 @@ export default function AppBottomNav({ role }) {
         border: "1px solid",
         borderColor: "divider",
         backgroundColor: (theme) =>
-          theme.palette.mode === "dark"
-            ? "rgba(10, 16, 28, 0.9)"
-            : "rgba(255,255,255,0.86)",
+          theme.palette.mode === "dark" ? "rgba(10, 16, 28, 0.9)" : "rgba(255,255,255,0.86)",
         backdropFilter: "blur(10px) saturate(120%)",
         overflow: "hidden",
         boxShadow: (theme) =>
@@ -109,7 +113,12 @@ export default function AppBottomNav({ role }) {
         }}
       >
         {actions.map((action) => (
-          <BottomNavigationAction key={action.to} value={action.to} label={action.label} icon={action.icon} />
+          <BottomNavigationAction
+            key={action.to}
+            value={action.to}
+            label={action.label}
+            icon={action.icon}
+          />
         ))}
       </BottomNavigation>
     </Paper>

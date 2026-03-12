@@ -244,6 +244,28 @@ class EmailVerificationToken(TimeStampedModel):
         return self.expires_at <= timezone.now()
 
 
+class PasswordResetToken(TimeStampedModel):
+    user = models.ForeignKey(
+        "accounts.User",
+        related_name="password_reset_tokens",
+        on_delete=models.CASCADE,
+    )
+    token = models.CharField(max_length=96, unique=True, db_index=True)
+    expires_at = models.DateTimeField(db_index=True)
+    used_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ("-id",)
+        indexes = [
+            models.Index(fields=("user", "used_at")),
+            models.Index(fields=("expires_at",)),
+        ]
+
+    @property
+    def is_expired(self) -> bool:
+        return self.expires_at <= timezone.now()
+
+
 class MasterStats(TimeStampedModel):
     user = models.OneToOneField(
         "accounts.User",

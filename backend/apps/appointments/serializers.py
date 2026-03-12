@@ -1,9 +1,14 @@
 ﻿from __future__ import annotations
 
+from datetime import datetime
+
+from django.conf import settings
 from rest_framework import serializers
 
 from apps.accounts.models import WholesalePriorityChoices, WholesaleStatusChoices
 from apps.chat.models import Message, ReadState
+from apps.common.secure_media import build_appointment_media_url
+from apps.common.upload_security import image_upload_policy, payment_proof_upload_policy, sanitize_upload
 
 from .client_actions import CLIENT_SIGNAL_META
 from .models import (
@@ -18,6 +23,8 @@ class AppointmentSerializer(serializers.ModelSerializer):
     unread_count = serializers.SerializerMethodField()
     client_username = serializers.CharField(source="client.username", read_only=True)
     master_username = serializers.CharField(source="assigned_master.username", read_only=True)
+    rustdesk_id = serializers.SerializerMethodField()
+    rustdesk_password = serializers.SerializerMethodField()
     photo_lock_screen_url = serializers.SerializerMethodField()
     payment_proof_url = serializers.SerializerMethodField()
     client_risk_score = serializers.SerializerMethodField()
@@ -97,6 +104,10 @@ class AppointmentSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         )
+        extra_kwargs = {
+            "photo_lock_screen": {"write_only": True},
+            "payment_proof": {"write_only": True},
+        }
 
     def get_unread_count(self, obj: Appointment) -> int:
         request = self.context.get("request")
@@ -109,16 +120,35 @@ class AppointmentSerializer(serializers.ModelSerializer):
         return obj.messages.filter(id__gt=last_read_id, is_deleted=False).exclude(sender=user).count()
 
     def get_photo_lock_screen_url(self, obj: Appointment) -> str | None:
-        request = self.context.get("request")
-        if obj.photo_lock_screen and hasattr(obj.photo_lock_screen, "url"):
-            return request.build_absolute_uri(obj.photo_lock_screen.url) if request else obj.photo_lock_screen.url
-        return None
+        return build_appointment_media_url(self.context.get("request"), obj, "photo_lock_screen")
 
     def get_payment_proof_url(self, obj: Appointment) -> str | None:
+        return build_appointment_media_url(self.context.get("request"), obj, "payment_proof")
+
+    def _can_see_client_access(self, obj: Appointment) -> bool:
+        if not self.context.get("include_client_access"):
+            return False
         request = self.context.get("request")
-        if obj.payment_proof and hasattr(obj.payment_proof, "url"):
-            return request.build_absolute_uri(obj.payment_proof.url) if request else obj.payment_proof.url
-        return None
+        user = getattr(request, "user", None)
+        if not user or not user.is_authenticated:
+            return False
+        if user.is_superuser or user.role == "admin":
+            return True
+        if user.role == "client" and obj.client_id == user.id:
+            return True
+        if user.role == "master" and obj.assigned_master_id == user.id:
+            return True
+        return False
+
+    def get_rustdesk_id(self, obj: Appointment) -> str:
+        if not self._can_see_client_access(obj):
+            return ""
+        return obj.rustdesk_id or ""
+
+    def get_rustdesk_password(self, obj: Appointment) -> str:
+        if not self._can_see_client_access(obj):
+            return ""
+        return obj.rustdesk_password or ""
 
     def _can_see_client_risk(self, obj: Appointment) -> bool:
         request = self.context.get("request")
@@ -168,7 +198,7 @@ class AppointmentSerializer(serializers.ModelSerializer):
             return "Файл"
         return ""
 
-    def get_latest_message_created_at(self, obj: Appointment):
+    def get_latest_message_created_at(self, obj: Appointment) -> datetime | None:
         annotated = getattr(obj, "latest_message_created_at", None)
         if annotated is not None:
             return annotated
@@ -212,6 +242,9 @@ class AppointmentCreateSerializer(serializers.ModelSerializer):
     wholesale_company_name = serializers.CharField(write_only=True, required=False, allow_blank=True, max_length=255)
     wholesale_service_photo_1 = serializers.FileField(write_only=True, required=False, allow_null=True)
     wholesale_service_photo_2 = serializers.FileField(write_only=True, required=False, allow_null=True)
+
+    def validate_photo_lock_screen(self, value):
+        return sanitize_upload(value, image_upload_policy(settings.LOCK_SCREEN_MAX_UPLOAD_MB * 1024 * 1024))
 
     def validate(self, attrs):
         wholesale_payload_detected = any(
@@ -299,6 +332,9 @@ class ClientAccessUpdateSerializer(serializers.Serializer):
 
 
 class UploadPaymentProofSerializer(serializers.ModelSerializer):
+    def validate_payment_proof(self, value):
+        return sanitize_upload(value, payment_proof_upload_policy(settings.PAYMENT_PROOF_MAX_UPLOAD_MB * 1024 * 1024))
+
     class Meta:
         model = Appointment
         fields = ("payment_proof",)

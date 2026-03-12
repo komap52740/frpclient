@@ -6,7 +6,17 @@ import PersonRoundedIcon from "@mui/icons-material/PersonRounded";
 import RocketLaunchRoundedIcon from "@mui/icons-material/RocketLaunchRounded";
 import StorefrontRoundedIcon from "@mui/icons-material/StorefrontRounded";
 import TrendingUpRoundedIcon from "@mui/icons-material/TrendingUpRounded";
-import { Alert, Box, Button, Chip, Divider, Paper, Stack, TextField, Typography } from "@mui/material";
+import {
+  Alert,
+  Box,
+  Button,
+  Chip,
+  Divider,
+  Paper,
+  Stack,
+  TextField,
+  Typography,
+} from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import dayjs from "dayjs";
 import "dayjs/locale/ru";
@@ -14,7 +24,8 @@ import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { authApi } from "../../api/client";
-import { useAuth } from "../../auth/AuthContext";
+import { useAuth } from "../../features/auth/hooks/useAuth";
+import { getB2BStatusMeta } from "../../shared/lib/b2bLabels";
 
 dayjs.locale("ru");
 
@@ -23,13 +34,6 @@ function resolveLevelLabel(level) {
   if (level === "advanced") return "Продвинутый";
   if (level === "newbie") return "Новичок";
   return "Базовый";
-}
-
-function resolveWholesaleLabel(status) {
-  if (status === "approved") return "Одобрено";
-  if (status === "pending") return "На рассмотрении";
-  if (status === "rejected") return "Отклонено";
-  return "Не запрошено";
 }
 
 function formatPercent(value) {
@@ -101,9 +105,27 @@ export default function ClientProfilePage() {
   const avatarUrl = user?.profile_photo_url || user?.telegram_photo_url || "";
 
   const levelLabel = resolveLevelLabel(stats.level);
-  const wholesaleLabel = resolveWholesaleLabel(user?.wholesale_status);
+  const b2bStatusMeta = getB2BStatusMeta(user?.wholesale_status);
   const isWholesaleApproved = user?.wholesale_status === "approved";
-  const hasExistingServicePhoto = Boolean(user?.wholesale_service_photo_1_url || user?.wholesale_service_photo_2_url);
+  const hasExistingServicePhoto = Boolean(
+    user?.wholesale_service_photo_1_url || user?.wholesale_service_photo_2_url
+  );
+  const b2bModeLabel =
+    user?.wholesale_status === "approved"
+      ? "B2B-партнёр"
+      : user?.wholesale_status === "pending"
+        ? "B2B-заявка в модерации"
+        : user?.wholesale_status === "rejected"
+          ? "B2B-заявка отклонена"
+          : "Базовый аккаунт";
+  const b2bModeColor =
+    user?.wholesale_status === "approved"
+      ? "success"
+      : user?.wholesale_status === "pending"
+        ? "warning"
+        : user?.wholesale_status === "rejected"
+          ? "error"
+          : "default";
 
   const updateServiceField = (key, value) => {
     setServiceForm((prev) => ({ ...prev, [key]: value }));
@@ -124,7 +146,8 @@ export default function ClientProfilePage() {
       return;
     }
     const hasNicknameChanged = nextUsername !== (user?.username || "");
-    const hasPhotoChanged = Boolean(profileForm.profile_photo) || Boolean(profileForm.remove_profile_photo);
+    const hasPhotoChanged =
+      Boolean(profileForm.profile_photo) || Boolean(profileForm.remove_profile_photo);
     if (!hasNicknameChanged && !hasPhotoChanged) {
       setProfileError("Нет изменений для сохранения.");
       return;
@@ -169,14 +192,20 @@ export default function ClientProfilePage() {
       return;
     }
     if (!city) {
-      setRequestError("\u0423\u043a\u0430\u0436\u0438\u0442\u0435 \u0433\u043e\u0440\u043e\u0434 \u0441\u0435\u0440\u0432\u0438\u0441\u043d\u043e\u0433\u043e \u0446\u0435\u043d\u0442\u0440\u0430");
+      setRequestError(
+        "\u0423\u043a\u0430\u0436\u0438\u0442\u0435 \u0433\u043e\u0440\u043e\u0434 \u0441\u0435\u0440\u0432\u0438\u0441\u043d\u043e\u0433\u043e \u0446\u0435\u043d\u0442\u0440\u0430"
+      );
       return;
     }
     if (!address) {
       setRequestError("Укажите адрес сервисного центра");
       return;
     }
-    if (!serviceForm.wholesale_service_photo_1 && !serviceForm.wholesale_service_photo_2 && !hasExistingServicePhoto) {
+    if (
+      !serviceForm.wholesale_service_photo_1 &&
+      !serviceForm.wholesale_service_photo_2 &&
+      !hasExistingServicePhoto
+    ) {
       setRequestError("Добавьте хотя бы одно фото сервиса");
       return;
     }
@@ -190,12 +219,18 @@ export default function ClientProfilePage() {
       payload.append("wholesale_company_name", company);
       payload.append("wholesale_city", city);
       payload.append("wholesale_address", address);
-      if (serviceForm.wholesale_service_photo_1) payload.append("wholesale_service_photo_1", serviceForm.wholesale_service_photo_1);
-      if (serviceForm.wholesale_service_photo_2) payload.append("wholesale_service_photo_2", serviceForm.wholesale_service_photo_2);
+      if (serviceForm.wholesale_service_photo_1)
+        payload.append("wholesale_service_photo_1", serviceForm.wholesale_service_photo_1);
+      if (serviceForm.wholesale_service_photo_2)
+        payload.append("wholesale_service_photo_2", serviceForm.wholesale_service_photo_2);
       await authApi.requestWholesale(payload);
       await reloadMe();
-      setRequestSuccess("Заявка на оптовый статус отправлена. Ожидайте проверку администратора.");
-      setServiceForm((prev) => ({ ...prev, wholesale_service_photo_1: null, wholesale_service_photo_2: null }));
+      setRequestSuccess("Заявка на B2B-статус отправлена. Ожидайте проверку администратора.");
+      setServiceForm((prev) => ({
+        ...prev,
+        wholesale_service_photo_1: null,
+        wholesale_service_photo_2: null,
+      }));
     } catch (error) {
       const responseData = error?.response?.data;
       const detail = responseData?.detail;
@@ -237,7 +272,7 @@ export default function ClientProfilePage() {
         }
       }
 
-      setRequestError(detail || fieldError || "Не удалось отправить заявку на оптовый статус");
+      setRequestError(detail || fieldError || "Не удалось отправить заявку на B2B-статус");
     } finally {
       setRequestLoading(false);
     }
@@ -300,12 +335,16 @@ export default function ClientProfilePage() {
             <Chip
               size="small"
               icon={<StorefrontRoundedIcon />}
-              label={`Опт: ${wholesaleLabel}`}
-              variant={isWholesaleApproved ? "filled" : "outlined"}
-              color={isWholesaleApproved ? "success" : "default"}
+              label={`B2B: ${b2bStatusMeta.label}`}
+              variant={b2bStatusMeta.chipVariant}
+              color={b2bStatusMeta.chipColor}
             />
             {user?.telegram_username ? (
-              <Chip size="small" label={`Telegram: @${user.telegram_username}`} variant="outlined" />
+              <Chip
+                size="small"
+                label={`Telegram: @${user.telegram_username}`}
+                variant="outlined"
+              />
             ) : null}
           </Stack>
         </Stack>
@@ -350,7 +389,11 @@ export default function ClientProfilePage() {
             inputProps={{ maxLength: 150 }}
           />
           <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
-            <Button component="label" variant="outlined" startIcon={<AddPhotoAlternateRoundedIcon />}>
+            <Button
+              component="label"
+              variant="outlined"
+              startIcon={<AddPhotoAlternateRoundedIcon />}
+            >
               {profileForm.profile_photo ? "Заменить фото" : "Загрузить фото"}
               <input
                 hidden
@@ -366,7 +409,9 @@ export default function ClientProfilePage() {
               <Button
                 variant={profileForm.remove_profile_photo ? "contained" : "outlined"}
                 color={profileForm.remove_profile_photo ? "warning" : "inherit"}
-                onClick={() => updateProfileField("remove_profile_photo", !profileForm.remove_profile_photo)}
+                onClick={() =>
+                  updateProfileField("remove_profile_photo", !profileForm.remove_profile_photo)
+                }
               >
                 {profileForm.remove_profile_photo ? "Фото будет удалено" : "Удалить фото"}
               </Button>
@@ -377,7 +422,12 @@ export default function ClientProfilePage() {
               Файл: {profileForm.profile_photo.name}
             </Typography>
           ) : null}
-          <Button variant="contained" onClick={submitProfileUpdate} disabled={profileLoading} sx={{ alignSelf: "flex-start" }}>
+          <Button
+            variant="contained"
+            onClick={submitProfileUpdate}
+            disabled={profileLoading}
+            sx={{ alignSelf: "flex-start" }}
+          >
             {profileLoading ? "Сохраняем..." : "Сохранить профиль"}
           </Button>
         </Stack>
@@ -385,15 +435,15 @@ export default function ClientProfilePage() {
 
       <Paper sx={{ p: { xs: 1.6, md: 1.8 }, borderRadius: 1.8 }}>
         <Stack spacing={1.2}>
-          <Typography variant="h3">Статус сервиса</Typography>
+          <Typography variant="h3">Партнёрский режим</Typography>
           <Stack direction="row" spacing={0.9} flexWrap="wrap" useFlexGap alignItems="center">
             <Chip
               icon={<StorefrontRoundedIcon />}
-              label={isWholesaleApproved ? "Оптовый сервис" : "Обычный клиент"}
-              color={isWholesaleApproved ? "success" : "default"}
-              variant={isWholesaleApproved ? "filled" : "outlined"}
+              label={b2bModeLabel}
+              color={b2bModeColor}
+              variant={user?.wholesale_status === "approved" ? "filled" : "outlined"}
             />
-            <Chip label={`Статус: ${wholesaleLabel}`} variant="outlined" />
+            <Chip label={`Статус: ${b2bStatusMeta.label}`} variant="outlined" />
           </Stack>
           {!isWholesaleApproved ? (
             <Stack spacing={1.15}>
@@ -403,41 +453,61 @@ export default function ClientProfilePage() {
                 label="Название сервиса"
                 required
                 value={serviceForm.wholesale_company_name}
-                onChange={(event) => updateServiceField("wholesale_company_name", event.target.value)}
-                helperText="Обязательно для заявки на оптовый статус"
+                onChange={(event) =>
+                  updateServiceField("wholesale_company_name", event.target.value)
+                }
+                helperText="Обязательно для заявки на B2B-статус"
               />
               <TextField
                 label="Город"
                 required
                 value={serviceForm.wholesale_city}
                 onChange={(event) => updateServiceField("wholesale_city", event.target.value)}
-                helperText="Обязательно для заявки на оптовый статус"
+                helperText="Обязательно для заявки на B2B-статус"
               />
               <TextField
                 label="Адрес сервиса"
                 required
                 value={serviceForm.wholesale_address}
                 onChange={(event) => updateServiceField("wholesale_address", event.target.value)}
-                helperText="Обязательно для заявки на оптовый статус"
+                helperText="Обязательно для заявки на B2B-статус"
               />
-              
+
               <Stack direction={{ xs: "column", sm: "row" }} spacing={1.1}>
-                <Button component="label" variant="outlined" startIcon={<AddPhotoAlternateRoundedIcon />}>
+                <Button
+                  component="label"
+                  variant="outlined"
+                  startIcon={<AddPhotoAlternateRoundedIcon />}
+                >
                   Фото сервиса 1
                   <input
                     hidden
                     type="file"
                     accept=".jpg,.jpeg,.png,.webp"
-                    onChange={(event) => updateServiceField("wholesale_service_photo_1", event.target.files?.[0] || null)}
+                    onChange={(event) =>
+                      updateServiceField(
+                        "wholesale_service_photo_1",
+                        event.target.files?.[0] || null
+                      )
+                    }
                   />
                 </Button>
-                <Button component="label" variant="outlined" startIcon={<AddPhotoAlternateRoundedIcon />}>
+                <Button
+                  component="label"
+                  variant="outlined"
+                  startIcon={<AddPhotoAlternateRoundedIcon />}
+                >
                   Фото сервиса 2
                   <input
                     hidden
                     type="file"
                     accept=".jpg,.jpeg,.png,.webp"
-                    onChange={(event) => updateServiceField("wholesale_service_photo_2", event.target.files?.[0] || null)}
+                    onChange={(event) =>
+                      updateServiceField(
+                        "wholesale_service_photo_2",
+                        event.target.files?.[0] || null
+                      )
+                    }
                   />
                 </Button>
               </Stack>
@@ -447,12 +517,12 @@ export default function ClientProfilePage() {
                 disabled={requestLoading}
                 sx={{ alignSelf: "flex-start" }}
               >
-                {requestLoading ? "Отправляем..." : "Отправить заявку на оптовый статус"}
+                {requestLoading ? "Отправляем..." : "Отправить заявку на B2B-статус"}
               </Button>
             </Stack>
           ) : (
             <Typography variant="caption" color="text.secondary">
-              Пометка оптового сервиса активна. Мастер видит этот статус в карточке клиента.
+              B2B-пометка активна. Мастер и администратор видят этот статус в карточке клиента.
             </Typography>
           )}
         </Stack>

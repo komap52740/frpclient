@@ -1,6 +1,6 @@
 ﻿import ArrowForwardRoundedIcon from "@mui/icons-material/ArrowForwardRounded";
-import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
 import ChatRoundedIcon from "@mui/icons-material/ChatRounded";
+import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
 import PaymentsRoundedIcon from "@mui/icons-material/PaymentsRounded";
 import PlayArrowRoundedIcon from "@mui/icons-material/PlayArrowRounded";
 import TaskAltRoundedIcon from "@mui/icons-material/TaskAltRounded";
@@ -50,7 +50,11 @@ const ACTION_MAP = {
       icon: CheckCircleRoundedIcon,
       helper: "Проверьте устройство и оставьте короткий отзыв.",
     },
-    DECLINED_BY_MASTER: { key: "create_new", label: "Создать новую заявку", icon: ArrowForwardRoundedIcon },
+    DECLINED_BY_MASTER: {
+      key: "create_new",
+      label: "Создать новую заявку",
+      icon: ArrowForwardRoundedIcon,
+    },
     CANCELLED: { key: "create_new", label: "Создать новую заявку", icon: ArrowForwardRoundedIcon },
   },
   master: {
@@ -62,22 +66,41 @@ const ACTION_MAP = {
     },
     IN_REVIEW: { key: "set_price", label: "Назначить цену", icon: ArrowForwardRoundedIcon },
     AWAITING_PAYMENT: { key: "open_chat", label: "Открыть чат", icon: ChatRoundedIcon },
-    PAYMENT_PROOF_UPLOADED: { key: "confirm_payment", label: "Подтвердить оплату", icon: PaymentsRoundedIcon },
+    PAYMENT_PROOF_UPLOADED: {
+      key: "confirm_payment",
+      label: "Подтвердить оплату",
+      icon: PaymentsRoundedIcon,
+    },
     PAID: { key: "start_work", label: "Начать работу", icon: PlayArrowRoundedIcon },
     IN_PROGRESS: { key: "complete_work", label: "Завершить работу", icon: TaskAltRoundedIcon },
     COMPLETED: { key: "open_chat", label: "Открыть чат", icon: ChatRoundedIcon },
-    DECLINED_BY_MASTER: { key: "open_details", label: "Открыть заявку", icon: ArrowForwardRoundedIcon },
+    DECLINED_BY_MASTER: {
+      key: "open_details",
+      label: "Открыть заявку",
+      icon: ArrowForwardRoundedIcon,
+    },
     CANCELLED: { key: "open_details", label: "Открыть заявку", icon: ArrowForwardRoundedIcon },
   },
   admin: {
-    PAYMENT_PROOF_UPLOADED: { key: "confirm_payment_admin", label: "Подтвердить оплату", icon: PaymentsRoundedIcon },
+    PAYMENT_PROOF_UPLOADED: {
+      key: "confirm_payment_admin",
+      label: "Подтвердить оплату",
+      icon: PaymentsRoundedIcon,
+    },
     default: { key: "manage_status", label: "Управлять статусом", icon: ArrowForwardRoundedIcon },
   },
 };
 
 function resolveAction(status, role) {
   const roleMap = ACTION_MAP[role] || ACTION_MAP.client;
-  return roleMap[status] || roleMap.default || { key: "open_details", label: "Открыть заявку", icon: ArrowForwardRoundedIcon };
+  return (
+    roleMap[status] ||
+    roleMap.default || {
+      key: "open_details",
+      label: "Открыть заявку",
+      icon: ArrowForwardRoundedIcon,
+    }
+  );
 }
 
 export default function PrimaryCTA({

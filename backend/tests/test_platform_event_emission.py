@@ -9,6 +9,7 @@ from apps.accounts.models import RoleChoices, User
 from apps.appointments.models import Appointment, AppointmentStatusChoices
 from apps.platform.models import PlatformEvent
 from apps.platform.services import emit_event
+from upload_helpers import make_test_image_upload
 
 
 def auth_as(user: User) -> APIClient:
@@ -58,7 +59,7 @@ def test_appointment_lifecycle_emits_platform_events():
 
     upload_response = auth_as(client_user).post(
         f"/api/appointments/{appointment_id}/upload-payment-proof/",
-        {"payment_proof": SimpleUploadedFile("proof.jpg", b"proof", content_type="image/jpeg")},
+        {"payment_proof": make_test_image_upload("proof.jpg")},
         format="multipart",
     )
     assert upload_response.status_code == 200

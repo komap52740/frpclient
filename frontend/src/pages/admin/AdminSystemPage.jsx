@@ -4,11 +4,11 @@ import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import SaveIcon from "@mui/icons-material/Save";
 import {
   Alert,
-  Box,
   Button,
   Chip,
   Divider,
   FormControl,
+  Grid,
   InputLabel,
   MenuItem,
   Paper,
@@ -29,12 +29,18 @@ import { useNavigate } from "react-router-dom";
 
 import { adminApi, notificationsApi } from "../../api/client";
 import KpiTiles from "../../components/ui/KpiTiles";
+import AppointmentStatusChart from "../../features/platform/admin-dashboard/ui/AppointmentStatusChart";
+import FinanceTrendChart from "../../features/platform/admin-dashboard/ui/FinanceTrendChart";
+import OpsLatencyChart from "../../features/platform/admin-dashboard/ui/OpsLatencyChart";
+import SlaBreachesChart from "../../features/platform/admin-dashboard/ui/SlaBreachesChart";
 
 const ACTIONS = [
   { id: "check", label: "Проверка системы" },
   { id: "migrate", label: "Применить миграции" },
   { id: "collectstatic", label: "Собрать статику" },
   { id: "clearsessions", label: "Очистить сессии" },
+  { id: "flushexpiredtokens", label: "Очистить токены" },
+  { id: "compute_daily_metrics", label: "Пересчитать метрики" },
 ];
 
 const PAYMENT_STATE_OPTIONS = [
@@ -49,6 +55,20 @@ const PAYMENT_METHOD_OPTIONS = [
   { value: "crypto", label: "Криптовалюта" },
 ];
 
+const JOB_LABELS = {
+  public_smoke: "Public smoke",
+  runtime_audit: "Runtime audit",
+  managed_acceptance: "Managed acceptance",
+  deploy: "Последний deploy",
+  postgres_backup: "Postgres backup",
+  postgres_verify: "Postgres verify",
+  media_backup: "Media backup",
+  media_verify: "Media verify",
+  certbot_dry_run: "Certbot dry-run",
+  django_housekeeping: "Django housekeeping",
+  platform_metrics_refresh: "Metrics refresh",
+};
+
 function BoolChip({ value, trueLabel = "Готово", falseLabel = "Не настроено" }) {
   return (
     <Chip
@@ -60,26 +80,109 @@ function BoolChip({ value, trueLabel = "Готово", falseLabel = "Не нас
   );
 }
 
-function MiniBars({ values }) {
-  const safeValues = values.length ? values : [0];
-  const max = Math.max(...safeValues, 1);
+function OpsStateChip({ state, activeLabel, inactiveLabel }) {
+  const active = Boolean(state?.active);
+  const stale = Boolean(state?.stale);
+  let color = "success";
+  let label = inactiveLabel;
 
-  return (
-    <Stack direction="row" spacing={0.5} alignItems="flex-end" sx={{ minHeight: 64 }}>
-      {safeValues.map((value, index) => (
-        <Box
-          key={`${index}-${value}`}
-          sx={{
-            width: 10,
-            height: `${Math.max((value / max) * 100, 6)}%`,
-            bgcolor: "primary.main",
-            borderRadius: 1,
-            opacity: 0.85,
-          }}
-        />
-      ))}
-    </Stack>
+  if (active && stale) {
+    color = "error";
+    label = `${activeLabel} (зависло)`;
+  } else if (active) {
+    color = "warning";
+    label = activeLabel;
+  }
+
+  return <Chip size="small" color={color} label={label} variant={active ? "filled" : "outlined"} />;
+}
+
+function formatOpsStateMeta(state, timestampKey) {
+  if (!state?.active) return "";
+
+  const parts = [];
+  if (state.reason) {
+    parts.push(`Причина: ${state.reason}`);
+  }
+  if (state[timestampKey]) {
+    const timestamp = dayjs(state[timestampKey]);
+    if (timestamp.isValid()) {
+      parts.push(`С ${timestamp.format("DD.MM.YYYY HH:mm")}`);
+    }
+  }
+  if (typeof state.age_seconds === "number") {
+    parts.push(`Возраст: ${Math.max(1, Math.round(state.age_seconds / 60))} мин`);
+  }
+  return parts.join(" · ");
+}
+
+function getJobStatusChip(job) {
+  if (!job || job.status === "missing") {
+    return { color: "warning", label: "Нет данных" };
+  }
+  if (job.stale) {
+    return { color: "error", label: "Устарело" };
+  }
+  if (job.status === "success") {
+    return { color: "success", label: "OK" };
+  }
+  if (job.status === "skipped") {
+    return { color: "warning", label: "Пропущено" };
+  }
+  if (job.status === "running") {
+    return { color: "info", label: "Выполняется" };
+  }
+  return { color: "error", label: "Ошибка" };
+}
+
+function formatJobMeta(job) {
+  if (!job) return "";
+
+  const parts = [];
+  const finishedAt = dayjs(job.finished_at || job.updated_at || job.started_at);
+  if (finishedAt.isValid()) {
+    parts.push(`Последний запуск: ${finishedAt.format("DD.MM.YYYY HH:mm")}`);
+  }
+  if (typeof job.age_seconds === "number") {
+    parts.push(`Возраст: ${Math.max(1, Math.round(job.age_seconds / 60))} мин`);
+  }
+  if (typeof job.duration_seconds === "number" && job.duration_seconds > 0) {
+    parts.push(`Длительность: ${job.duration_seconds.toFixed(1)} сек`);
+  }
+  return parts.join(" · ");
+}
+
+function formatRollbackMeta(rollback) {
+  if (!rollback) return "";
+
+  const parts = [];
+  const latestCreatedAt = dayjs(rollback.latest_created_at);
+  if (latestCreatedAt.isValid()) {
+    parts.push(`Последний snapshot: ${latestCreatedAt.format("DD.MM.YYYY HH:mm")}`);
+  }
+  if (typeof rollback.latest_age_seconds === "number") {
+    parts.push(`Возраст: ${Math.max(1, Math.round(rollback.latest_age_seconds / 60))} мин`);
+  }
+  return parts.join(" · ");
+}
+
+function formatReleaseMeta(releaseState) {
+  if (!releaseState) return "";
+
+  const parts = [];
+  const finishedAt = dayjs(
+    releaseState.finished_at || releaseState.updated_at || releaseState.started_at
   );
+  if (finishedAt.isValid()) {
+    parts.push(`Последнее изменение: ${finishedAt.format("DD.MM.YYYY HH:mm")}`);
+  }
+  if (typeof releaseState.age_seconds === "number") {
+    parts.push(`Возраст: ${Math.max(1, Math.round(releaseState.age_seconds / 60))} мин`);
+  }
+  if (typeof releaseState.duration_seconds === "number" && releaseState.duration_seconds > 0) {
+    parts.push(`Длительность: ${releaseState.duration_seconds.toFixed(1)} сек`);
+  }
+  return parts.join(" · ");
 }
 
 function getActionError(error) {
@@ -155,7 +258,9 @@ export default function AdminSystemPage() {
     const to = dayjs().format("YYYY-MM-DD");
     try {
       const response = await adminApi.dailyMetrics({ from, to });
-      const rows = (response.data || []).slice().sort((a, b) => dayjs(a.date).valueOf() - dayjs(b.date).valueOf());
+      const rows = (response.data || [])
+        .slice()
+        .sort((a, b) => dayjs(a.date).valueOf() - dayjs(b.date).valueOf());
       setMetricsRows(rows);
       setMetricsError("");
     } catch {
@@ -278,7 +383,10 @@ export default function AdminSystemPage() {
         from: paymentRegistryFilters.from,
         to: paymentRegistryFilters.to,
       });
-      const blob = response.data instanceof Blob ? response.data : new Blob([response.data], { type: "text/csv;charset=utf-8" });
+      const blob =
+        response.data instanceof Blob
+          ? response.data
+          : new Blob([response.data], { type: "text/csv;charset=utf-8" });
       const url = window.URL.createObjectURL(blob);
       const anchor = document.createElement("a");
       anchor.href = url;
@@ -327,28 +435,74 @@ export default function AdminSystemPage() {
     return [actionResult.stdout || "", actionResult.stderr || ""].filter(Boolean).join("\n");
   }, [actionResult]);
 
+  const jobStatusEntries = useMemo(
+    () =>
+      Object.keys(JOB_LABELS)
+        .filter((key) => statusData?.operations?.jobs?.[key])
+        .map((key) => ({ key, label: JOB_LABELS[key], job: statusData.operations.jobs[key] })),
+    [statusData]
+  );
+
+  const unhealthyJobCount = useMemo(
+    () =>
+      jobStatusEntries.filter(
+        ({ job }) => job.stale || !["success", "skipped"].includes(job.status || "")
+      ).length,
+    [jobStatusEntries]
+  );
+  const releaseState = statusData?.operations?.release || null;
+  const releaseHistoryEntries = useMemo(
+    () => (Array.isArray(releaseState?.history) ? releaseState.history.slice(0, 4) : []),
+    [releaseState]
+  );
+  const rollbackInventory = statusData?.operations?.rollback || null;
+
   const focusCards = useMemo(
     () => [
-      { label: "Непрочитанные сигналы", value: unreadNotifications.length, color: unreadNotifications.length ? "error" : "default" },
-      { label: "Опт-заявки на проверке", value: wholesalePendingCount, color: wholesalePendingCount ? "warning" : "default" },
-      { label: "Платежи на подтверждении", value: Number(statusData?.appointments?.awaiting_payment_confirmation || 0), color: "info" },
+      {
+        label: "Непрочитанные сигналы",
+        value: unreadNotifications.length,
+        color: unreadNotifications.length ? "error" : "default",
+      },
+      {
+        label: "B2B-заявки на проверке",
+        value: wholesalePendingCount,
+        color: wholesalePendingCount ? "warning" : "default",
+      },
+      {
+        label: "Платежи на подтверждении",
+        value: Number(statusData?.appointments?.awaiting_payment_confirmation || 0),
+        color: "info",
+      },
     ],
-    [statusData?.appointments?.awaiting_payment_confirmation, unreadNotifications.length, wholesalePendingCount]
+    [
+      statusData?.appointments?.awaiting_payment_confirmation,
+      unreadNotifications.length,
+      wholesalePendingCount,
+    ]
   );
 
   const primaryOpsAction = useMemo(() => {
     if (unreadNotifications.length) {
-      return { label: "Открыть заявки с сигналами", onClick: () => navigate("/admin/appointments") };
+      return {
+        label: "Открыть заявки с сигналами",
+        onClick: () => navigate("/admin/appointments"),
+      };
     }
     if (wholesalePendingCount > 0) {
-      return { label: "Проверить опт-клиентов", onClick: () => navigate("/admin/clients") };
+      return { label: "Проверить B2B-клиентов", onClick: () => navigate("/admin/clients") };
     }
     return { label: "Открыть системные правила", onClick: () => navigate("/admin/rules") };
   }, [navigate, unreadNotifications.length, wholesalePendingCount]);
 
   return (
     <Stack spacing={2}>
-      <Stack direction={{ xs: "column", sm: "row" }} spacing={1} justifyContent="space-between" alignItems={{ xs: "flex-start", sm: "center" }}>
+      <Stack
+        direction={{ xs: "column", sm: "row" }}
+        spacing={1}
+        justifyContent="space-between"
+        alignItems={{ xs: "flex-start", sm: "center" }}
+      >
         <Typography variant="h2">Админ-пульт</Typography>
         <Button
           variant="outlined"
@@ -370,7 +524,11 @@ export default function AdminSystemPage() {
 
       <Paper sx={{ p: 2 }}>
         <Stack spacing={1.2}>
-          <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" alignItems={{ xs: "flex-start", sm: "center" }}>
+          <Stack
+            direction={{ xs: "column", sm: "row" }}
+            justifyContent="space-between"
+            alignItems={{ xs: "flex-start", sm: "center" }}
+          >
             <Typography variant="h3">Операционный фокус</Typography>
             <Button variant="contained" size="small" onClick={primaryOpsAction.onClick}>
               {primaryOpsAction.label}
@@ -393,15 +551,34 @@ export default function AdminSystemPage() {
       </Paper>
 
       <Paper sx={{ p: 2 }}>
-        <Typography variant="h3" sx={{ mb: 1 }}>Финансовый блок</Typography>
+        <Typography variant="h3" sx={{ mb: 1 }}>
+          Финансовый блок
+        </Typography>
         {financeSummary ? (
           <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-            <Chip size="small" color="success" variant="outlined" label={`Оплачено: ${(financeSummary.paid_total || 0).toLocaleString("ru-RU")} ₽`} />
-            <Chip size="small" color="info" variant="outlined" label={`В работе: ${(financeSummary.in_work_total || 0).toLocaleString("ru-RU")} ₽`} />
-            <Chip size="small" color="primary" variant="outlined" label={`За период: ${(financeSummary.period_total || 0).toLocaleString("ru-RU")} ₽`} />
+            <Chip
+              size="small"
+              color="success"
+              variant="outlined"
+              label={`Оплачено: ${(financeSummary.paid_total || 0).toLocaleString("ru-RU")} ₽`}
+            />
+            <Chip
+              size="small"
+              color="info"
+              variant="outlined"
+              label={`В работе: ${(financeSummary.in_work_total || 0).toLocaleString("ru-RU")} ₽`}
+            />
+            <Chip
+              size="small"
+              color="primary"
+              variant="outlined"
+              label={`За период: ${(financeSummary.period_total || 0).toLocaleString("ru-RU")} ₽`}
+            />
           </Stack>
         ) : (
-          <Typography variant="body2" color="text.secondary">Финансовая сводка недоступна.</Typography>
+          <Typography variant="body2" color="text.secondary">
+            Финансовая сводка недоступна.
+          </Typography>
         )}
       </Paper>
 
@@ -479,12 +656,21 @@ export default function AdminSystemPage() {
             value={paymentRegistryFilters.to}
             onChange={(event) => updatePaymentFilter("to", event.target.value)}
           />
-          <Button size="small" variant="contained" onClick={applyPaymentRegistryFilters} disabled={paymentRegistryLoading}>
+          <Button
+            size="small"
+            variant="contained"
+            onClick={applyPaymentRegistryFilters}
+            disabled={paymentRegistryLoading}
+          >
             Обновить реестр
           </Button>
         </Stack>
 
-        {paymentRegistryError ? <Alert severity="error" sx={{ mb: 1 }}>{paymentRegistryError}</Alert> : null}
+        {paymentRegistryError ? (
+          <Alert severity="error" sx={{ mb: 1 }}>
+            {paymentRegistryError}
+          </Alert>
+        ) : null}
 
         <TableContainer sx={{ border: "1px solid", borderColor: "divider", borderRadius: 2 }}>
           <Table size="small">
@@ -504,10 +690,16 @@ export default function AdminSystemPage() {
                 <TableRow key={row.appointment_id} hover>
                   <TableCell>
                     <Stack spacing={0.3}>
-                      <Typography variant="body2" sx={{ fontWeight: 700 }}>#{row.appointment_id}</Typography>
-                      <Typography variant="caption" color="text.secondary">{row.status}</Typography>
+                      <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                        #{row.appointment_id}
+                      </Typography>
                       <Typography variant="caption" color="text.secondary">
-                        {row.total_price ? `${Number(row.total_price).toLocaleString("ru-RU")} ₽` : "Цена не указана"}
+                        {row.status}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {row.total_price
+                          ? `${Number(row.total_price).toLocaleString("ru-RU")} ₽`
+                          : "Цена не указана"}
                       </Typography>
                     </Stack>
                   </TableCell>
@@ -515,7 +707,9 @@ export default function AdminSystemPage() {
                   <TableCell>{row.master_username || "—"}</TableCell>
                   <TableCell>
                     <Stack spacing={0.2}>
-                      <Typography variant="body2">{row.payment_method_label || row.payment_method || "—"}</Typography>
+                      <Typography variant="body2">
+                        {row.payment_method_label || row.payment_method || "—"}
+                      </Typography>
                       <Typography variant="caption" color="text.secondary">
                         {row.payment_requisites_note || "Реквизиты не указаны"}
                       </Typography>
@@ -523,18 +717,30 @@ export default function AdminSystemPage() {
                   </TableCell>
                   <TableCell>
                     {row.payment_proof_url ? (
-                      <Button size="small" variant="text" href={row.payment_proof_url} target="_blank" rel="noreferrer">
+                      <Button
+                        size="small"
+                        variant="text"
+                        href={row.payment_proof_url}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
                         Открыть чек
                       </Button>
                     ) : (
-                      <Typography variant="caption" color="text.secondary">Нет файла</Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        Нет файла
+                      </Typography>
                     )}
                   </TableCell>
                   <TableCell>
                     <Stack spacing={0.2}>
-                      <Typography variant="body2">{row.payment_confirmed_by_username || "—"}</Typography>
+                      <Typography variant="body2">
+                        {row.payment_confirmed_by_username || "—"}
+                      </Typography>
                       <Typography variant="caption" color="text.secondary">
-                        {row.payment_confirmed_at ? dayjs(row.payment_confirmed_at).format("DD.MM.YYYY HH:mm") : "Не подтверждено"}
+                        {row.payment_confirmed_at
+                          ? dayjs(row.payment_confirmed_at).format("DD.MM.YYYY HH:mm")
+                          : "Не подтверждено"}
                       </Typography>
                     </Stack>
                   </TableCell>
@@ -542,13 +748,16 @@ export default function AdminSystemPage() {
                     <Stack spacing={0.4}>
                       {(row.history || []).slice(0, 3).map((eventItem) => (
                         <Typography key={eventItem.id} variant="caption" color="text.secondary">
-                          {dayjs(eventItem.created_at).format("DD.MM HH:mm")} — {eventItem.event_label || eventItem.event_type}
+                          {dayjs(eventItem.created_at).format("DD.MM HH:mm")} —{" "}
+                          {eventItem.event_label || eventItem.event_type}
                           {" · "}
                           {eventItem.actor_username || "система"}
                         </Typography>
                       ))}
                       {!row.history?.length ? (
-                        <Typography variant="caption" color="text.secondary">История пустая</Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          История пустая
+                        </Typography>
                       ) : null}
                     </Stack>
                   </TableCell>
@@ -569,12 +778,26 @@ export default function AdminSystemPage() {
       </Paper>
 
       <Paper sx={{ p: 2 }}>
-        <Typography variant="h3" sx={{ mb: 1 }}>Еженедельный отчет</Typography>
+        <Typography variant="h3" sx={{ mb: 1 }}>
+          Еженедельный отчет
+        </Typography>
         {weeklyReport ? (
           <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-            <Chip size="small" variant="outlined" label={`SLA нарушено: ${weeklyReport.sla_breached_count || 0}`} />
-            <Chip size="small" variant="outlined" label={`Средний ответ: ${Math.round((weeklyReport.avg_first_response_seconds || 0) / 60) || 0} мин`} />
-            <Chip size="small" variant="outlined" label={`Закрытые заявки: ${weeklyReport.closed_count || 0}`} />
+            <Chip
+              size="small"
+              variant="outlined"
+              label={`SLA нарушено: ${weeklyReport.sla_breached_count || 0}`}
+            />
+            <Chip
+              size="small"
+              variant="outlined"
+              label={`Средний ответ: ${Math.round((weeklyReport.avg_first_response_seconds || 0) / 60) || 0} мин`}
+            />
+            <Chip
+              size="small"
+              variant="outlined"
+              label={`Закрытые заявки: ${weeklyReport.closed_count || 0}`}
+            />
             <Chip
               size="small"
               color={(weeklyReport.problematic_cases_count || 0) > 0 ? "warning" : "default"}
@@ -583,17 +806,27 @@ export default function AdminSystemPage() {
             />
           </Stack>
         ) : (
-          <Typography variant="body2" color="text.secondary">Недельный отчет недоступен.</Typography>
+          <Typography variant="body2" color="text.secondary">
+            Недельный отчет недоступен.
+          </Typography>
         )}
       </Paper>
 
       <Paper sx={{ p: 2 }}>
-        <Typography variant="h3" sx={{ mb: 1 }}>Критичные сигналы</Typography>
+        <Typography variant="h3" sx={{ mb: 1 }}>
+          Критичные сигналы
+        </Typography>
         {unreadNotifications.length ? (
           <Stack spacing={0.8}>
             {unreadNotifications.map((notification) => (
-              <Paper key={notification.id} variant="outlined" sx={{ p: 1.2, borderStyle: "dashed" }}>
-                <Typography variant="body2" sx={{ fontWeight: 700 }}>{notification.title}</Typography>
+              <Paper
+                key={notification.id}
+                variant="outlined"
+                sx={{ p: 1.2, borderStyle: "dashed" }}
+              >
+                <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                  {notification.title}
+                </Typography>
                 <Typography variant="caption" color="text.secondary">
                   {notification.message || "Системное уведомление"}
                 </Typography>
@@ -601,32 +834,54 @@ export default function AdminSystemPage() {
             ))}
           </Stack>
         ) : (
-          <Typography variant="body2" color="text.secondary">Новых сигналов нет.</Typography>
+          <Typography variant="body2" color="text.secondary">
+            Новых сигналов нет.
+          </Typography>
         )}
       </Paper>
 
       <Paper sx={{ p: 2 }}>
-        <Stack direction={{ xs: "column", md: "row" }} spacing={2} justifyContent="space-between" alignItems={{ xs: "flex-start", md: "center" }}>
+        <Stack
+          direction={{ xs: "column", md: "row" }}
+          spacing={2}
+          justifyContent="space-between"
+          alignItems={{ xs: "flex-start", md: "center" }}
+        >
           <Typography variant="h3">Метрики за 14 дней</Typography>
           <Typography variant="caption" color="text.secondary">
             Последняя дата: {latestMetrics?.date || "—"}
           </Typography>
         </Stack>
 
-        {metricsError ? <Alert severity="error" sx={{ mt: 1 }}>{metricsError}</Alert> : null}
+        {metricsError ? (
+          <Alert severity="error" sx={{ mt: 1 }}>
+            {metricsError}
+          </Alert>
+        ) : null}
 
         {latestMetrics ? (
           <Stack spacing={1.5} sx={{ mt: 1 }}>
             <KpiTiles items={metricsTiles} />
             <Divider />
-            <Stack spacing={0.6}>
-              <Typography variant="caption">Динамика новых заявок</Typography>
-              <MiniBars values={metricsRows.map((row) => row.new_appointments || 0)} />
-            </Stack>
+            <Grid container spacing={2}>
+              <Grid item xs={12} lg={7}>
+                <FinanceTrendChart rows={metricsRows} />
+              </Grid>
+              <Grid item xs={12} lg={5}>
+                <SlaBreachesChart weeklyReport={weeklyReport} />
+              </Grid>
+              <Grid item xs={12} lg={6}>
+                <AppointmentStatusChart rows={metricsRows} />
+              </Grid>
+              <Grid item xs={12} lg={6}>
+                <OpsLatencyChart rows={metricsRows} />
+              </Grid>
+            </Grid>
           </Stack>
         ) : (
           <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-            Метрики пока не собраны. Запустите расчет командой `python manage.py compute_daily_metrics --date=YYYY-MM-DD`.
+            Метрики пока не собраны. Запустите расчет командой `python manage.py
+            compute_daily_metrics --date=YYYY-MM-DD`.
           </Typography>
         )}
       </Paper>
@@ -636,9 +891,344 @@ export default function AdminSystemPage() {
       <Paper sx={{ p: 2 }}>
         <Stack spacing={1}>
           <Typography variant="h3">Состояние системы</Typography>
+          {statusData?.operations?.deploy_lock?.stale ? (
+            <Alert severity="error">
+              Deploy lock висит дольше нормы. Проверьте зависший deploy/rollback и снимите lock
+              вручную после проверки.
+            </Alert>
+          ) : null}
+          {statusData?.operations?.maintenance_mode?.stale ? (
+            <Alert severity="error">
+              Maintenance mode включен слишком долго. Проверьте marker и снимите его после
+              завершения работ.
+            </Alert>
+          ) : null}
+          {releaseState?.available && !releaseState.healthy ? (
+            <Alert severity="warning">
+              Current release metadata устарела или повреждена. Следующий штатный deploy/rollback
+              должен её восстановить.
+            </Alert>
+          ) : null}
+          {releaseState && !releaseState.available ? (
+            <Alert severity="warning">
+              Current release metadata пока не записана. После следующего штатного deploy/rollback
+              админка начнет показывать текущий live release.
+            </Alert>
+          ) : null}
+          {rollbackInventory && !rollbackInventory.healthy ? (
+            <Alert severity="warning">
+              Rollback snapshots недоступны или повреждены. Проверьте `.deploy/rollback/manifests` и
+              снимите новый snapshot перед следующим релизом.
+            </Alert>
+          ) : null}
+          {rollbackInventory?.healthy && rollbackInventory.invalid_count > 0 ? (
+            <Alert severity="warning">
+              В rollback inventory есть битые manifest-файлы: {rollbackInventory.invalid_count}.
+              Последний snapshot пригоден, но старые точки лучше проверить.
+            </Alert>
+          ) : null}
+          {rollbackInventory?.last_run &&
+          rollbackInventory.last_run.status !== "missing" &&
+          (rollbackInventory.last_run.stale ||
+            !["success", "skipped"].includes(rollbackInventory.last_run.status || "")) ? (
+            <Alert severity="warning">
+              Последний rollback завершился неидеально. Проверьте recovery path и повторите drill до
+              следующего критичного релиза.
+            </Alert>
+          ) : null}
+          {unhealthyJobCount > 0 ? (
+            <Alert severity="warning">
+              Есть фоновые задачи без свежего успешного статуса. Проверьте блок мониторинга ниже.
+            </Alert>
+          ) : null}
           <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
             <Typography variant="body2">База данных:</Typography>
-            <BoolChip value={Boolean(statusData?.database?.connected)} trueLabel="Подключена" falseLabel="Ошибка подключения" />
+            <BoolChip
+              value={Boolean(statusData?.database?.connected)}
+              trueLabel="Подключена"
+              falseLabel="Ошибка подключения"
+            />
+          </Stack>
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+            <Typography variant="body2">Deploy lock:</Typography>
+            <OpsStateChip
+              state={statusData?.operations?.deploy_lock}
+              activeLabel="Активен"
+              inactiveLabel="Нет"
+            />
+            {statusData?.operations?.deploy_lock?.active ? (
+              <Typography variant="body2" color="text.secondary">
+                {formatOpsStateMeta(statusData?.operations?.deploy_lock, "locked_at")}
+              </Typography>
+            ) : null}
+          </Stack>
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+            <Typography variant="body2">Maintenance mode:</Typography>
+            <OpsStateChip
+              state={statusData?.operations?.maintenance_mode}
+              activeLabel="Включен"
+              inactiveLabel="Выключен"
+            />
+            {statusData?.operations?.maintenance_mode?.active ? (
+              <Typography variant="body2" color="text.secondary">
+                {formatOpsStateMeta(statusData?.operations?.maintenance_mode, "enabled_at")}
+              </Typography>
+            ) : null}
+          </Stack>
+          <Stack spacing={0.8}>
+            <Typography variant="body2">Current release:</Typography>
+            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+              <Chip
+                size="small"
+                color={releaseState?.healthy ? "success" : "warning"}
+                label={
+                  !releaseState?.available
+                    ? "Release metadata нет"
+                    : releaseState?.action === "rollback"
+                      ? "Live после rollback"
+                      : "Live после deploy"
+                }
+                variant={releaseState?.healthy ? "filled" : "outlined"}
+              />
+              {releaseState?.git_commit ? (
+                <Chip size="small" variant="outlined" label={`Git: ${releaseState.git_commit}`} />
+              ) : null}
+              {releaseState?.git_branch ? (
+                <Chip
+                  size="small"
+                  variant="outlined"
+                  label={`Branch: ${releaseState.git_branch}`}
+                />
+              ) : null}
+              {releaseState?.source_fingerprint_short ? (
+                <Chip
+                  size="small"
+                  variant="outlined"
+                  label={`Source: ${releaseState.source_fingerprint_short}`}
+                />
+              ) : null}
+              {releaseState?.with_bot ? (
+                <Chip size="small" color="info" variant="outlined" label="Telegram bot включен" />
+              ) : null}
+              {releaseState?.rollback_snapshot_label ? (
+                <Chip
+                  size="small"
+                  variant="outlined"
+                  label={`Rollback point: ${releaseState.rollback_snapshot_label}`}
+                />
+              ) : null}
+              {releaseState?.restored_snapshot_label ? (
+                <Chip
+                  size="small"
+                  variant="outlined"
+                  label={`Восстановлено из: ${releaseState.restored_snapshot_label}`}
+                />
+              ) : null}
+            </Stack>
+            {formatReleaseMeta(releaseState) ? (
+              <Typography variant="body2" color="text.secondary">
+                {formatReleaseMeta(releaseState)}
+              </Typography>
+            ) : null}
+            {releaseState?.base_url ? (
+              <Typography variant="caption" color="text.secondary">
+                Base URL: {releaseState.base_url}
+              </Typography>
+            ) : null}
+            {releaseState?.containers && Object.keys(releaseState.containers).length ? (
+              <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                {Object.entries(releaseState.containers)
+                  .filter(([, container]) => container?.container_name)
+                  .map(([key, container]) => (
+                    <Chip
+                      key={key}
+                      size="small"
+                      variant="outlined"
+                      label={`${container.container_name}: ${container.image_id_short || "unknown"}`}
+                    />
+                  ))}
+              </Stack>
+            ) : null}
+            {releaseState?.error ? (
+              <Typography variant="caption" color="error">
+                {releaseState.error}
+              </Typography>
+            ) : null}
+            {releaseHistoryEntries.length ? (
+              <Stack spacing={0.6}>
+                <Typography variant="caption" color="text.secondary">
+                  Последние live transitions
+                </Typography>
+                {releaseHistoryEntries.map((entry) => (
+                  <Paper
+                    key={`${entry.release_label || "unknown"}-${entry.action || "unknown"}-${entry.finished_at || entry.updated_at || entry.started_at || "na"}`}
+                    variant="outlined"
+                    sx={{ p: 1.1 }}
+                  >
+                    <Stack spacing={0.4}>
+                      <Stack
+                        direction={{ xs: "column", sm: "row" }}
+                        spacing={1}
+                        justifyContent="space-between"
+                        alignItems={{ xs: "flex-start", sm: "center" }}
+                      >
+                        <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                          {entry.action === "rollback" ? "Rollback" : "Deploy"}
+                        </Typography>
+                        <Chip
+                          size="small"
+                          color={entry.action === "rollback" ? "warning" : "success"}
+                          variant="outlined"
+                          label={entry.release_label || "без label"}
+                        />
+                      </Stack>
+                      {formatReleaseMeta(entry) ? (
+                        <Typography variant="caption" color="text.secondary">
+                          {formatReleaseMeta(entry)}
+                        </Typography>
+                      ) : null}
+                      <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                        {entry.source_fingerprint_short ? (
+                          <Chip
+                            size="small"
+                            variant="outlined"
+                            label={`Source: ${entry.source_fingerprint_short}`}
+                          />
+                        ) : null}
+                        {entry.rollback_snapshot_label ? (
+                          <Chip
+                            size="small"
+                            variant="outlined"
+                            label={`Rollback point: ${entry.rollback_snapshot_label}`}
+                          />
+                        ) : null}
+                        {entry.restored_snapshot_label ? (
+                          <Chip
+                            size="small"
+                            variant="outlined"
+                            label={`Восстановлено из: ${entry.restored_snapshot_label}`}
+                          />
+                        ) : null}
+                      </Stack>
+                    </Stack>
+                  </Paper>
+                ))}
+              </Stack>
+            ) : null}
+          </Stack>
+          <Stack spacing={0.8}>
+            <Typography variant="body2">Rollback snapshots:</Typography>
+            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+              <Chip
+                size="small"
+                color={rollbackInventory?.healthy ? "success" : "warning"}
+                label={rollbackInventory?.healthy ? "Rollback готов" : "Rollback требует внимания"}
+              />
+              <Chip
+                size="small"
+                variant="outlined"
+                label={`Точек: ${rollbackInventory?.available_count ?? 0}`}
+              />
+              {rollbackInventory?.latest_label ? (
+                <Chip
+                  size="small"
+                  variant="outlined"
+                  label={`Последняя: ${rollbackInventory.latest_label}`}
+                />
+              ) : null}
+              {rollbackInventory?.latest_with_bot ? (
+                <Chip size="small" color="info" variant="outlined" label="Bot snapshot включен" />
+              ) : null}
+              {rollbackInventory?.latest_source_fingerprint_short ? (
+                <Chip
+                  size="small"
+                  variant="outlined"
+                  label={`Source: ${rollbackInventory.latest_source_fingerprint_short}`}
+                />
+              ) : null}
+              {rollbackInventory?.latest_git_commit ? (
+                <Chip
+                  size="small"
+                  variant="outlined"
+                  label={`Git: ${rollbackInventory.latest_git_commit}`}
+                />
+              ) : null}
+              {rollbackInventory?.latest_git_branch ? (
+                <Chip
+                  size="small"
+                  variant="outlined"
+                  label={`Branch: ${rollbackInventory.latest_git_branch}`}
+                />
+              ) : null}
+              {rollbackInventory?.invalid_count > 0 ? (
+                <Chip
+                  size="small"
+                  color="warning"
+                  variant="outlined"
+                  label={`Битых manifest'ов: ${rollbackInventory.invalid_count}`}
+                />
+              ) : null}
+            </Stack>
+            {formatRollbackMeta(rollbackInventory) ? (
+              <Typography variant="body2" color="text.secondary">
+                {formatRollbackMeta(rollbackInventory)}
+              </Typography>
+            ) : null}
+            {rollbackInventory?.recent_labels?.length ? (
+              <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                {rollbackInventory.recent_labels.map((label) => (
+                  <Chip key={label} size="small" variant="outlined" label={label} />
+                ))}
+              </Stack>
+            ) : null}
+            {rollbackInventory?.error ? (
+              <Typography variant="caption" color="error">
+                {rollbackInventory.error}
+              </Typography>
+            ) : null}
+            {rollbackInventory?.healthy &&
+            rollbackInventory?.latest_source_metadata_available === false ? (
+              <Typography variant="caption" color="warning.main">
+                У последнего rollback snapshot нет source metadata. Следующий штатный deploy должен
+                переснять recovery point.
+              </Typography>
+            ) : null}
+            {rollbackInventory?.last_run?.status &&
+            rollbackInventory.last_run.status !== "missing" ? (
+              <Paper variant="outlined" sx={{ p: 1.2 }}>
+                <Stack spacing={0.4}>
+                  <Stack
+                    direction={{ xs: "column", sm: "row" }}
+                    spacing={1}
+                    justifyContent="space-between"
+                    alignItems={{ xs: "flex-start", sm: "center" }}
+                  >
+                    <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                      Последний rollback
+                    </Typography>
+                    <Chip
+                      size="small"
+                      color={getJobStatusChip(rollbackInventory.last_run).color}
+                      label={getJobStatusChip(rollbackInventory.last_run).label}
+                    />
+                  </Stack>
+                  {formatJobMeta(rollbackInventory.last_run) ? (
+                    <Typography variant="caption" color="text.secondary">
+                      {formatJobMeta(rollbackInventory.last_run)}
+                    </Typography>
+                  ) : null}
+                  {rollbackInventory.last_run.summary ? (
+                    <Typography variant="caption" color="text.secondary">
+                      {rollbackInventory.last_run.summary}
+                    </Typography>
+                  ) : null}
+                </Stack>
+              </Paper>
+            ) : (
+              <Typography variant="caption" color="text.secondary">
+                Rollback ещё не запускался после включения persisted status.
+              </Typography>
+            )}
           </Stack>
           <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
             <Typography variant="body2">Токен Telegram:</Typography>
@@ -648,21 +1238,63 @@ export default function AdminSystemPage() {
             <Typography variant="body2">Имя бота Telegram:</Typography>
             <BoolChip value={Boolean(statusData?.telegram?.login_username_configured)} />
             {statusData?.telegram?.login_username ? (
-              <Typography variant="body2" color="text.secondary">@{statusData.telegram.login_username}</Typography>
+              <Typography variant="body2" color="text.secondary">
+                @{statusData.telegram.login_username}
+              </Typography>
             ) : null}
           </Stack>
           <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
             <Typography variant="body2">SLA:</Typography>
             <Typography variant="body2" color="text.secondary">
-              Ответ {statusData?.sla?.response_minutes ?? settingsData.sla_response_minutes} мин, завершение {statusData?.sla?.completion_hours ?? settingsData.sla_completion_hours} ч
+              Ответ {statusData?.sla?.response_minutes ?? settingsData.sla_response_minutes} мин,
+              завершение {statusData?.sla?.completion_hours ?? settingsData.sla_completion_hours} ч
             </Typography>
           </Stack>
-          {statusData?.database?.error ? <Alert severity="error">{statusData.database.error}</Alert> : null}
+          {jobStatusEntries.length ? (
+            <Stack spacing={1}>
+              <Typography variant="body2">Фоновые задачи:</Typography>
+              {jobStatusEntries.map(({ key, label, job }) => {
+                const chip = getJobStatusChip(job);
+                return (
+                  <Paper key={key} variant="outlined" sx={{ p: 1.2 }}>
+                    <Stack spacing={0.4}>
+                      <Stack
+                        direction={{ xs: "column", sm: "row" }}
+                        spacing={1}
+                        justifyContent="space-between"
+                        alignItems={{ xs: "flex-start", sm: "center" }}
+                      >
+                        <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                          {label}
+                        </Typography>
+                        <Chip size="small" color={chip.color} label={chip.label} />
+                      </Stack>
+                      {formatJobMeta(job) ? (
+                        <Typography variant="caption" color="text.secondary">
+                          {formatJobMeta(job)}
+                        </Typography>
+                      ) : null}
+                      {job.summary ? (
+                        <Typography variant="caption" color="text.secondary">
+                          {job.summary}
+                        </Typography>
+                      ) : null}
+                    </Stack>
+                  </Paper>
+                );
+              })}
+            </Stack>
+          ) : null}
+          {statusData?.database?.error ? (
+            <Alert severity="error">{statusData.database.error}</Alert>
+          ) : null}
         </Stack>
       </Paper>
 
       <Paper sx={{ p: 2 }}>
-        <Typography variant="h3" mb={1}>Реквизиты и системные настройки</Typography>
+        <Typography variant="h3" mb={1}>
+          Реквизиты и системные настройки
+        </Typography>
         <Stack spacing={1.5}>
           {settingsError ? <Alert severity="error">{settingsError}</Alert> : null}
           {settingsSuccess ? <Alert severity="success">{settingsSuccess}</Alert> : null}
@@ -672,21 +1304,27 @@ export default function AdminSystemPage() {
             multiline
             minRows={2}
             value={settingsData.bank_requisites}
-            onChange={(event) => setSettingsData((prev) => ({ ...prev, bank_requisites: event.target.value }))}
+            onChange={(event) =>
+              setSettingsData((prev) => ({ ...prev, bank_requisites: event.target.value }))
+            }
           />
           <TextField
             label="Криптореквизиты"
             multiline
             minRows={2}
             value={settingsData.crypto_requisites}
-            onChange={(event) => setSettingsData((prev) => ({ ...prev, crypto_requisites: event.target.value }))}
+            onChange={(event) =>
+              setSettingsData((prev) => ({ ...prev, crypto_requisites: event.target.value }))
+            }
           />
           <TextField
             label="Инструкция для клиента"
             multiline
             minRows={3}
             value={settingsData.instructions}
-            onChange={(event) => setSettingsData((prev) => ({ ...prev, instructions: event.target.value }))}
+            onChange={(event) =>
+              setSettingsData((prev) => ({ ...prev, instructions: event.target.value }))
+            }
           />
 
           <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
@@ -694,24 +1332,41 @@ export default function AdminSystemPage() {
               label="SLA ответ (мин)"
               type="number"
               value={settingsData.sla_response_minutes}
-              onChange={(event) => setSettingsData((prev) => ({ ...prev, sla_response_minutes: Number(event.target.value || 0) }))}
+              onChange={(event) =>
+                setSettingsData((prev) => ({
+                  ...prev,
+                  sla_response_minutes: Number(event.target.value || 0),
+                }))
+              }
             />
             <TextField
               label="SLA завершение (ч)"
               type="number"
               value={settingsData.sla_completion_hours}
-              onChange={(event) => setSettingsData((prev) => ({ ...prev, sla_completion_hours: Number(event.target.value || 0) }))}
+              onChange={(event) =>
+                setSettingsData((prev) => ({
+                  ...prev,
+                  sla_completion_hours: Number(event.target.value || 0),
+                }))
+              }
             />
           </Stack>
 
-          <Button variant="contained" startIcon={<SaveIcon />} onClick={saveSettings} disabled={savingSettings}>
+          <Button
+            variant="contained"
+            startIcon={<SaveIcon />}
+            onClick={saveSettings}
+            disabled={savingSettings}
+          >
             {savingSettings ? "Сохранение..." : "Сохранить настройки"}
           </Button>
         </Stack>
       </Paper>
 
       <Paper sx={{ p: 2 }}>
-        <Typography variant="h3" mb={1}>Сервисные действия</Typography>
+        <Typography variant="h3" mb={1}>
+          Сервисные действия
+        </Typography>
         <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
           {ACTIONS.map((action) => (
             <Button
@@ -732,9 +1387,13 @@ export default function AdminSystemPage() {
           <Stack spacing={1}>
             <Typography variant="h3">Результат действия</Typography>
             <Alert severity={actionResult.success ? "success" : "error"}>
-              {actionResult.success ? "Успешно" : "С ошибкой"} | {actionResult.action || "неизвестно"} | {actionResult.duration_seconds ?? "-"} сек
+              {actionResult.success ? "Успешно" : "С ошибкой"} |{" "}
+              {actionResult.action || "неизвестно"} | {actionResult.duration_seconds ?? "-"} сек
             </Alert>
-            <Typography component="pre" sx={{ whiteSpace: "pre-wrap", m: 0, fontFamily: "monospace", fontSize: 13 }}>
+            <Typography
+              component="pre"
+              sx={{ whiteSpace: "pre-wrap", m: 0, fontFamily: "monospace", fontSize: 13 }}
+            >
               {outputText || "Вывод отсутствует"}
             </Typography>
           </Stack>

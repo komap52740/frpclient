@@ -629,7 +629,8 @@ No-Go, РµСЃР»Рё:
 - Added quality gates:
   - master cannot take new appointment without quality approval.
   - `trainee` level is blocked from taking service-center appointments.
-  - non-approved/trainee masters are excluded from new-appointment Telegram notifications.
+  - non-approved masters are excluded from new-appointment Telegram notifications.
+  - `trainee` masters are excluded from service-center new-appointment Telegram notifications.
 - Added admin quality management API:
   - `POST /api/admin/masters/{id}/quality/` for level/specializations/comment/approval updates.
   - `GET /api/admin/masters/` supports `quality` and `level` filters.

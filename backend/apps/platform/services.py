@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from .models import FeatureFlag, Notification, PlatformEvent
+from .realtime import broadcast_notification, broadcast_platform_event
 
 
 def emit_event(event_type: str, entity, actor=None, payload: dict | None = None) -> PlatformEvent:
@@ -16,6 +17,7 @@ def emit_event(event_type: str, entity, actor=None, payload: dict | None = None)
     from .rules import process_event_rules
 
     process_event_rules(event)
+    broadcast_platform_event(event)
     return event
 
 
@@ -27,10 +29,12 @@ def is_feature_enabled(name: str, *, user=None, role: str | None = None) -> bool
 
 
 def create_notification(*, user, type: str, title: str, message: str = "", payload: dict | None = None) -> Notification:
-    return Notification.objects.create(
+    notification = Notification.objects.create(
         user=user,
         type=type,
         title=title,
         message=message,
         payload=payload or {},
     )
+    broadcast_notification(notification)
+    return notification

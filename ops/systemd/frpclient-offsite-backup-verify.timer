@@ -1,0 +1,11 @@
+[Unit]
+Description=Run FRP Client offsite backup verification daily
+
+[Timer]
+OnCalendar=*-*-* 04:10:00
+Persistent=true
+RandomizedDelaySec=5m
+Unit=frpclient-offsite-backup-verify.service
+
+[Install]
+WantedBy=timers.target

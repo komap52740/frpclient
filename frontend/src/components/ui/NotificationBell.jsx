@@ -1,10 +1,11 @@
 import NotificationsRoundedIcon from "@mui/icons-material/NotificationsRounded";
 import { Badge, IconButton, Tooltip } from "@mui/material";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { keyframes } from "@mui/system";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { notificationsApi } from "../../api/client";
-import useAutoRefresh from "../../hooks/useAutoRefresh";
+import { useNotificationsRealtime } from "../../features/platform/notifications/hooks/useNotificationsRealtime";
+import { accessibleFocusRingSx } from "../../shared/ui/focusStyles";
 import NotificationsDrawer from "./NotificationsDrawer";
 
 const bellPulse = keyframes`
@@ -12,8 +13,6 @@ const bellPulse = keyframes`
   70% { box-shadow: 0 0 0 8px rgba(239, 68, 68, 0); }
   100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
 `;
-
-const NOTIFICATION_POLL_INTERVAL_MS = 7000;
 
 function resolveNotificationKind(notification) {
   const payload = notification?.payload || {};
@@ -45,7 +44,14 @@ function requestAudioContext(audioContextRef) {
   return audioCtx;
 }
 
-function playEnvelope(audioCtx, frequency, offsetSeconds, durationSeconds = 0.12, type = "sine", gainPeak = 0.04) {
+function playEnvelope(
+  audioCtx,
+  frequency,
+  offsetSeconds,
+  durationSeconds = 0.12,
+  type = "sine",
+  gainPeak = 0.04
+) {
   const oscillator = audioCtx.createOscillator();
   const gainNode = audioCtx.createGain();
   const startAt = audioCtx.currentTime + offsetSeconds;
@@ -104,8 +110,8 @@ function showBrowserPush(notification) {
 
   const browserNotification = new window.Notification(notification.title || "Новое уведомление", {
     body: notification.message || "Откройте уведомления в кабинете.",
-    icon: "/favicon.ico",
-    badge: "/favicon.ico",
+    icon: "/favicon-192.png",
+    badge: "/favicon-32.png",
     tag: `frp-notification-${notification.id}`,
   });
 
@@ -160,6 +166,33 @@ export default function NotificationBell({ buttonSx = {} }) {
     showBrowserPush(latest);
   }, []);
 
+  const registerRealtimeNotification = useCallback((notification, nextUnreadCount = null) => {
+    if (!notification?.id) {
+      if (typeof nextUnreadCount === "number") {
+        setUnreadCount(nextUnreadCount);
+      }
+      return;
+    }
+
+    if (!initializedUnreadRef.current) {
+      initializedUnreadRef.current = true;
+    }
+
+    const alreadySeen = seenUnreadIdsRef.current.has(notification.id);
+    if (!alreadySeen) {
+      seenUnreadIdsRef.current = new Set([...seenUnreadIdsRef.current, notification.id]);
+      const kind = resolveNotificationKind(notification);
+      playTypedNotificationSound(kind, audioContextRef);
+      showBrowserPush(notification);
+    }
+
+    if (typeof nextUnreadCount === "number") {
+      setUnreadCount(nextUnreadCount);
+    }
+
+    setItems((prev) => [notification, ...prev.filter((item) => item.id !== notification.id)]);
+  }, []);
+
   const pollUnread = useCallback(async () => {
     try {
       const response = await notificationsApi.list({ is_read: 0 });
@@ -175,7 +208,15 @@ export default function NotificationBell({ buttonSx = {} }) {
     pollUnread();
   }, [pollUnread]);
 
-  useAutoRefresh(pollUnread, { intervalMs: NOTIFICATION_POLL_INTERVAL_MS });
+  useNotificationsRealtime({
+    onConnected: pollUnread,
+    onNotification: (payload) => {
+      if (payload?.kind !== "notification") {
+        return;
+      }
+      registerRealtimeNotification(payload.notification, payload.unread_count);
+    },
+  });
 
   useEffect(
     () => () => {
@@ -209,8 +250,10 @@ export default function NotificationBell({ buttonSx = {} }) {
   const markAllRead = async () => {
     try {
       await notificationsApi.markAllRead();
+      seenUnreadIdsRef.current = new Set();
+      initializedUnreadRef.current = true;
+      setUnreadCount(0);
       await loadItems();
-      await pollUnread();
     } catch {
       setError("Не удалось отметить уведомления прочитанными");
     }
@@ -230,6 +273,7 @@ export default function NotificationBell({ buttonSx = {} }) {
   };
 
   const cappedUnread = useMemo(() => (unreadCount > 99 ? "99+" : unreadCount), [unreadCount]);
+  const bellAriaLabel = unreadCount ? `Уведомления, непрочитанных: ${unreadCount}` : "Уведомления";
 
   return (
     <>
@@ -237,10 +281,15 @@ export default function NotificationBell({ buttonSx = {} }) {
         <IconButton
           color="inherit"
           onClick={openDrawer}
+          aria-label={bellAriaLabel}
+          aria-haspopup="dialog"
+          aria-controls="notifications-drawer"
+          aria-expanded={open}
           sx={{
             border: unreadCount ? "1px solid" : "1px solid transparent",
             borderColor: unreadCount ? "error.light" : "transparent",
             bgcolor: unreadCount ? "rgba(239,68,68,0.08)" : "transparent",
+            ...accessibleFocusRingSx,
             ...buttonSx,
           }}
         >

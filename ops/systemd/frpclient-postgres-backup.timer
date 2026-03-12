@@ -1,0 +1,11 @@
+[Unit]
+Description=Run FRP Client PostgreSQL backup daily
+
+[Timer]
+OnCalendar=*-*-* 03:30:00
+Persistent=true
+RandomizedDelaySec=5m
+Unit=frpclient-postgres-backup.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,26 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="56" y1="36" x2="470" y2="498" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#071127" />
+      <stop offset="0.55" stop-color="#0B2B69" />
+      <stop offset="1" stop-color="#114AB0" />
+    </linearGradient>
+    <radialGradient id="glow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(156 126) rotate(52.11) scale(344.091)">
+      <stop stop-color="#1AA9FF" stop-opacity="0.5" />
+      <stop offset="1" stop-color="#1AA9FF" stop-opacity="0" />
+    </radialGradient>
+    <linearGradient id="shackle" x1="142" y1="112" x2="350" y2="247" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#C4F6FF" />
+      <stop offset="1" stop-color="#2D7CFF" />
+    </linearGradient>
+  </defs>
+  <rect x="8" y="8" width="496" height="496" rx="124" fill="url(#bg)" />
+  <rect x="8" y="8" width="496" height="496" rx="124" fill="url(#glow)" />
+  <rect x="58" y="58" width="396" height="396" rx="98" fill="#0A1738" fill-opacity="0.34" stroke="#A5D7FF" stroke-opacity="0.16" stroke-width="4" />
+  <path d="M133.5 254.5C133.5 188.896 187.101 135.5 252.5 135.5H271C336.399 135.5 390 188.896 390 254.5" stroke="url(#shackle)" stroke-width="42" stroke-linecap="round" />
+  <path d="M364 254.5C364 227.438 341.957 205.5 314.75 205.5H209.25C182.043 205.5 160 227.438 160 254.5V333C160 360.062 182.043 382 209.25 382H314.75C341.957 382 364 360.062 364 333V254.5Z" fill="#EEF6FF" />
+  <path d="M241.5 228L205 288.5H240.5L209.5 348L305 270H266L299.5 228H241.5Z" fill="#08152F" />
+  <circle cx="390" cy="116" r="26" fill="#7DF2FF" />
+  <circle cx="390" cy="116" r="15" fill="white" />
+  <rect x="8" y="8" width="496" height="496" rx="124" stroke="#CFE8FF" stroke-opacity="0.16" stroke-width="4" />
+</svg>

@@ -18,10 +18,12 @@ export const STATUS_LABELS = APPOINTMENT_STATUS_OPTIONS.reduce((acc, status) => 
 }, {});
 
 export const LOCK_TYPE_LABELS = {
-  PIN: "PIN-код",
-  GOOGLE: "Google-аккаунт",
-  APPLE_ID: "Apple ID",
+  GOOGLE: "Google",
+  HUAWEI_ID: "Huawei ID",
+  MI_ACC: "Mi Acc",
   OTHER: "Другое",
+  PIN: "PIN-код",
+  APPLE_ID: "Apple ID",
 };
 
 export const PAYMENT_METHOD_LABELS = {

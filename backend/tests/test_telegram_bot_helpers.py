@@ -28,14 +28,16 @@ def test_parse_yes_no(raw, expected):
 @pytest.mark.parametrize(
     ("raw", "expected"),
     [
-        ("1", "PIN"),
-        ("pin", "PIN"),
-        ("2", "GOOGLE"),
+        ("1", "GOOGLE"),
         ("google", "GOOGLE"),
-        ("3", "APPLE_ID"),
-        ("apple", "APPLE_ID"),
+        ("2", "HUAWEI_ID"),
+        ("huawei", "HUAWEI_ID"),
+        ("3", "MI_ACC"),
+        ("mi acc", "MI_ACC"),
         ("4", "OTHER"),
         ("другое", "OTHER"),
+        ("pin", "PIN"),
+        ("apple", "APPLE_ID"),
         ("unknown", None),
     ],
 )
@@ -56,4 +58,3 @@ def test_parse_lock_type_input(raw, expected):
 )
 def test_parse_signal_code(raw, expected):
     assert parse_signal_code(raw) == expected
-

@@ -1,0 +1,11 @@
+[Unit]
+Description=Run FRP Client platform metrics refresh hourly
+
+[Timer]
+OnCalendar=hourly
+Persistent=true
+RandomizedDelaySec=10m
+Unit=frpclient-platform-metrics.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,12 @@
+[Unit]
+Description=Run FRP Client runtime audit every 30 minutes
+
+[Timer]
+OnBootSec=10m
+OnUnitActiveSec=30m
+Persistent=true
+RandomizedDelaySec=5m
+Unit=frpclient-runtime-audit.service
+
+[Install]
+WantedBy=timers.target

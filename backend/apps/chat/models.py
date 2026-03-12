@@ -1,34 +1,22 @@
 ﻿from __future__ import annotations
 
-import os
-
 from django.conf import settings
-from django.core.exceptions import ValidationError
 from django.db import models
 
 from apps.common.models import TimeStampedModel
+from apps.common.upload_security import chat_file_upload_policy, quick_reply_media_upload_policy, validate_upload
 
 
 def validate_chat_file(value):
     if not value:
         return
-    ext = os.path.splitext(value.name.lower())[1]
-    allowed = {".jpg", ".jpeg", ".png", ".webp", ".pdf", ".txt", ".log", ".zip", ".mp4", ".mov", ".webm", ".m4v"}
-    if ext not in allowed:
-        raise ValidationError("Недопустимый тип файла")
-    if value.size > 10 * 1024 * 1024:
-        raise ValidationError("Максимальный размер файла 10MB")
+    validate_upload(value, chat_file_upload_policy(settings.CHAT_FILE_MAX_UPLOAD_MB * 1024 * 1024))
 
 
 def validate_quick_reply_media(value):
     if not value:
         return
-    ext = os.path.splitext(value.name.lower())[1]
-    allowed = {".jpg", ".jpeg", ".png", ".webp", ".mp4", ".mov", ".webm", ".m4v"}
-    if ext not in allowed:
-        raise ValidationError("Медиа шаблона: только фото (jpg/png/webp) или видео (mp4/mov/webm)")
-    if value.size > 100 * 1024 * 1024:
-        raise ValidationError("Максимальный размер медиа шаблона 100MB")
+    validate_upload(value, quick_reply_media_upload_policy(settings.QUICK_REPLY_MEDIA_MAX_UPLOAD_MB * 1024 * 1024))
 
 
 class Message(TimeStampedModel):

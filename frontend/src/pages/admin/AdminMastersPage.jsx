@@ -73,7 +73,6 @@ export default function AdminMastersPage() {
 
   useEffect(() => {
     load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [requestParams]);
 
   const activate = async (id) => {
@@ -121,7 +120,9 @@ export default function AdminMastersPage() {
   const toggleQualityApproval = async (row) => {
     try {
       setSavingId(row.id);
-      await adminApi.updateMasterQuality(row.id, { master_quality_approved: !row.master_quality_approved });
+      await adminApi.updateMasterQuality(row.id, {
+        master_quality_approved: !row.master_quality_approved,
+      });
       await load();
     } finally {
       setSavingId(0);
@@ -234,7 +235,9 @@ export default function AdminMastersPage() {
         </Stack>
       </Paper>
 
-      {!filteredRows.length ? <Alert severity="info">Мастера по текущим фильтрам не найдены.</Alert> : null}
+      {!filteredRows.length ? (
+        <Alert severity="info">Мастера по текущим фильтрам не найдены.</Alert>
+      ) : null}
 
       <Stack spacing={1}>
         {filteredRows.map((row) => {
@@ -252,14 +255,29 @@ export default function AdminMastersPage() {
                   sx={{ width: "100%", pr: 1 }}
                 >
                   <Stack spacing={0.6} sx={{ minWidth: 0 }}>
-                    <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
+                    <Stack
+                      direction="row"
+                      spacing={1}
+                      alignItems="center"
+                      flexWrap="wrap"
+                      useFlexGap
+                    >
                       <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
                         {row.username}
                       </Typography>
                       {qualityChip(row.master_quality_approved)}
-                      <Chip size="small" variant="outlined" label={`Score: ${row.master_stats?.master_score ?? "—"}`} />
+                      <Chip
+                        size="small"
+                        variant="outlined"
+                        label={`Score: ${row.master_stats?.master_score ?? "—"}`}
+                      />
                     </Stack>
-                    <Typography variant="caption" color="text.secondary" noWrap sx={{ maxWidth: 560 }}>
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      noWrap
+                      sx={{ maxWidth: 560 }}
+                    >
                       {row.master_specializations || "Специализация не указана"}
                     </Typography>
                   </Stack>
@@ -279,7 +297,9 @@ export default function AdminMastersPage() {
                       size="small"
                       label="Уровень"
                       value={draft.master_level || "junior"}
-                      onChange={(event) => onDraftChange(row.id, "master_level", event.target.value)}
+                      onChange={(event) =>
+                        onDraftChange(row.id, "master_level", event.target.value)
+                      }
                       sx={{ minWidth: 230 }}
                     >
                       {LEVEL_OPTIONS.map((option) => (
@@ -292,7 +312,9 @@ export default function AdminMastersPage() {
                       size="small"
                       label="Специализация"
                       value={draft.master_specializations || ""}
-                      onChange={(event) => onDraftChange(row.id, "master_specializations", event.target.value)}
+                      onChange={(event) =>
+                        onDraftChange(row.id, "master_specializations", event.target.value)
+                      }
                       sx={{ flexGrow: 1 }}
                     />
                   </Stack>
@@ -300,21 +322,40 @@ export default function AdminMastersPage() {
                     size="small"
                     label="Комментарий QA"
                     value={draft.master_quality_comment || ""}
-                    onChange={(event) => onDraftChange(row.id, "master_quality_comment", event.target.value)}
+                    onChange={(event) =>
+                      onDraftChange(row.id, "master_quality_comment", event.target.value)
+                    }
                     fullWidth
                   />
 
                   <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
                     {row.is_master_active ? (
-                      <Button size="small" color="warning" variant="outlined" disabled={busy} onClick={() => suspend(row.id)}>
+                      <Button
+                        size="small"
+                        color="warning"
+                        variant="outlined"
+                        disabled={busy}
+                        onClick={() => suspend(row.id)}
+                      >
                         Отключить
                       </Button>
                     ) : (
-                      <Button size="small" color="success" variant="outlined" disabled={busy} onClick={() => activate(row.id)}>
+                      <Button
+                        size="small"
+                        color="success"
+                        variant="outlined"
+                        disabled={busy}
+                        onClick={() => activate(row.id)}
+                      >
                         Активировать
                       </Button>
                     )}
-                    <Button size="small" variant="contained" disabled={busy} onClick={() => saveQuality(row.id)}>
+                    <Button
+                      size="small"
+                      variant="contained"
+                      disabled={busy}
+                      onClick={() => saveQuality(row.id)}
+                    >
                       Сохранить
                     </Button>
                     <Button

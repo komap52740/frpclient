@@ -209,7 +209,9 @@ export function createAppTheme(mode = "light") {
             backgroundColor: isDark ? alpha("#0f172a", 0.82) : "rgba(255,255,255,0.72)",
             color: colors.textMain,
             borderBottom: `1px solid ${colors.borderSoft}`,
-            boxShadow: isDark ? "0 6px 30px rgba(2, 6, 23, 0.45)" : "0 4px 24px rgba(15, 23, 42, 0.07)",
+            boxShadow: isDark
+              ? "0 6px 30px rgba(2, 6, 23, 0.45)"
+              : "0 4px 24px rgba(15, 23, 42, 0.07)",
             backdropFilter: "blur(12px) saturate(120%)",
           },
         },

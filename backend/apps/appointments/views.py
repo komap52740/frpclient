@@ -1,5 +1,6 @@
 ﻿from __future__ import annotations
 
+from django.conf import settings
 from django.db.models import OuterRef, Subquery
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -13,6 +14,7 @@ from apps.accounts.permissions import IsAdminRole, IsAuthenticatedAndNotBanned
 from apps.accounts.services import recalculate_client_stats
 from apps.appointments.access import get_appointment_for_user
 from apps.chat.models import Message
+from apps.common.api_limits import parse_non_negative_int_param, serialize_bounded_queryset
 from apps.chat.services import notify_client_about_chat_message
 from apps.platform.services import emit_event
 
@@ -33,10 +35,18 @@ from .serializers import (
 from .services import (
     add_event,
     assert_master_assigned,
+    get_available_new_appointments_queryset_for_master,
     initialize_response_deadline,
     take_appointment,
     transition_status,
 )
+
+
+def _appointment_serializer_context(request, *, include_client_access: bool) -> dict:
+    return {
+        "request": request,
+        "include_client_access": include_client_access,
+    }
 
 
 class AppointmentCreateView(APIView):
@@ -64,7 +74,13 @@ class AppointmentCreateView(APIView):
             payload={"status": appointment.status},
         )
         notify_masters_about_new_appointment(appointment)
-        return Response(AppointmentSerializer(appointment, context={"request": request}).data, status=status.HTTP_201_CREATED)
+        return Response(
+            AppointmentSerializer(
+                appointment,
+                context=_appointment_serializer_context(request, include_client_access=True),
+            ).data,
+            status=status.HTTP_201_CREATED,
+        )
 
 
 class MyAppointmentsView(APIView):
@@ -75,8 +91,14 @@ class MyAppointmentsView(APIView):
             return Response({"detail": "Только для клиентов"}, status=status.HTTP_403_FORBIDDEN)
 
         queryset = Appointment.objects.filter(client=request.user).select_related("assigned_master", "client")
-        data = AppointmentSerializer(queryset, many=True, context={"request": request}).data
-        return Response(data)
+        return serialize_bounded_queryset(
+            request,
+            queryset,
+            AppointmentSerializer,
+            serializer_context=_appointment_serializer_context(request, include_client_access=False),
+            default_limit=settings.DEFAULT_API_LIST_LIMIT,
+            max_limit=settings.MAX_API_LIST_LIMIT,
+        )
 
 
 class AppointmentDetailView(APIView):
@@ -84,7 +106,10 @@ class AppointmentDetailView(APIView):
 
     def get(self, request, appointment_id: int):
         appointment = get_appointment_for_user(request.user, appointment_id)
-        data = AppointmentSerializer(appointment, context={"request": request}).data
+        data = AppointmentSerializer(
+            appointment,
+            context=_appointment_serializer_context(request, include_client_access=True),
+        ).data
         return Response(data)
 
 
@@ -125,7 +150,12 @@ class ClientAccessUpdateView(APIView):
             actor=request.user,
             payload={"rustdesk_id_updated": bool(rustdesk_id), "rustdesk_password_updated": bool(rustdesk_password)},
         )
-        return Response(AppointmentSerializer(appointment, context={"request": request}).data)
+        return Response(
+            AppointmentSerializer(
+                appointment,
+                context=_appointment_serializer_context(request, include_client_access=True),
+            ).data
+        )
 
 
 class AppointmentEventsView(APIView):
@@ -133,18 +163,19 @@ class AppointmentEventsView(APIView):
 
     def get(self, request, appointment_id: int):
         appointment = get_appointment_for_user(request.user, appointment_id)
-        after_id_raw = request.query_params.get("after_id", "0")
-        try:
-            after_id = int(after_id_raw or 0)
-        except (TypeError, ValueError):
-            return Response({"detail": "Параметр after_id должен быть числом"}, status=status.HTTP_400_BAD_REQUEST)
+        after_id = parse_non_negative_int_param(request.query_params.get("after_id"), field_name="after_id", default=0)
 
         queryset = appointment.events.select_related("actor").all()
         if after_id > 0:
             queryset = queryset.filter(id__gt=after_id)
-        queryset = queryset[:100]
-        data = AppointmentEventSerializer(queryset, many=True).data
-        return Response(data)
+        queryset = queryset.order_by("-id")
+        return serialize_bounded_queryset(
+            request,
+            queryset,
+            AppointmentEventSerializer,
+            default_limit=settings.APPOINTMENT_EVENTS_LIST_LIMIT,
+            max_limit=settings.APPOINTMENT_EVENTS_MAX_LIST_LIMIT,
+        )
 
 
 class UploadPaymentProofView(APIView):
@@ -182,7 +213,12 @@ class UploadPaymentProofView(APIView):
             actor=request.user,
             payload={"status": appointment.status},
         )
-        return Response(AppointmentSerializer(appointment, context={"request": request}).data)
+        return Response(
+            AppointmentSerializer(
+                appointment,
+                context=_appointment_serializer_context(request, include_client_access=True),
+            ).data
+        )
 
 
 class MarkPaidView(APIView):
@@ -227,7 +263,12 @@ class MarkPaidView(APIView):
                 "has_payment_proof": bool(appointment.payment_proof),
             },
         )
-        return Response(AppointmentSerializer(appointment, context={"request": request}).data)
+        return Response(
+            AppointmentSerializer(
+                appointment,
+                context=_appointment_serializer_context(request, include_client_access=True),
+            ).data
+        )
 
 
 class ClientSignalView(APIView):
@@ -272,7 +313,10 @@ class RepeatAppointmentView(APIView):
         repeated = repeat_client_appointment(source=source, client_user=request.user)
 
         return Response(
-            AppointmentSerializer(repeated, context={"request": request}).data,
+            AppointmentSerializer(
+                repeated,
+                context=_appointment_serializer_context(request, include_client_access=True),
+            ).data,
             status=status.HTTP_201_CREATED,
         )
 
@@ -283,12 +327,16 @@ class MasterNewAppointmentsView(APIView):
     def get(self, request):
         if request.user.role != RoleChoices.MASTER:
             return Response({"detail": "Только для мастеров"}, status=status.HTTP_403_FORBIDDEN)
-        if not request.user.is_master_active:
-            return Response([], status=status.HTTP_200_OK)
 
-        queryset = Appointment.objects.filter(status=AppointmentStatusChoices.NEW, assigned_master__isnull=True).select_related("client")
-        data = AppointmentSerializer(queryset, many=True, context={"request": request}).data
-        return Response(data)
+        queryset = get_available_new_appointments_queryset_for_master(request.user).select_related("client")
+        return serialize_bounded_queryset(
+            request,
+            queryset,
+            AppointmentSerializer,
+            serializer_context=_appointment_serializer_context(request, include_client_access=False),
+            default_limit=settings.DEFAULT_API_LIST_LIMIT,
+            max_limit=settings.MAX_API_LIST_LIMIT,
+        )
 
 
 class MasterActiveAppointmentsView(APIView):
@@ -319,8 +367,14 @@ class MasterActiveAppointmentsView(APIView):
                 latest_message_sender_role=Subquery(latest_message_qs.values("sender__role")[:1]),
             )
         )
-        data = AppointmentSerializer(queryset, many=True, context={"request": request}).data
-        return Response(data)
+        return serialize_bounded_queryset(
+            request,
+            queryset,
+            AppointmentSerializer,
+            serializer_context=_appointment_serializer_context(request, include_client_access=False),
+            default_limit=settings.DEFAULT_API_LIST_LIMIT,
+            max_limit=settings.MAX_API_LIST_LIMIT,
+        )
 
 
 class MasterBulkActionView(APIView):
@@ -396,7 +450,12 @@ class MasterTakeView(APIView):
 
     def post(self, request, appointment_id: int):
         appointment = take_appointment(appointment_id, request.user)
-        return Response(AppointmentSerializer(appointment, context={"request": request}).data)
+        return Response(
+            AppointmentSerializer(
+                appointment,
+                context=_appointment_serializer_context(request, include_client_access=True),
+            ).data
+        )
 
 
 class MasterDeclineView(APIView):
@@ -412,7 +471,12 @@ class MasterDeclineView(APIView):
 
         transition_status(appointment, request.user, AppointmentStatusChoices.DECLINED_BY_MASTER)
         recalculate_client_stats(appointment.client)
-        return Response(AppointmentSerializer(appointment, context={"request": request}).data)
+        return Response(
+            AppointmentSerializer(
+                appointment,
+                context=_appointment_serializer_context(request, include_client_access=True),
+            ).data
+        )
 
 
 class MasterSetPriceView(APIView):
@@ -464,7 +528,12 @@ class MasterSetPriceView(APIView):
             },
         )
         transition_status(appointment, request.user, AppointmentStatusChoices.AWAITING_PAYMENT)
-        return Response(AppointmentSerializer(appointment, context={"request": request}).data)
+        return Response(
+            AppointmentSerializer(
+                appointment,
+                context=_appointment_serializer_context(request, include_client_access=True),
+            ).data
+        )
 
 
 class ConfirmPaymentMixin:
@@ -489,7 +558,12 @@ class ConfirmPaymentMixin:
             actor=request.user,
             payload={"confirmed_by": request.user.id},
         )
-        return Response(AppointmentSerializer(appointment, context={"request": request}).data)
+        return Response(
+            AppointmentSerializer(
+                appointment,
+                context=_appointment_serializer_context(request, include_client_access=True),
+            ).data
+        )
 
 
 class MasterConfirmPaymentView(APIView, ConfirmPaymentMixin):
@@ -517,7 +591,12 @@ class MasterStartView(APIView):
             actor=request.user,
             payload={"status": AppointmentStatusChoices.IN_PROGRESS},
         )
-        return Response(AppointmentSerializer(appointment, context={"request": request}).data)
+        return Response(
+            AppointmentSerializer(
+                appointment,
+                context=_appointment_serializer_context(request, include_client_access=True),
+            ).data
+        )
 
 
 class MasterCompleteView(APIView):
@@ -539,7 +618,12 @@ class MasterCompleteView(APIView):
             payload={"status": AppointmentStatusChoices.COMPLETED},
         )
         recalculate_client_stats(appointment.client)
-        return Response(AppointmentSerializer(appointment, context={"request": request}).data)
+        return Response(
+            AppointmentSerializer(
+                appointment,
+                context=_appointment_serializer_context(request, include_client_access=True),
+            ).data
+        )
 
 
 class AdminManualStatusView(APIView):
@@ -553,5 +637,10 @@ class AdminManualStatusView(APIView):
         to_status = serializer.validated_data["status"]
         transition_status(appointment, request.user, to_status, serializer.validated_data.get("note", ""))
         recalculate_client_stats(appointment.client)
-        return Response(AppointmentSerializer(appointment, context={"request": request}).data)
+        return Response(
+            AppointmentSerializer(
+                appointment,
+                context=_appointment_serializer_context(request, include_client_access=True),
+            ).data
+        )
 

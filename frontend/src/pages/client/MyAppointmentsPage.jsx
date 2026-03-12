@@ -19,16 +19,18 @@ import {
 } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import useMediaQuery from "@mui/material/useMediaQuery";
+import { useQueryClient } from "@tanstack/react-query";
 import dayjs from "dayjs";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useDeferredValue, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { appointmentsApi } from "../../api/client";
 import AppointmentCard from "../../components/AppointmentCard";
 import EmptyState from "../../components/EmptyState";
 import AppointmentCardSkeleton from "../../components/ui/skeletons/AppointmentCardSkeleton";
 import { getStatusLabel } from "../../constants/labels";
-import useAutoRefresh from "../../hooks/useAutoRefresh";
+import { useMyAppointmentsQuery } from "../../features/appointments/list/hooks/useMyAppointmentsQuery";
+import { useNotificationsRealtime } from "../../features/platform/notifications/hooks/useNotificationsRealtime";
+import { queryKeys } from "../../shared/api/queryKeys";
 
 const FILTERS = [
   { key: "ALL", label: "Все" },
@@ -66,7 +68,14 @@ const DETAIL_FOCUS_BY_ACTION = {
 function matchesFilter(item, filter) {
   if (filter === "ALL") return true;
   if (filter === "ACTIVE") {
-    return ["NEW", "IN_REVIEW", "AWAITING_PAYMENT", "PAYMENT_PROOF_UPLOADED", "PAID", "IN_PROGRESS"].includes(item.status);
+    return [
+      "NEW",
+      "IN_REVIEW",
+      "AWAITING_PAYMENT",
+      "PAYMENT_PROOF_UPLOADED",
+      "PAID",
+      "IN_PROGRESS",
+    ].includes(item.status);
   }
   return item.status === filter;
 }
@@ -131,56 +140,45 @@ function resolveAttentionAction(item) {
 
 export default function MyAppointmentsPage() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
-
-  const [items, setItems] = useState([]);
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
-
   const [search, setSearch] = useState("");
   const [activeFilter, setActiveFilter] = useState("ALL");
   const [onlyUnread, setOnlyUnread] = useState(false);
   const [sortValue, setSortValue] = useState("updated_desc");
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const deferredSearch = useDeferredValue(search);
+  const { data: items = [], isPending, isFetching, error, refetch } = useMyAppointmentsQuery();
+  const loading = isPending;
+  const refreshing = isFetching;
+  const errorMessage = error ? "Не удалось загрузить список заявок" : "";
 
-  const load = useCallback(async ({ silent = false } = {}) => {
-    setLoading(true);
-    try {
-      const response = await appointmentsApi.my();
-      setItems(response.data || []);
-      setError("");
-    } catch {
-      if (!silent) setError("Не удалось загрузить список заявок");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const refreshData = useCallback(async () => {
+    await refetch();
+  }, [refetch]);
 
-  useEffect(() => {
-    load();
-  }, [load]);
+  const invalidateData = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: queryKeys.appointments.myRoot() });
+  }, [queryClient]);
 
-  useAutoRefresh(
-    async () => {
-      try {
-        const response = await appointmentsApi.my();
-        setItems(response.data || []);
-      } catch {
-        // silent background refresh
-      }
-    },
-    { intervalMs: 5000 }
+  useNotificationsRealtime({
+    onConnected: invalidateData,
+    onNotification: invalidateData,
+  });
+
+  const unreadTotal = useMemo(
+    () => items.reduce((sum, item) => sum + (item.unread_count || 0), 0),
+    [items]
   );
-
-  const unreadTotal = useMemo(() => items.reduce((sum, item) => sum + (item.unread_count || 0), 0), [items]);
   const filterCounts = useMemo(
-    () => Object.fromEntries(FILTERS.map((filter) => [filter.key, countForFilter(items, filter.key)])),
+    () =>
+      Object.fromEntries(FILTERS.map((filter) => [filter.key, countForFilter(items, filter.key)])),
     [items]
   );
 
   const filteredItems = useMemo(() => {
-    const normalizedQuery = search.trim().toLowerCase();
+    const normalizedQuery = deferredSearch.trim().toLowerCase();
 
     const result = items.filter((item) => {
       if (!matchesFilter(item, activeFilter)) return false;
@@ -200,7 +198,7 @@ export default function MyAppointmentsPage() {
     });
 
     return sortItems(result, sortValue);
-  }, [activeFilter, items, onlyUnread, search, sortValue]);
+  }, [activeFilter, deferredSearch, items, onlyUnread, sortValue]);
 
   const priorityItem = useMemo(() => sortItems(items, "priority")[0] || null, [items]);
   const attentionAction = useMemo(() => resolveAttentionAction(priorityItem), [priorityItem]);
@@ -243,8 +241,8 @@ export default function MyAppointmentsPage() {
                 <Button
                   variant="outlined"
                   startIcon={<RefreshRoundedIcon />}
-                  onClick={() => load()}
-                  disabled={loading}
+                  onClick={refreshData}
+                  disabled={refreshing}
                   sx={{ minWidth: { xs: "100%", sm: 140 } }}
                 >
                   Обновить
@@ -324,9 +322,18 @@ export default function MyAppointmentsPage() {
             </Button>
           </Stack>
 
-          <Tabs value={activeFilter} onChange={(_, value) => setActiveFilter(value)} variant="scrollable" allowScrollButtonsMobile>
+          <Tabs
+            value={activeFilter}
+            onChange={(_, value) => setActiveFilter(value)}
+            variant="scrollable"
+            allowScrollButtonsMobile
+          >
             {FILTERS.map((filter) => (
-              <Tab key={filter.key} value={filter.key} label={`${filter.label} (${filterCounts[filter.key] || 0})`} />
+              <Tab
+                key={filter.key}
+                value={filter.key}
+                label={`${filter.label} (${filterCounts[filter.key] || 0})`}
+              />
             ))}
           </Tabs>
 
@@ -347,9 +354,18 @@ export default function MyAppointmentsPage() {
                 }}
               />
 
-              <Stack direction={{ xs: "column", md: "row" }} spacing={1} justifyContent="space-between">
+              <Stack
+                direction={{ xs: "column", md: "row" }}
+                spacing={1}
+                justifyContent="space-between"
+              >
                 <FormControlLabel
-                  control={<Switch checked={onlyUnread} onChange={(event) => setOnlyUnread(event.target.checked)} />}
+                  control={
+                    <Switch
+                      checked={onlyUnread}
+                      onChange={(event) => setOnlyUnread(event.target.checked)}
+                    />
+                  }
                   label="Только с непрочитанными"
                 />
                 <TextField
@@ -371,7 +387,7 @@ export default function MyAppointmentsPage() {
         </Stack>
       </Paper>
 
-      {error ? <Alert severity="error">{error}</Alert> : null}
+      {errorMessage ? <Alert severity="error">{errorMessage}</Alert> : null}
 
       {loading && !items.length ? (
         <Stack spacing={1}>

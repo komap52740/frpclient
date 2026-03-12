@@ -1,22 +1,24 @@
-﻿import {
-  Alert,
-  Box,
-  Button,
-  Chip,
-  CircularProgress,
-  Divider,
-  Paper,
-  Stack,
-  TextField,
-  Typography,
-} from "@mui/material";
-import GoogleIcon from "@mui/icons-material/Google";
-import TelegramIcon from "@mui/icons-material/Telegram";
+import { Box, Button, Stack, TextField, Typography } from "@mui/material";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { authApi } from "../../api/client";
-import { useAuth } from "../../auth/AuthContext";
+import { useAuth } from "../../features/auth/hooks/useAuth";
+import { getApiErrorMessage } from "../../features/auth/lib/getApiErrorMessage";
+import { useBootstrapStatusQuery } from "../../features/auth/model/useBootstrapStatusQuery";
+import {
+  useBootstrapAdminMutation,
+  useOAuthStartMutation,
+  usePasswordResetConfirmMutation,
+  usePasswordResetRequestMutation,
+} from "../../features/auth/model/useLoginMutations";
+import { authInputSx, authPrimaryButtonSx } from "../../features/auth/ui/authStyles";
+import BootstrapAdminCard from "../../features/auth/ui/BootstrapAdminCard";
+import LoginCard from "../../features/auth/ui/LoginCard";
+import LoginForm from "../../features/auth/ui/LoginForm";
+import LoginLoadingScreen from "../../features/auth/ui/LoginLoadingScreen";
+import LoginShell from "../../features/auth/ui/LoginShell";
+import OAuthButtons from "../../features/auth/ui/OAuthButtons";
+import TelegramWidget from "../../features/auth/ui/TelegramWidget";
 
 const BOT_USERNAME_RAW = import.meta.env.VITE_TELEGRAM_BOT_USERNAME || "";
 const BOT_USERNAME = BOT_USERNAME_RAW.trim().replace(/^@/, "");
@@ -24,247 +26,43 @@ const TELEGRAM_WIDGET_RETRY_LIMIT = 5;
 const TELEGRAM_WIDGET_BOOT_TIMEOUT_MS = 20000;
 const TELEGRAM_WIDGET_POLL_MS = 450;
 
-function getApiErrorMessage(error, fallback) {
-  const data = error?.response?.data;
-  if (typeof data?.detail === "string" && data.detail) {
-    return data.detail;
+const AUTH_VIEW_LOGIN = "login";
+const AUTH_VIEW_RESET_REQUEST = "reset-request";
+const AUTH_VIEW_RESET_CONFIRM = "reset-confirm";
+
+function clearLoginHash() {
+  if (typeof window === "undefined") {
+    return;
   }
-  if (Array.isArray(data?.non_field_errors) && typeof data.non_field_errors[0] === "string") {
-    return data.non_field_errors[0];
-  }
-  if (data && typeof data === "object") {
-    for (const key of Object.keys(data)) {
-      const value = data[key];
-      if (typeof value === "string" && value) {
-        return value;
-      }
-      if (Array.isArray(value) && typeof value[0] === "string" && value[0]) {
-        return value[0];
-      }
-    }
-  }
-  if (typeof data === "string" && data) {
-    return data;
-  }
-  return fallback;
+  window.history.replaceState(
+    {},
+    document.title,
+    `${window.location.pathname}${window.location.search}`
+  );
 }
-
-const authInputSx = {
-  "& .MuiInputLabel-root": {
-    color: "rgba(188, 207, 232, 0.82)",
-    fontWeight: 600,
-  },
-  "& .MuiInputLabel-root.Mui-focused": {
-    color: "#bfe0ff",
-  },
-  "& .MuiOutlinedInput-root": {
-    borderRadius: 1.9,
-    fontWeight: 600,
-    color: "#f1f7ff",
-    background: "rgba(9, 20, 39, 0.76)",
-    transition: "all .22s ease",
-    "& fieldset": {
-      borderColor: "rgba(132, 169, 224, 0.36)",
-      borderWidth: 1.1,
-    },
-    "&:hover fieldset": {
-      borderColor: "rgba(148, 193, 255, 0.62)",
-    },
-    "&.Mui-focused fieldset": {
-      borderColor: "rgba(150, 204, 255, 0.95)",
-      boxShadow: "0 0 0 3px rgba(86, 157, 255, 0.14)",
-    },
-  },
-  "& .MuiInputBase-input": {
-    py: 1.32,
-  },
-};
-
-const authPrimaryButtonSx = {
-  minHeight: 52,
-  borderRadius: 3,
-  py: 1.15,
-  px: 1.7,
-  textTransform: "none",
-  fontWeight: 800,
-  letterSpacing: 0.1,
-  fontSize: 18,
-  fontFamily: "'Sora', 'Manrope', sans-serif",
-  background: "linear-gradient(135deg, #7fbeff 0%, #4f8dff 45%, #386de2 100%)",
-  color: "#f7fcff",
-  border: "1.2px solid rgba(160, 204, 255, 0.58)",
-  boxShadow: "0 16px 30px rgba(45, 111, 226, 0.34), inset 0 1px 0 rgba(255,255,255,0.22)",
-  transition: "all .2s ease",
-  "&:hover": {
-    background: "linear-gradient(135deg, #8bc4ff 0%, #5b97ff 45%, #477eef 100%)",
-    boxShadow: "0 18px 36px rgba(52, 123, 241, 0.42), inset 0 1px 0 rgba(255,255,255,0.26)",
-    transform: "translateY(-1px)",
-  },
-  "&:active": {
-    transform: "translateY(0)",
-    boxShadow: "0 8px 22px rgba(45, 111, 226, 0.28), inset 0 1px 0 rgba(255,255,255,0.18)",
-  },
-  "&.Mui-disabled": {
-    color: "rgba(213,230,255,0.72)",
-    background: "linear-gradient(135deg, rgba(91,145,222,0.62) 0%, rgba(69,116,199,0.6) 100%)",
-    borderColor: "rgba(152,188,236,0.38)",
-  },
-};
-
-const AUTH_PROVIDER_BUTTON_HEIGHT = 56;
-
-const oauthButtonBaseSx = {
-  minHeight: AUTH_PROVIDER_BUTTON_HEIGHT,
-  borderRadius: 2.8,
-  px: 1.9,
-  textTransform: "none",
-  fontWeight: 800,
-  letterSpacing: 0.12,
-  fontSize: { xs: 16, sm: 17 },
-  fontFamily: "'Sora', 'Manrope', sans-serif",
-  lineHeight: 1.2,
-  borderWidth: 1.3,
-  justifyContent: "center",
-  transition: "all .18s ease",
-  boxShadow: "0 12px 24px rgba(5,12,28,0.35), inset 0 1px 0 rgba(255,255,255,0.12)",
-  "& .MuiButton-startIcon": {
-    mr: 1,
-  },
-  "&:active": {
-    transform: "translateY(0)",
-  },
-};
-
-const oauthServiceButtonSx = {
-  ...oauthButtonBaseSx,
-  color: "#e9f4ff",
-  borderColor: "rgba(139,188,248,0.62)",
-  background: "linear-gradient(145deg, rgba(28,53,96,0.9) 0%, rgba(17,34,67,0.92) 100%)",
-  "&:hover": {
-    borderColor: "rgba(159,208,255,0.92)",
-    background: "linear-gradient(145deg, rgba(36,66,116,0.95) 0%, rgba(23,45,86,0.95) 100%)",
-    boxShadow: "0 16px 30px rgba(19,59,122,0.34)",
-    transform: "translateY(-1px)",
-  },
-  "&.Mui-disabled": {
-    color: "rgba(220,236,255,0.64)",
-    background: "linear-gradient(145deg, rgba(27,47,83,0.72) 0%, rgba(18,33,62,0.72) 100%)",
-    borderColor: "rgba(130,175,230,0.38)",
-  },
-};
-
-const oauthTelegramShellSx = {
-  borderRadius: 2.8,
-  border: "1.3px solid rgba(139,188,248,0.62)",
-  background: "linear-gradient(145deg, rgba(28,53,96,0.9) 0%, rgba(17,34,67,0.92) 100%)",
-  minHeight: AUTH_PROVIDER_BUTTON_HEIGHT,
-  px: 1.2,
-  py: 0.8,
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  boxShadow: "0 12px 24px rgba(5,12,28,0.35), inset 0 1px 0 rgba(255,255,255,0.12)",
-  transition: "all .18s ease",
-  "&:hover": {
-    borderColor: "rgba(159,208,255,0.92)",
-    background: "linear-gradient(145deg, rgba(36,66,116,0.95) 0%, rgba(23,45,86,0.95) 100%)",
-    boxShadow: "0 16px 30px rgba(19,59,122,0.34)",
-    transform: "translateY(-1px)",
-  },
-};
-
-const oauthTelegramFallbackButtonSx = {
-  ...oauthServiceButtonSx,
-  minHeight: AUTH_PROVIDER_BUTTON_HEIGHT - 8,
-  borderRadius: 2.5,
-  fontSize: { xs: 15, sm: 16 },
-  px: 1.5,
-};
-
-const providerBadgeSx = {
-  width: 27,
-  height: 27,
-  borderRadius: "50%",
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  fontSize: 13,
-  fontWeight: 900,
-  flexShrink: 0,
-  color: "#d9ecff",
-  border: "1px solid rgba(169,208,255,0.42)",
-  background: "rgba(16,36,70,0.72)",
-  boxShadow: "inset 0 1px 0 rgba(255,255,255,0.24), 0 6px 14px rgba(0,0,0,0.28)",
-};
-
-const LOGIN_FAQ_ITEMS = [
-  {
-    question: "Можно ли работать полностью удаленно?",
-    answer: "Да. Все этапы ведутся онлайн: заявка, чат, оплата и сопровождение мастером.",
-  },
-  {
-    question: "Когда давать RuDesktop-данные?",
-    answer: "Можно сразу при создании заявки или позже в карточке, когда мастер запросит подключение.",
-  },
-  {
-    question: "Как контролировать процесс?",
-    answer: "В карточке заявки видны статусы и сообщения. Никаких скрытых этапов.",
-  },
-];
-
-const LANDING_PRICE_ITEMS = [
-  {
-    title: "Базовая разблокировка",
-    price: "от 1 500 ₽",
-    eta: "10-30 минут",
-    note: "Типовые кейсы после сброса/аккаунта.",
-  },
-  {
-    title: "Сложный кейс",
-    price: "от 3 500 ₽",
-    eta: "30-90 минут",
-    note: "Редкие модели и нестандартные ограничения.",
-  },
-  {
-    title: "Сервисный центр PRO",
-    price: "индивидуально",
-    eta: "SLA и приоритет",
-    note: "Потоковые заявки с ручным приоритетом.",
-  },
-];
-
-const LANDING_CASE_ITEMS = [
-  {
-    device: "Samsung A54",
-    issue: "FRP после сброса",
-    result: "Разблокировано за 18 минут",
-    finalPrice: "2 000 ₽",
-  },
-  {
-    device: "Xiaomi Redmi Note",
-    issue: "Google-аккаунт + блокировка входа",
-    result: "Решено в чате за 42 минуты",
-    finalPrice: "3 200 ₽",
-  },
-  {
-    device: "Honor / Huawei",
-    issue: "Сложный вход после обновления",
-    result: "Сессия с мастером, статус «Готово»",
-    finalPrice: "4 500 ₽",
-  },
-];
 
 export default function LoginPage() {
   const { loginWithTelegram, loginWithAccessToken, loginWithPassword } = useAuth();
   const navigate = useNavigate();
+  const {
+    data: bootstrapStatus,
+    isLoading: setupLoading,
+    isError: bootstrapStatusError,
+  } = useBootstrapStatusQuery();
+  const { mutateAsync: startOAuthMutation } = useOAuthStartMutation();
+  const { mutateAsync: bootstrapAdminMutation } = useBootstrapAdminMutation();
+  const { mutateAsync: passwordResetRequestMutation } = usePasswordResetRequestMutation();
+  const { mutateAsync: passwordResetConfirmMutation } = usePasswordResetConfirmMutation();
+
+  const requiresSetup = Boolean(bootstrapStatus?.requires_setup);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
-  const [setupLoading, setSetupLoading] = useState(true);
-  const [requiresSetup, setRequiresSetup] = useState(false);
   const [telegramWidgetError, setTelegramWidgetError] = useState("");
   const [telegramWidgetReloadKey, setTelegramWidgetReloadKey] = useState(0);
+  const [authView, setAuthView] = useState(AUTH_VIEW_LOGIN);
+  const [passwordResetToken, setPasswordResetToken] = useState("");
   const telegramContainerRef = useRef(null);
   const telegramWidgetRetryRef = useRef(0);
   const loginWithTelegramRef = useRef(loginWithTelegram);
@@ -283,6 +81,15 @@ export default function LoginPage() {
     password: "",
   });
 
+  const [passwordResetRequestForm, setPasswordResetRequestForm] = useState({
+    email: "",
+  });
+
+  const [passwordResetConfirmForm, setPasswordResetConfirmForm] = useState({
+    password: "",
+    passwordConfirm: "",
+  });
+
   useEffect(() => {
     loginWithTelegramRef.current = loginWithTelegram;
   }, [loginWithTelegram]);
@@ -292,61 +99,84 @@ export default function LoginPage() {
   }, [navigate]);
 
   useEffect(() => {
-    const loadBootstrapStatus = async () => {
-      setSetupLoading(true);
-      try {
-        const response = await authApi.bootstrapStatus();
-        setRequiresSetup(Boolean(response.requires_setup));
-      } catch {
-        setError("Не удалось получить статус первичной настройки.");
-      } finally {
-        setSetupLoading(false);
-      }
-    };
-
-    loadBootstrapStatus();
-  }, []);
+    if (bootstrapStatusError) {
+      setError((prev) => prev || "Не удалось получить статус первичной настройки.");
+    }
+  }, [bootstrapStatusError]);
 
   useEffect(() => {
-    if (requiresSetup) return;
+    if (setupLoading || requiresSetup || typeof window === "undefined") {
+      return;
+    }
 
     const hashValue = (window.location.hash || "").replace(/^#/, "");
-    if (!hashValue) return;
+    if (!hashValue) {
+      return;
+    }
 
     const params = new URLSearchParams(hashValue);
     const oauthAccess = params.get("oauth_access");
     const oauthError = params.get("oauth_error");
+    const emailVerified = params.get("email_verified");
+    const emailError = params.get("email_error");
+    const nextPasswordResetToken = params.get("password_reset_token");
 
-    if (!oauthAccess && !oauthError) {
+    if (oauthAccess || oauthError) {
+      clearLoginHash();
+
+      if (oauthError) {
+        setError(oauthError);
+        setSuccess("");
+        return;
+      }
+      if (!oauthAccess) {
+        return;
+      }
+
+      setLoading(true);
+      setError("");
+      setSuccess("");
+      loginWithAccessToken(oauthAccess)
+        .then(() => {
+          navigate("/", { replace: true });
+        })
+        .catch((err) => {
+          setError(getApiErrorMessage(err, "Не удалось завершить OAuth-вход"));
+        })
+        .finally(() => {
+          setLoading(false);
+        });
       return;
     }
 
-    window.history.replaceState({}, document.title, `${window.location.pathname}${window.location.search}`);
-
-    if (oauthError) {
-      setError(oauthError);
+    if (emailVerified === "1") {
+      clearLoginHash();
+      setAuthView(AUTH_VIEW_LOGIN);
+      setPasswordResetToken("");
+      setSuccess("Email подтверждён. Теперь можно войти в систему.");
+      setError("");
       return;
     }
-    if (!oauthAccess) {
+
+    if (emailError) {
+      clearLoginHash();
+      setAuthView(AUTH_VIEW_LOGIN);
+      setPasswordResetToken("");
+      setSuccess("");
+      setError(emailError);
       return;
     }
 
-    setLoading(true);
-    setError("");
-    loginWithAccessToken(oauthAccess)
-      .then(() => {
-        navigate("/", { replace: true });
-      })
-      .catch((err) => {
-        setError(getApiErrorMessage(err, "Не удалось завершить OAuth-вход"));
-      })
-      .finally(() => {
-        setLoading(false);
-      });
-  }, [loginWithAccessToken, navigate, requiresSetup]);
+    if (nextPasswordResetToken) {
+      setAuthView(AUTH_VIEW_RESET_CONFIRM);
+      setPasswordResetToken(nextPasswordResetToken);
+      setError("");
+      setSuccess("");
+    }
+  }, [loginWithAccessToken, navigate, requiresSetup, setupLoading]);
 
   useEffect(() => {
-    if (setupLoading || requiresSetup || !BOT_USERNAME) {
+    if (setupLoading || requiresSetup || authView !== AUTH_VIEW_LOGIN || !BOT_USERNAME) {
       return undefined;
     }
 
@@ -387,7 +217,9 @@ export default function LoginPage() {
     const hasWidgetUi = () =>
       Boolean(
         container.querySelector("iframe") ||
-          Array.from(container.children).some((node) => node.tagName && node.tagName.toLowerCase() !== "script")
+          Array.from(container.children).some(
+            (node) => node.tagName && node.tagName.toLowerCase() !== "script"
+          )
       );
 
     const markWidgetReady = () => {
@@ -410,11 +242,14 @@ export default function LoginPage() {
 
       if (nextAttempt < TELEGRAM_WIDGET_RETRY_LIMIT) {
         setTelegramWidgetError("");
-        retryTimer = window.setTimeout(() => {
-          if (!isDisposed) {
-            setTelegramWidgetReloadKey((prev) => prev + 1);
-          }
-        }, 1000 + nextAttempt * 550);
+        retryTimer = window.setTimeout(
+          () => {
+            if (!isDisposed) {
+              setTelegramWidgetReloadKey((prev) => prev + 1);
+            }
+          },
+          1000 + nextAttempt * 550
+        );
         return;
       }
 
@@ -476,14 +311,30 @@ export default function LoginPage() {
         container.removeChild(script);
       }
     };
-  }, [setupLoading, requiresSetup, telegramWidgetReloadKey]);
+  }, [authView, requiresSetup, setupLoading, telegramWidgetReloadKey]);
+
+  const switchToLoginView = () => {
+    clearLoginHash();
+    setAuthView(AUTH_VIEW_LOGIN);
+    setPasswordResetToken("");
+    setPasswordResetConfirmForm({ password: "", passwordConfirm: "" });
+    setError("");
+  };
+
+  const switchToResetRequestView = () => {
+    clearLoginHash();
+    setAuthView(AUTH_VIEW_RESET_REQUEST);
+    setPasswordResetToken("");
+    setSuccess("");
+    setError("");
+  };
 
   const startOAuthLogin = async (provider) => {
     setLoading(true);
     setError("");
     setSuccess("");
     try {
-      const response = await authApi.oauthStart(provider);
+      const response = await startOAuthMutation(provider);
       if (!response?.auth_url) {
         throw new Error("OAuth URL is missing");
       }
@@ -509,6 +360,55 @@ export default function LoginPage() {
     }
   };
 
+  const submitPasswordResetRequest = async (event) => {
+    event.preventDefault();
+    setLoading(true);
+    setError("");
+    setSuccess("");
+    try {
+      const response = await passwordResetRequestMutation(passwordResetRequestForm);
+      setSuccess(response?.detail || "Если аккаунт найден, инструкция отправлена на email.");
+      setAuthView(AUTH_VIEW_LOGIN);
+      setPasswordResetRequestForm({ email: "" });
+    } catch (err) {
+      setError(getApiErrorMessage(err, "Не удалось отправить инструкцию по смене пароля."));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const submitPasswordResetConfirm = async (event) => {
+    event.preventDefault();
+    if (!passwordResetToken) {
+      setError("Ссылка для смены пароля недействительна.");
+      return;
+    }
+    if (passwordResetConfirmForm.password !== passwordResetConfirmForm.passwordConfirm) {
+      setError("Пароли не совпадают.");
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+    setSuccess("");
+    try {
+      const response = await passwordResetConfirmMutation({
+        token: passwordResetToken,
+        password: passwordResetConfirmForm.password,
+        password_confirm: passwordResetConfirmForm.passwordConfirm,
+      });
+      clearLoginHash();
+      setPasswordResetToken("");
+      setAuthView(AUTH_VIEW_LOGIN);
+      setPasswordResetConfirmForm({ password: "", passwordConfirm: "" });
+      setSuccess(response?.detail || "Пароль обновлён. Теперь можно войти.");
+    } catch (err) {
+      setError(getApiErrorMessage(err, "Не удалось обновить пароль."));
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const submitBootstrap = async (event) => {
     event.preventDefault();
     setError("");
@@ -520,7 +420,7 @@ export default function LoginPage() {
 
     setLoading(true);
     try {
-      const response = await authApi.bootstrapAdmin({
+      const response = await bootstrapAdminMutation({
         username: setupForm.username,
         password: setupForm.password,
         first_name: setupForm.first_name,
@@ -536,598 +436,140 @@ export default function LoginPage() {
   };
 
   if (setupLoading) {
-    return (
-      <Box
-        sx={{
-          minHeight: "100vh",
-          display: "grid",
-          placeItems: "center",
-          background:
-            "radial-gradient(1200px 700px at -10% -10%, rgba(64,153,255,0.24) 0%, rgba(8,16,33,0) 45%), radial-gradient(900px 620px at 110% 0%, rgba(22,191,134,0.18) 0%, rgba(8,16,33,0) 45%), linear-gradient(160deg, #050912 0%, #071025 45%, #040812 100%)",
-          fontFamily: "Manrope, 'Segoe UI', system-ui, sans-serif",
-        }}
-      >
-        <Stack spacing={2} alignItems="center">
-          <CircularProgress size={32} />
-          <Typography color="rgba(233,244,255,0.92)">Проверяем состояние системы...</Typography>
-        </Stack>
-      </Box>
-    );
+    return <LoginLoadingScreen />;
   }
 
+  const cardTitle = requiresSetup
+    ? ""
+    : authView === AUTH_VIEW_RESET_REQUEST
+      ? "Сброс пароля"
+      : authView === AUTH_VIEW_RESET_CONFIRM
+        ? "Новый пароль"
+        : "";
+
+  const cardSubtitle = requiresSetup
+    ? ""
+    : authView === AUTH_VIEW_RESET_REQUEST
+      ? "Введите email аккаунта. Если он зарегистрирован, мы отправим ссылку для безопасной смены пароля."
+      : authView === AUTH_VIEW_RESET_CONFIRM
+        ? "Задайте новый пароль для аккаунта. После сохранения все старые refresh-сессии будут отозваны."
+        : "";
+
   return (
-    <Box
-      sx={{
-        minHeight: "100vh",
-        px: { xs: 1.5, md: 3.5 },
-        py: { xs: 2, md: 3.5 },
-        fontFamily: "Manrope, 'Segoe UI', system-ui, sans-serif",
-        background:
-          "radial-gradient(1200px 700px at -10% -10%, rgba(64,153,255,0.24) 0%, rgba(8,16,33,0) 45%), radial-gradient(900px 620px at 110% 0%, rgba(22,191,134,0.18) 0%, rgba(8,16,33,0) 45%), linear-gradient(160deg, #050912 0%, #071025 45%, #040812 100%)",
-      }}
-    >
-      <Box
-        sx={{
-          width: "100%",
-          maxWidth: 1220,
-          mx: "auto",
-          display: "grid",
-          gap: { xs: 2, md: 3 },
-          gridTemplateColumns: { xs: "1fr", md: "1.05fr 0.95fr" },
-        }}
+    <LoginShell>
+      <LoginCard
+        requiresSetup={requiresSetup}
+        error={error}
+        success={success}
+        title={cardTitle}
+        subtitle={cardSubtitle}
       >
-        <Paper
-          elevation={0}
-          sx={{
-            position: "relative",
-            overflow: "hidden",
-            borderRadius: 5,
-            minHeight: { xs: 240, md: "100%" },
-            p: { xs: 2.4, md: 4.4 },
-            border: "1px solid rgba(122,171,255,0.24)",
-            background:
-              "linear-gradient(145deg, rgba(12,21,43,0.92) 0%, rgba(8,14,30,0.95) 58%, rgba(7,12,24,0.98) 100%)",
-            boxShadow: "0 24px 64px rgba(0,0,0,0.46)",
-            "&::before": {
-              content: '""',
-              position: "absolute",
-              inset: 0,
-              background:
-                "radial-gradient(560px 300px at 85% -10%, rgba(92,160,255,0.26) 0%, rgba(92,160,255,0) 62%), radial-gradient(420px 220px at -10% 100%, rgba(22,191,134,0.20) 0%, rgba(22,191,134,0) 60%)",
-              pointerEvents: "none",
-            },
-          }}
-        >
-          <Stack spacing={2.2} sx={{ position: "relative", zIndex: 1 }}>
-            <Chip
-              label="FRP Client Premium"
-              sx={{
-                alignSelf: "flex-start",
-                color: "rgba(220,239,255,0.95)",
-                bgcolor: "rgba(80,145,255,0.18)",
-                border: "1px solid rgba(122,171,255,0.45)",
-                fontWeight: 800,
-                letterSpacing: 0.25,
+        {requiresSetup ? (
+          <BootstrapAdminCard
+            form={setupForm}
+            loading={loading}
+            onSubmit={submitBootstrap}
+            onChange={(field, value) => setSetupForm((prev) => ({ ...prev, [field]: value }))}
+          />
+        ) : authView === AUTH_VIEW_RESET_REQUEST ? (
+          <Box component="form" onSubmit={submitPasswordResetRequest}>
+            <Stack spacing={1.2}>
+              <TextField
+                required
+                type="email"
+                label="Email"
+                autoComplete="email"
+                value={passwordResetRequestForm.email}
+                onChange={(event) =>
+                  setPasswordResetRequestForm((prev) => ({
+                    ...prev,
+                    email: event.target.value,
+                  }))
+                }
+                sx={authInputSx}
+              />
+              <Button type="submit" variant="contained" disabled={loading} sx={authPrimaryButtonSx}>
+                {loading ? "Отправляем..." : "Отправить ссылку"}
+              </Button>
+              <Button type="button" variant="text" disabled={loading} onClick={switchToLoginView}>
+                Вернуться ко входу
+              </Button>
+            </Stack>
+          </Box>
+        ) : authView === AUTH_VIEW_RESET_CONFIRM ? (
+          <Box component="form" onSubmit={submitPasswordResetConfirm}>
+            <Stack spacing={1.2}>
+              <TextField
+                required
+                label="Новый пароль"
+                type="password"
+                autoComplete="new-password"
+                value={passwordResetConfirmForm.password}
+                onChange={(event) =>
+                  setPasswordResetConfirmForm((prev) => ({
+                    ...prev,
+                    password: event.target.value,
+                  }))
+                }
+                sx={authInputSx}
+              />
+              <TextField
+                required
+                label="Повторите пароль"
+                type="password"
+                autoComplete="new-password"
+                value={passwordResetConfirmForm.passwordConfirm}
+                onChange={(event) =>
+                  setPasswordResetConfirmForm((prev) => ({
+                    ...prev,
+                    passwordConfirm: event.target.value,
+                  }))
+                }
+                sx={authInputSx}
+              />
+              <Typography sx={{ color: "rgba(204,221,244,0.72)", fontSize: 13.4 }}>
+                Используйте пароль не короче 10 символов и не повторяйте старые или слишком простые
+                комбинации.
+              </Typography>
+              <Button type="submit" variant="contained" disabled={loading} sx={authPrimaryButtonSx}>
+                {loading ? "Сохраняем..." : "Сменить пароль"}
+              </Button>
+              <Button type="button" variant="text" disabled={loading} onClick={switchToLoginView}>
+                Вернуться ко входу
+              </Button>
+            </Stack>
+          </Box>
+        ) : (
+          <LoginForm
+            form={loginForm}
+            loading={loading}
+            onSubmit={submitPasswordLogin}
+            onChange={(field, value) => setLoginForm((prev) => ({ ...prev, [field]: value }))}
+            footer={
+              <Button
+                type="button"
+                variant="text"
+                disabled={loading}
+                onClick={switchToResetRequestView}
+              >
+                Забыли пароль?
+              </Button>
+            }
+          >
+            <OAuthButtons loading={loading} onOAuthLogin={startOAuthLogin} />
+            <TelegramWidget
+              botUsername={BOT_USERNAME}
+              containerRef={telegramContainerRef}
+              loading={loading}
+              widgetError={telegramWidgetError}
+              onRetry={() => {
+                telegramWidgetRetryRef.current = 0;
+                setTelegramWidgetReloadKey((prev) => prev + 1);
               }}
             />
-
-            <Typography sx={{ fontSize: { xs: 30, md: 46 }, lineHeight: 1.05, fontWeight: 900, color: "#f7fbff" }}>
-              Разблокировка устройств
-              <Box component="span" sx={{ color: "#84d4ff", display: "block" }}>
-                без визита в сервис
-              </Box>
-            </Typography>
-
-            <Typography sx={{ color: "rgba(210,228,250,0.84)", fontSize: { xs: 14, md: 17 }, maxWidth: 620 }}>
-              Онлайн-заявка, диалог с мастером и прозрачные статусы в одном интерфейсе. Вы всегда понимаете,
-              что происходит на каждом этапе: проверка, оплата, работа, завершение.
-            </Typography>
-
-            <Box
-              sx={{
-                display: "grid",
-                gap: 1.15,
-                gridTemplateColumns: { xs: "1fr", sm: "repeat(3, minmax(0, 1fr))" },
-              }}
-            >
-              {[
-                {
-                  title: "01. Заявка",
-                  text: "Укажите модель, проблему и данные RuDesktop. Без лишних полей.",
-                },
-                {
-                  title: "02. Работа",
-                  text: "Мастер ведет заявку через чат и статусы, без скрытых этапов.",
-                },
-                {
-                  title: "03. Результат",
-                  text: "После завершения доступна история действий и быстрый отзыв.",
-                },
-              ].map((item) => (
-                <Box
-                  key={item.title}
-                  sx={{
-                    p: 1.35,
-                    borderRadius: 2.2,
-                    border: "1px solid rgba(126,174,255,0.32)",
-                    background: "linear-gradient(150deg, rgba(20,34,67,0.84) 0%, rgba(13,24,47,0.78) 100%)",
-                  }}
-                >
-                  <Typography sx={{ fontWeight: 800, color: "#ddedff", fontSize: 14 }}>{item.title}</Typography>
-                  <Typography sx={{ color: "rgba(202,220,246,0.82)", fontSize: 13, mt: 0.65, lineHeight: 1.42 }}>
-                    {item.text}
-                  </Typography>
-                </Box>
-              ))}
-            </Box>
-
-            <Box
-              sx={{
-                p: 1.4,
-                borderRadius: 2.2,
-                border: "1px solid rgba(120,170,255,0.28)",
-                background: "rgba(10,20,40,0.74)",
-              }}
-            >
-              <Stack direction="row" justifyContent="space-between" alignItems="center" flexWrap="wrap" useFlexGap sx={{ mb: 0.9 }}>
-                <Typography sx={{ fontWeight: 800, color: "#d6e9ff" }}>Прозрачный прайс</Typography>
-                <Typography sx={{ color: "rgba(190,214,245,0.74)", fontSize: 12.6 }}>
-                  Финальная стоимость фиксируется до начала работ
-                </Typography>
-              </Stack>
-              <Box
-                sx={{
-                  display: "grid",
-                  gap: 0.9,
-                  gridTemplateColumns: { xs: "1fr", sm: "repeat(3, minmax(0, 1fr))" },
-                }}
-              >
-                {LANDING_PRICE_ITEMS.map((item) => (
-                  <Box
-                    key={item.title}
-                    sx={{
-                      p: 1.05,
-                      borderRadius: 1.8,
-                      border: "1px solid rgba(118,164,236,0.26)",
-                      background: "rgba(11,22,44,0.66)",
-                    }}
-                  >
-                    <Typography sx={{ color: "#e0efff", fontWeight: 700, fontSize: 13.2 }}>{item.title}</Typography>
-                    <Typography sx={{ color: "#9ed0ff", fontWeight: 800, mt: 0.35, fontSize: 14.2 }}>{item.price}</Typography>
-                    <Typography sx={{ color: "rgba(206,224,248,0.8)", fontSize: 12.5, mt: 0.2 }}>{item.eta}</Typography>
-                    <Typography sx={{ color: "rgba(196,216,242,0.75)", fontSize: 12.1, mt: 0.35 }}>{item.note}</Typography>
-                  </Box>
-                ))}
-              </Box>
-            </Box>
-
-            <Box
-              sx={{
-                p: 1.4,
-                borderRadius: 2.2,
-                border: "1px solid rgba(120,170,255,0.28)",
-                background: "rgba(10,20,40,0.74)",
-              }}
-            >
-              <Typography sx={{ fontWeight: 800, color: "#d6e9ff", mb: 0.85 }}>Примеры работ</Typography>
-              <Stack spacing={0.75}>
-                {LANDING_CASE_ITEMS.map((item) => (
-                  <Box
-                    key={`${item.device}-${item.issue}`}
-                    sx={{
-                      p: 0.95,
-                      borderRadius: 1.7,
-                      border: "1px solid rgba(118,164,236,0.26)",
-                      background: "rgba(11,22,44,0.66)",
-                      display: "grid",
-                      gridTemplateColumns: { xs: "1fr", sm: "1.5fr 1.3fr auto" },
-                      gap: 0.8,
-                      alignItems: "center",
-                    }}
-                  >
-                    <Box>
-                      <Typography sx={{ color: "#e0efff", fontWeight: 700, fontSize: 13 }}>{item.device}</Typography>
-                      <Typography sx={{ color: "rgba(201,221,246,0.82)", fontSize: 12.3 }}>{item.issue}</Typography>
-                    </Box>
-                    <Typography sx={{ color: "rgba(206,224,248,0.84)", fontSize: 12.4 }}>{item.result}</Typography>
-                    <Chip
-                      size="small"
-                      label={item.finalPrice}
-                      sx={{
-                        justifySelf: { xs: "flex-start", sm: "flex-end" },
-                        color: "#dff0ff",
-                        bgcolor: "rgba(77,142,244,0.28)",
-                        border: "1px solid rgba(130,183,255,0.5)",
-                        fontWeight: 700,
-                      }}
-                    />
-                  </Box>
-                ))}
-              </Stack>
-            </Box>
-
-            <Box
-              sx={{
-                p: 1.4,
-                borderRadius: 2.2,
-                border: "1px solid rgba(120,170,255,0.28)",
-                background: "rgba(11,22,42,0.72)",
-              }}
-            >
-              <Typography sx={{ fontWeight: 800, color: "#d6e9ff", mb: 0.65 }}>Что нужно для старта</Typography>
-              <Box component="ul" sx={{ m: 0, pl: 2.4, color: "rgba(206,224,250,0.84)", fontSize: 13.5, lineHeight: 1.54 }}>
-                <li>модель устройства и описание проблемы;</li>
-                <li>логин/ID и пароль RuDesktop для подключения;</li>
-                <li>подтверждение оплаты в карточке заявки.</li>
-              </Box>
-            </Box>
-
-            <Box
-              sx={{
-                p: 1.4,
-                borderRadius: 2.2,
-                border: "1px solid rgba(120,170,255,0.28)",
-                background: "rgba(10,19,38,0.72)",
-              }}
-            >
-              <Typography sx={{ fontWeight: 800, color: "#d6e9ff", mb: 0.9 }}>Частые вопросы</Typography>
-              <Stack spacing={0.9}>
-                {LOGIN_FAQ_ITEMS.map((item) => (
-                  <Box
-                    key={item.question}
-                    sx={{
-                      p: 1,
-                      borderRadius: 1.7,
-                      border: "1px solid rgba(118,164,236,0.26)",
-                      background: "rgba(11,22,44,0.66)",
-                    }}
-                  >
-                    <Typography sx={{ color: "#e0efff", fontWeight: 700, fontSize: 13.3 }}>{item.question}</Typography>
-                    <Typography sx={{ color: "rgba(202,220,246,0.85)", fontSize: 12.9, lineHeight: 1.45, mt: 0.4 }}>
-                      {item.answer}
-                    </Typography>
-                  </Box>
-                ))}
-              </Stack>
-            </Box>
-
-            <Button
-              variant="outlined"
-              onClick={() => document.getElementById("auth-login-card")?.scrollIntoView({ behavior: "smooth", block: "start" })}
-              sx={{
-                alignSelf: "flex-start",
-                borderRadius: 2,
-                textTransform: "none",
-                fontWeight: 800,
-                borderColor: "rgba(132,179,255,0.66)",
-                color: "#b7dbff",
-                px: 2,
-                "&:hover": {
-                  borderColor: "rgba(158,198,255,0.95)",
-                  background: "rgba(86,146,255,0.10)",
-                },
-              }}
-            >
-              Перейти ко входу
-            </Button>
-          </Stack>
-        </Paper>
-
-        <Paper
-          id="auth-login-card"
-          elevation={0}
-          sx={{
-            position: "relative",
-            overflow: "hidden",
-            borderRadius: 3.5,
-            p: { xs: 2.1, md: 3.1 },
-            border: "1px solid rgba(126,171,232,0.34)",
-            background:
-              "linear-gradient(165deg, rgba(24,37,69,0.97) 0%, rgba(15,27,53,0.96) 55%, rgba(9,18,39,0.98) 100%)",
-            boxShadow: "0 24px 56px rgba(0,0,0,0.42)",
-            backdropFilter: "blur(10px)",
-            "&::before": {
-              content: '""',
-              position: "absolute",
-              inset: 0,
-              background:
-                "radial-gradient(360px 220px at 100% -15%, rgba(92,163,255,0.24) 0%, rgba(92,163,255,0) 62%), radial-gradient(320px 180px at -5% 110%, rgba(26,169,127,0.16) 0%, rgba(26,169,127,0) 66%)",
-              pointerEvents: "none",
-            },
-            "&::after": {
-              content: '""',
-              position: "absolute",
-              top: 0,
-              left: 0,
-              right: 0,
-              height: 1,
-              background: "linear-gradient(90deg, rgba(138,192,255,0.14) 0%, rgba(167,212,255,0.62) 50%, rgba(138,192,255,0.14) 100%)",
-              pointerEvents: "none",
-            },
-          }}
-        >
-          <Stack spacing={2} sx={{ position: "relative", zIndex: 1 }}>
-            <Stack direction="row" justifyContent="space-between" alignItems="center" flexWrap="wrap" useFlexGap>
-              <Typography
-                variant="h4"
-                sx={{
-                  fontWeight: 800,
-                  fontSize: { xs: 30, md: 40 },
-                  lineHeight: 1.05,
-                  letterSpacing: -0.4,
-                  fontFamily: "'Sora', 'Manrope', sans-serif",
-                  color: "#f2f8ff",
-                }}
-              >
-                {requiresSetup ? "Первичная настройка" : "Вход в систему"}
-              </Typography>
-              {!requiresSetup ? (
-                <Chip
-                  label="Безопасный вход"
-                  sx={{
-                    color: "#d9ecff",
-                    border: "1px solid rgba(118,173,255,0.52)",
-                    bgcolor: "rgba(79,138,235,0.18)",
-                    fontWeight: 700,
-                    borderRadius: 1.2,
-                  }}
-                />
-              ) : null}
-            </Stack>
-
-            <Typography sx={{ color: "rgba(204,221,244,0.82)", fontSize: 14.2 }}>
-              {requiresSetup
-                ? "Создайте первого администратора для запуска платформы."
-                : "Авторизация через Google, Яндекс, VK, Telegram или логин/пароль."}
-            </Typography>
-
-            {error ? (
-              <Alert
-                severity="error"
-                sx={{
-                  borderRadius: 1.6,
-                  border: "1px solid rgba(255, 129, 129, 0.28)",
-                  bgcolor: "rgba(78, 25, 26, 0.78)",
-                }}
-              >
-                {error}
-              </Alert>
-            ) : null}
-            {success ? (
-              <Alert
-                severity="success"
-                sx={{
-                  borderRadius: 1.6,
-                  border: "1px solid rgba(116, 220, 165, 0.28)",
-                  bgcolor: "rgba(17, 56, 39, 0.76)",
-                }}
-              >
-                {success}
-              </Alert>
-            ) : null}
-
-            {requiresSetup ? (
-              <Box component="form" onSubmit={submitBootstrap}>
-                <Stack spacing={1.35}>
-                  <Alert severity="info">После создания администратора вход будет доступен всем ролям.</Alert>
-                  <TextField
-                    required
-                    label="Логин администратора"
-                    value={setupForm.username}
-                    onChange={(e) => setSetupForm((prev) => ({ ...prev, username: e.target.value }))}
-                    sx={authInputSx}
-                  />
-                  <TextField
-                    required
-                    label="Пароль"
-                    type="password"
-                    value={setupForm.password}
-                    onChange={(e) => setSetupForm((prev) => ({ ...prev, password: e.target.value }))}
-                    sx={authInputSx}
-                  />
-                  <TextField
-                    required
-                    label="Подтверждение пароля"
-                    type="password"
-                    value={setupForm.passwordConfirm}
-                    onChange={(e) => setSetupForm((prev) => ({ ...prev, passwordConfirm: e.target.value }))}
-                    sx={authInputSx}
-                  />
-                  <TextField
-                    label="Имя"
-                    value={setupForm.first_name}
-                    onChange={(e) => setSetupForm((prev) => ({ ...prev, first_name: e.target.value }))}
-                    sx={authInputSx}
-                  />
-                  <TextField
-                    label="Фамилия"
-                    value={setupForm.last_name}
-                    onChange={(e) => setSetupForm((prev) => ({ ...prev, last_name: e.target.value }))}
-                    sx={authInputSx}
-                  />
-                  <Button
-                    type="submit"
-                    variant="contained"
-                    disabled={loading}
-                    sx={{ mt: 0.5, ...authPrimaryButtonSx }}
-                  >
-                    {loading ? "Создаем администратора..." : "Создать администратора и войти"}
-                  </Button>
-                </Stack>
-              </Box>
-            ) : (
-              <Stack spacing={1.4}>
-                <Stack spacing={1.2}>
-                  <Button
-                    fullWidth
-                    variant="outlined"
-                    disabled={loading}
-                    onClick={() => startOAuthLogin("google")}
-                    sx={oauthServiceButtonSx}
-                    startIcon={
-                      <Box sx={providerBadgeSx}>
-                        <GoogleIcon sx={{ fontSize: 19 }} />
-                      </Box>
-                    }
-                  >
-                    Войти через Google
-                  </Button>
-                  <Button
-                    fullWidth
-                    variant="outlined"
-                    disabled={loading}
-                    onClick={() => startOAuthLogin("yandex")}
-                    sx={oauthServiceButtonSx}
-                    startIcon={
-                      <Box sx={providerBadgeSx}>
-                        Я
-                      </Box>
-                    }
-                  >
-                    Войти через Яндекс
-                  </Button>
-                  <Button
-                    fullWidth
-                    variant="outlined"
-                    disabled={loading}
-                    onClick={() => startOAuthLogin("vk")}
-                    sx={oauthServiceButtonSx}
-                    startIcon={
-                      <Box sx={providerBadgeSx}>
-                        VK
-                      </Box>
-                    }
-                  >
-                    Войти через VK
-                  </Button>
-                </Stack>
-
-                {!BOT_USERNAME ? (
-                  <Typography
-                    variant="caption"
-                    color="rgba(196,219,246,0.88)"
-                    sx={{ px: 0.2 }}
-                  >
-                    Telegram-вход временно недоступен: не задано имя бота.
-                  </Typography>
-                ) : (
-                  <Stack spacing={1}>
-                    <Box sx={oauthTelegramShellSx}>
-                      <Box
-                        id="telegram-login-container"
-                        ref={telegramContainerRef}
-                        sx={{
-                          width: "100%",
-                          minHeight: AUTH_PROVIDER_BUTTON_HEIGHT - 10,
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          borderRadius: 2.2,
-                          overflow: "hidden",
-                          "& > *": {
-                            maxWidth: "100% !important",
-                          },
-                          "& iframe": {
-                            display: "block",
-                            margin: "0 auto",
-                            minHeight: `${AUTH_PROVIDER_BUTTON_HEIGHT - 10}px !important`,
-                            borderRadius: "10px !important",
-                          },
-                          "& a": {
-                            display: "inline-flex !important",
-                            margin: "0 auto !important",
-                          },
-                        }}
-                      />
-                    </Box>
-
-                    {telegramWidgetError ? (
-                      <Stack spacing={1}>
-                        <Typography variant="caption" color="rgba(205,223,245,0.9)" sx={{ px: 0.25 }}>
-                          {telegramWidgetError}
-                        </Typography>
-                        <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
-                          <Button
-                            size="small"
-                            variant="outlined"
-                            startIcon={<TelegramIcon sx={{ fontSize: 18 }} />}
-                            onClick={() => {
-                              telegramWidgetRetryRef.current = 0;
-                              setTelegramWidgetReloadKey((prev) => prev + 1);
-                            }}
-                            sx={{ ...oauthTelegramFallbackButtonSx, minHeight: 44, flex: 1 }}
-                          >
-                            Перезагрузить Telegram вход
-                          </Button>
-                          <Button
-                            size="small"
-                            variant="outlined"
-                            startIcon={<TelegramIcon sx={{ fontSize: 18 }} />}
-                            component="a"
-                            href={`https://t.me/${BOT_USERNAME}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            sx={{
-                              flex: 1,
-                              minHeight: 44,
-                              borderRadius: 2.2,
-                              px: 1.4,
-                              fontWeight: 700,
-                              borderColor: "rgba(121,195,255,0.72)",
-                              color: "#b6e2ff",
-                              background: "linear-gradient(145deg, rgba(17,45,82,0.45) 0%, rgba(12,33,63,0.45) 100%)",
-                              "&:hover": {
-                                borderColor: "rgba(150,214,255,0.94)",
-                                background: "linear-gradient(145deg, rgba(25,62,108,0.65) 0%, rgba(16,46,84,0.65) 100%)",
-                              },
-                            }}
-                          >
-                            Открыть @{BOT_USERNAME}
-                          </Button>
-                        </Stack>
-                      </Stack>
-                    ) : null}
-                  </Stack>
-                )}
-
-                <Divider sx={{ color: "rgba(194,214,243,0.66)", fontSize: 12, "&::before, &::after": { borderColor: "rgba(140,177,229,0.34)" } }}>
-                  или вход по логину/паролю
-                </Divider>
-
-                <Box component="form" onSubmit={submitPasswordLogin}>
-                  <Stack spacing={1.2}>
-                    <TextField
-                      required
-                      label="Логин"
-                      autoComplete="username"
-                      value={loginForm.username}
-                      onChange={(e) => setLoginForm((prev) => ({ ...prev, username: e.target.value }))}
-                      sx={authInputSx}
-                    />
-                    <TextField
-                      required
-                      label="Пароль"
-                      type="password"
-                      autoComplete="current-password"
-                      value={loginForm.password}
-                      onChange={(e) => setLoginForm((prev) => ({ ...prev, password: e.target.value }))}
-                      sx={authInputSx}
-                    />
-                    <Button
-                      type="submit"
-                      variant="contained"
-                      disabled={loading}
-                      sx={{ mt: 0.5, ...authPrimaryButtonSx }}
-                    >
-                      {loading ? "Входим..." : "Войти"}
-                    </Button>
-                  </Stack>
-                </Box>
-              </Stack>
-            )}
-          </Stack>
-        </Paper>
-      </Box>
-    </Box>
+          </LoginForm>
+        )}
+      </LoginCard>
+    </LoginShell>
   );
 }

@@ -73,7 +73,6 @@ export default function AdminUsersPage() {
 
   useEffect(() => {
     load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roleFilter]);
 
   const saveUser = async (userId) => {
@@ -117,13 +116,18 @@ export default function AdminUsersPage() {
     }
   };
 
-  const titleText = useMemo(() => (loading ? "Загрузка..." : `Пользователей: ${rows.length}`), [loading, rows.length]);
+  const titleText = useMemo(
+    () => (loading ? "Загрузка..." : `Пользователей: ${rows.length}`),
+    [loading, rows.length]
+  );
 
   return (
     <Stack spacing={2}>
       <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" spacing={1}>
         <Typography variant="h5">Пользователи и роли</Typography>
-        <Typography variant="body2" color="text.secondary">{titleText}</Typography>
+        <Typography variant="body2" color="text.secondary">
+          {titleText}
+        </Typography>
       </Stack>
 
       <Paper sx={{ p: 1.5, borderRadius: 1.8 }}>
@@ -142,7 +146,9 @@ export default function AdminUsersPage() {
               </MenuItem>
             ))}
           </TextField>
-          <Button variant="outlined" onClick={load} disabled={loading}>Обновить</Button>
+          <Button variant="outlined" onClick={load} disabled={loading}>
+            Обновить
+          </Button>
         </Stack>
       </Paper>
 
@@ -150,7 +156,10 @@ export default function AdminUsersPage() {
 
       <Stack spacing={1}>
         {rows.map((row) => {
-          const editData = editsById[row.id] || { role: row.role, is_master_active: row.is_master_active };
+          const editData = editsById[row.id] || {
+            role: row.role,
+            is_master_active: row.is_master_active,
+          };
           const isSaving = savingUserId === row.id;
           const role = editData.role;
 
@@ -173,7 +182,9 @@ export default function AdminUsersPage() {
                       <Chip size="small" color="error" variant="outlined" label="Заблокирован" />
                     ) : null}
                   </Stack>
-                  <Typography variant="caption" color="text.secondary">ID {row.id}</Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    ID {row.id}
+                  </Typography>
                 </Stack>
               </AccordionSummary>
               <AccordionDetails>
@@ -190,14 +201,17 @@ export default function AdminUsersPage() {
                           [row.id]: {
                             ...editData,
                             role: e.target.value,
-                            is_master_active: e.target.value === "master" ? editData.is_master_active : false,
+                            is_master_active:
+                              e.target.value === "master" ? editData.is_master_active : false,
                           },
                         }))
                       }
                       sx={{ minWidth: 200 }}
                     >
                       {ROLE_OPTIONS.filter((item) => item.value).map((item) => (
-                        <MenuItem key={item.value} value={item.value}>{item.label}</MenuItem>
+                        <MenuItem key={item.value} value={item.value}>
+                          {item.label}
+                        </MenuItem>
                       ))}
                     </TextField>
                     {role === "master" ? (
@@ -223,21 +237,40 @@ export default function AdminUsersPage() {
                       size="small"
                       label="Причина блокировки"
                       value={banReasonById[row.id] || row.ban_reason || ""}
-                      onChange={(e) => setBanReasonById((prev) => ({ ...prev, [row.id]: e.target.value }))}
+                      onChange={(e) =>
+                        setBanReasonById((prev) => ({ ...prev, [row.id]: e.target.value }))
+                      }
                     />
                   ) : null}
 
                   <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-                    <Button size="small" variant="contained" disabled={isSaving} onClick={() => saveUser(row.id)}>
+                    <Button
+                      size="small"
+                      variant="contained"
+                      disabled={isSaving}
+                      onClick={() => saveUser(row.id)}
+                    >
                       Сохранить роль
                     </Button>
                     {row.role === "client" && !row.is_banned ? (
-                      <Button size="small" color="error" variant="outlined" disabled={isSaving} onClick={() => banUser(row.id)}>
+                      <Button
+                        size="small"
+                        color="error"
+                        variant="outlined"
+                        disabled={isSaving}
+                        onClick={() => banUser(row.id)}
+                      >
                         Заблокировать
                       </Button>
                     ) : null}
                     {row.role === "client" && row.is_banned ? (
-                      <Button size="small" color="success" variant="outlined" disabled={isSaving} onClick={() => unbanUser(row.id)}>
+                      <Button
+                        size="small"
+                        color="success"
+                        variant="outlined"
+                        disabled={isSaving}
+                        onClick={() => unbanUser(row.id)}
+                      >
                         Разблокировать
                       </Button>
                     ) : null}
@@ -250,7 +283,8 @@ export default function AdminUsersPage() {
       </Stack>
 
       <Typography variant="body2" color="text.secondary">
-        Роли: {ROLE_LABELS.client}, {ROLE_LABELS.master}, {ROLE_LABELS.admin}. Нажмите на строку, чтобы открыть детали.
+        Роли: {ROLE_LABELS.client}, {ROLE_LABELS.master}, {ROLE_LABELS.admin}. Нажмите на строку,
+        чтобы открыть детали.
       </Typography>
     </Stack>
   );

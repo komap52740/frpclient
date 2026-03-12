@@ -1,0 +1,11 @@
+[Unit]
+Description=Run FRP Client certbot dry-run renewal check monthly
+
+[Timer]
+OnCalendar=weekly
+Persistent=true
+RandomizedDelaySec=12h
+Unit=frpclient-certbot-dry-run.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,14 @@
+[Unit]
+Description=FRP Client managed production acceptance
+Wants=docker.service network-online.target
+After=docker.service network-online.target frpclient-runtime-audit.service
+
+[Service]
+Type=oneshot
+User=root
+WorkingDirectory=/var/www/FRPclient
+Environment=PROJECT_DIR=/var/www/FRPclient
+Environment=BASE_URL=https://frpclient.ru
+Environment=USERNAME_PREFIX=smoke_client
+Environment=KEEP_ARTIFACTS=0
+ExecStart=/bin/sh /var/www/FRPclient/ops/monitoring/managed_acceptance.sh

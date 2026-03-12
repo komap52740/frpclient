@@ -39,7 +39,7 @@ def test_login_is_blocked_until_email_is_verified(monkeypatch, settings):
 def test_verify_email_callback_activates_user_and_allows_login(monkeypatch, settings):
     settings.EMAIL_HOST = "mail.unlocktool.ru"
     settings.DEFAULT_FROM_EMAIL = "no-reply@example.com"
-    settings.OAUTH_FRONTEND_URL = "https://client.androidmultitool.ru"
+    settings.OAUTH_FRONTEND_URL = "https://frpclient.ru"
 
     monkeypatch.setattr("apps.accounts.views.send_mail", lambda *args, **kwargs: 1)
 
@@ -61,7 +61,7 @@ def test_verify_email_callback_activates_user_and_allows_login(monkeypatch, sett
 
     callback_response = client.get(f"/api/auth/verify-email/?token={verification.token}")
     assert callback_response.status_code == 302
-    assert callback_response["Location"].startswith("https://client.androidmultitool.ru/login#")
+    assert callback_response["Location"].startswith("https://frpclient.ru/login#")
     assert "email_verified=1" in callback_response["Location"]
 
     user.refresh_from_db()

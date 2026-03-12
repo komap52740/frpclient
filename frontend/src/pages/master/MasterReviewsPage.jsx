@@ -7,41 +7,48 @@ import {
   Alert,
   Button,
   Chip,
+  FormControlLabel,
   InputAdornment,
   MenuItem,
   Paper,
   Stack,
   Switch,
-  FormControlLabel,
   TextField,
   Typography,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
+import { useQueryClient } from "@tanstack/react-query";
 import dayjs from "dayjs";
 import "dayjs/locale/ru";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useDeferredValue, useMemo, useState } from "react";
 
-import { reviewsApi } from "../../api/client";
 import EmptyState from "../../components/EmptyState";
-import useAutoRefresh from "../../hooks/useAutoRefresh";
+import { useMasterQueueRealtime } from "../../features/appointments/master-inbox/hooks/useMasterQueueRealtime";
+import { useMasterReviewsQuery } from "../../features/reviews/hooks/useReviewQueries";
+import { queryKeys } from "../../shared/api/queryKeys";
 
 dayjs.locale("ru");
 
 function ratingTone(rating, isDark) {
-  if (rating >= 5) return { color: isDark ? "#77e2ac" : "#087443", bg: isDark ? "rgba(30,88,61,0.42)" : "#e8f7ef" };
-  if (rating >= 4) return { color: isDark ? "#8ac8ff" : "#0f6ba8", bg: isDark ? "rgba(20,52,82,0.42)" : "#e9f2ff" };
-  if (rating >= 3) return { color: isDark ? "#ffd98f" : "#9a6700", bg: isDark ? "rgba(87,63,22,0.4)" : "#fff8e1" };
+  if (rating >= 5)
+    return {
+      color: isDark ? "#77e2ac" : "#087443",
+      bg: isDark ? "rgba(30,88,61,0.42)" : "#e8f7ef",
+    };
+  if (rating >= 4)
+    return {
+      color: isDark ? "#8ac8ff" : "#0f6ba8",
+      bg: isDark ? "rgba(20,52,82,0.42)" : "#e9f2ff",
+    };
+  if (rating >= 3)
+    return { color: isDark ? "#ffd98f" : "#9a6700", bg: isDark ? "rgba(87,63,22,0.4)" : "#fff8e1" };
   return { color: isDark ? "#ff9a94" : "#b42318", bg: isDark ? "rgba(101,31,35,0.45)" : "#fee4e2" };
 }
 
 function matchesQuery(row, query) {
   if (!query) return true;
   const normalized = query.toLowerCase();
-  const haystack = [
-    String(row.appointment || ""),
-    row.author_username || "",
-    row.comment || "",
-  ]
+  const haystack = [String(row.appointment || ""), row.author_username || "", row.comment || ""]
     .join(" ")
     .toLowerCase();
   return haystack.includes(normalized);
@@ -49,50 +56,43 @@ function matchesQuery(row, query) {
 
 export default function MasterReviewsPage() {
   const theme = useTheme();
+  const queryClient = useQueryClient();
   const isDark = theme.palette.mode === "dark";
-  const [rows, setRows] = useState([]);
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
   const [query, setQuery] = useState("");
   const [minRating, setMinRating] = useState("0");
   const [onlyWithComment, setOnlyWithComment] = useState(false);
+  const deferredQuery = useDeferredValue(query);
+  const { data: rows = [], isPending, isFetching, error, refetch } = useMasterReviewsQuery();
+  const loading = isPending;
+  const refreshing = isFetching;
+  const errorMessage = error ? "Не удалось загрузить отзывы" : "";
 
-  const load = useCallback(async ({ silent = false, withLoading = true } = {}) => {
-    if (withLoading) {
-      setLoading(true);
-    }
-    try {
-      const response = await reviewsApi.my();
-      setRows(response.data || []);
-      setError("");
-    } catch {
-      if (!silent) {
-        setError("Не удалось загрузить отзывы");
-      }
-    } finally {
-      if (withLoading) {
-        setLoading(false);
-      }
-    }
-  }, []);
+  const refreshData = useCallback(async () => {
+    await refetch();
+  }, [refetch]);
 
-  useEffect(() => {
-    load();
-  }, [load]);
+  const invalidateData = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: queryKeys.reviews.myRoot() });
+  }, [queryClient]);
 
-  useAutoRefresh(() => load({ silent: true, withLoading: false }), { intervalMs: 15000 });
+  useMasterQueueRealtime({
+    onConnected: invalidateData,
+    onQueueEvent: invalidateData,
+  });
 
   const filteredRows = useMemo(() => {
     const min = Number(minRating || 0);
     return rows
       .filter((row) => (row.rating || 0) >= min)
       .filter((row) => (onlyWithComment ? Boolean((row.comment || "").trim()) : true))
-      .filter((row) => matchesQuery(row, query))
+      .filter((row) => matchesQuery(row, deferredQuery))
       .sort((a, b) => dayjs(b.created_at).valueOf() - dayjs(a.created_at).valueOf());
-  }, [minRating, onlyWithComment, query, rows]);
+  }, [deferredQuery, minRating, onlyWithComment, rows]);
 
   const avg = filteredRows.length
-    ? (filteredRows.reduce((sum, row) => sum + (row.rating || 0), 0) / filteredRows.length).toFixed(1)
+    ? (filteredRows.reduce((sum, row) => sum + (row.rating || 0), 0) / filteredRows.length).toFixed(
+        1
+      )
     : null;
   const positiveCount = filteredRows.filter((row) => (row.rating || 0) >= 4).length;
   const riskCount = filteredRows.filter((row) => (row.rating || 0) <= 2).length;
@@ -106,7 +106,12 @@ export default function MasterReviewsPage() {
         alignItems={{ xs: "flex-start", sm: "center" }}
       >
         <Typography variant="h5">Отзывы о мастере</Typography>
-        <Button variant="outlined" startIcon={<RefreshRoundedIcon />} onClick={() => load()} disabled={loading}>
+        <Button
+          variant="outlined"
+          startIcon={<RefreshRoundedIcon />}
+          onClick={refreshData}
+          disabled={refreshing}
+        >
           Обновить
         </Button>
       </Stack>
@@ -127,13 +132,19 @@ export default function MasterReviewsPage() {
             size="small"
             icon={<ThumbUpAltRoundedIcon fontSize="small" />}
             label={`Положительных: ${positiveCount}`}
-            sx={{ bgcolor: isDark ? "rgba(24,84,58,0.45)" : "#ecfdf3", color: isDark ? "#77e2ac" : "#027a48" }}
+            sx={{
+              bgcolor: isDark ? "rgba(24,84,58,0.45)" : "#ecfdf3",
+              color: isDark ? "#77e2ac" : "#027a48",
+            }}
           />
           <Chip
             size="small"
             icon={<ReportProblemRoundedIcon fontSize="small" />}
             label={`Риск-отзывы: ${riskCount}`}
-            sx={{ bgcolor: isDark ? "rgba(101,31,35,0.45)" : "#fee4e2", color: isDark ? "#ff9a94" : "#b42318" }}
+            sx={{
+              bgcolor: isDark ? "rgba(101,31,35,0.45)" : "#fee4e2",
+              color: isDark ? "#ff9a94" : "#b42318",
+            }}
           />
         </Stack>
       </Paper>
@@ -172,12 +183,17 @@ export default function MasterReviewsPage() {
 
         <FormControlLabel
           sx={{ mt: 0.8 }}
-          control={<Switch checked={onlyWithComment} onChange={(event) => setOnlyWithComment(event.target.checked)} />}
+          control={
+            <Switch
+              checked={onlyWithComment}
+              onChange={(event) => setOnlyWithComment(event.target.checked)}
+            />
+          }
           label="Только с текстовым комментарием"
         />
       </Paper>
 
-      {error ? <Alert severity="error">{error}</Alert> : null}
+      {errorMessage ? <Alert severity="error">{errorMessage}</Alert> : null}
 
       {!filteredRows.length && !loading ? (
         <EmptyState
@@ -204,7 +220,12 @@ export default function MasterReviewsPage() {
                 }}
               >
                 <Stack spacing={0.6}>
-                  <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={1}>
+                  <Stack
+                    direction="row"
+                    justifyContent="space-between"
+                    alignItems="center"
+                    spacing={1}
+                  >
                     <Stack direction="row" spacing={0.8} alignItems="center">
                       <Typography variant="subtitle2">Заявка #{row.appointment}</Typography>
                       <Chip

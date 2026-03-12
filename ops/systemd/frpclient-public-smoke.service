@@ -1,0 +1,13 @@
+[Unit]
+Description=FRP Client public smoke monitor
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+WorkingDirectory=/var/www/FRPclient
+Environment=PROJECT_DIR=/var/www/FRPclient
+Environment=BASE_URL=https://frpclient.ru
+Environment=TELEGRAM_BOT_USERNAME=ClientFRP_bot
+ExecStart=/bin/sh /var/www/FRPclient/ops/monitoring/public_smoke.sh

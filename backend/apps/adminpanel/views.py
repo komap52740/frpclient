@@ -40,6 +40,15 @@ from apps.appointments.models import (
 )
 from apps.appointments.serializers import AppointmentSerializer
 from apps.appointments.views import ConfirmPaymentMixin
+from apps.common.api_limits import BoundedListAPIView, resolve_list_window
+from apps.common.ops_state import (
+    get_deploy_lock_state,
+    get_job_statuses,
+    get_maintenance_mode_state,
+    get_release_state,
+    get_rollback_inventory,
+)
+from apps.common.secure_media import build_appointment_media_url
 from apps.platform.services import create_notification, emit_event
 
 from .filters import AdminAppointmentFilter
@@ -172,21 +181,21 @@ class AdminPaymentRegistryView(APIView):
 
         queryset = _payment_registry_queryset(request.user, request.query_params)
 
-        limit_raw = (request.query_params.get("limit") or "100").strip()
-        offset_raw = (request.query_params.get("offset") or "0").strip()
-        limit = int(limit_raw) if limit_raw.isdigit() else 100
-        offset = int(offset_raw) if offset_raw.isdigit() else 0
-        limit = max(1, min(limit, 500))
-        offset = max(0, offset)
+        window = resolve_list_window(
+            request,
+            default_limit=settings.ADMIN_API_LIST_LIMIT,
+            max_limit=settings.ADMIN_API_MAX_LIST_LIMIT,
+            max_offset=settings.API_LIST_MAX_OFFSET,
+        )
 
         total = queryset.count()
-        rows = queryset[offset : offset + limit]
+        rows = queryset[window.offset : window.offset + window.limit]
         serializer = AdminPaymentRegistryRowSerializer(rows, many=True, context={"request": request})
         return Response(
             {
                 "count": total,
-                "limit": limit,
-                "offset": offset,
+                "limit": window.limit,
+                "offset": window.offset,
                 "results": serializer.data,
             },
             status=status.HTTP_200_OK,
@@ -227,9 +236,7 @@ class AdminPaymentRegistryExportCsvView(APIView):
         )
 
         for appointment in queryset:
-            proof_url = ""
-            if appointment.payment_proof and getattr(appointment.payment_proof, "url", None):
-                proof_url = request.build_absolute_uri(appointment.payment_proof.url)
+            proof_url = build_appointment_media_url(request, appointment, "payment_proof") or ""
 
             history_rows = []
             for event in getattr(appointment, "payment_history_events", []):
@@ -263,11 +270,13 @@ class AdminPaymentRegistryExportCsvView(APIView):
         return response
 
 
-class AdminAppointmentListView(generics.ListAPIView):
+class AdminAppointmentListView(BoundedListAPIView):
     permission_classes = (IsAuthenticatedAndNotBanned, IsAdminRole)
     serializer_class = AppointmentSerializer
     filter_backends = (DjangoFilterBackend,)
     filterset_class = AdminAppointmentFilter
+    default_list_limit = settings.ADMIN_API_LIST_LIMIT
+    max_list_limit = settings.ADMIN_API_MAX_LIST_LIMIT
 
     def get_queryset(self):
         return Appointment.objects.select_related("client", "assigned_master", "payment_confirmed_by").all()
@@ -362,11 +371,15 @@ class AdminSuspendMasterView(APIView):
         return Response(AdminUserSerializer(user).data)
 
 
-class AdminClientsView(generics.ListAPIView):
+class AdminClientsView(BoundedListAPIView):
     permission_classes = (IsAuthenticatedAndNotBanned,)
     serializer_class = AdminUserSerializer
+    default_list_limit = settings.ADMIN_API_LIST_LIMIT
+    max_list_limit = settings.ADMIN_API_MAX_LIST_LIMIT
 
     def get_queryset(self):
+        if getattr(self, "swagger_fake_view", False):
+            return User.objects.none()
         user = self.request.user
         if not (user.is_superuser or user.role in {RoleChoices.ADMIN, RoleChoices.MASTER}):
             raise PermissionDenied("Только для админа и мастера.")
@@ -398,9 +411,11 @@ class AdminClientsView(generics.ListAPIView):
         )
 
 
-class AdminWholesaleRequestsView(generics.ListAPIView):
+class AdminWholesaleRequestsView(BoundedListAPIView):
     permission_classes = (IsAuthenticatedAndNotBanned, IsAdminRole)
     serializer_class = AdminUserSerializer
+    default_list_limit = settings.ADMIN_API_LIST_LIMIT
+    max_list_limit = settings.ADMIN_API_MAX_LIST_LIMIT
 
     def get_queryset(self):
         queryset = (
@@ -667,9 +682,11 @@ class WeeklyPerformanceReportView(APIView):
         return Response(payload, status=status.HTTP_200_OK)
 
 
-class AdminMastersView(generics.ListAPIView):
+class AdminMastersView(BoundedListAPIView):
     permission_classes = (IsAuthenticatedAndNotBanned, IsAdminRole)
     serializer_class = AdminUserSerializer
+    default_list_limit = settings.ADMIN_API_LIST_LIMIT
+    max_list_limit = settings.ADMIN_API_MAX_LIST_LIMIT
 
     def get_queryset(self):
         queryset = User.objects.filter(role=RoleChoices.MASTER).select_related("master_stats").order_by("-id")
@@ -727,9 +744,11 @@ class AdminMasterQualityUpdateView(APIView):
         return Response(AdminUserSerializer(user).data)
 
 
-class AdminAllUsersView(generics.ListAPIView):
+class AdminAllUsersView(BoundedListAPIView):
     permission_classes = (IsAuthenticatedAndNotBanned, IsAdminRole)
     serializer_class = AdminUserSerializer
+    default_list_limit = settings.ADMIN_API_LIST_LIMIT
+    max_list_limit = settings.ADMIN_API_MAX_LIST_LIMIT
 
     def get_queryset(self):
         queryset = User.objects.all().order_by("-id")
@@ -856,6 +875,13 @@ class AdminSystemStatusView(APIView):
                 "crypto_requisites_configured": bool(settings_obj.crypto_requisites.strip()),
                 "instructions_configured": bool(settings_obj.instructions.strip()),
             },
+            "operations": {
+                "deploy_lock": get_deploy_lock_state(),
+                "maintenance_mode": get_maintenance_mode_state(),
+                "release": get_release_state(),
+                "rollback": get_rollback_inventory(),
+                "jobs": get_job_statuses(),
+            },
             "sla": {
                 "response_minutes": settings_obj.sla_response_minutes,
                 "completion_hours": settings_obj.sla_completion_hours,
@@ -887,6 +913,14 @@ class AdminSystemRunActionView(APIView):
         AdminSystemActionSerializer.ACTION_CLEARSESSIONS: {
             "command": "clearsessions",
             "kwargs": {"verbosity": 1},
+        },
+        AdminSystemActionSerializer.ACTION_FLUSH_EXPIRED_TOKENS: {
+            "command": "flushexpiredtokens",
+            "kwargs": {"verbosity": 1},
+        },
+        AdminSystemActionSerializer.ACTION_COMPUTE_DAILY_METRICS: {
+            "command": "compute_daily_metrics",
+            "kwargs": {},
         },
         AdminSystemActionSerializer.ACTION_CHECK: {
             "command": "check",
@@ -939,7 +973,7 @@ class AdminSendClientEmailView(APIView):
 
         if not settings.EMAIL_HOST:
             return Response(
-                {"detail": "SMTP не настроен. Заполните EMAIL_* переменные в backend/.env."},
+                {"detail": "SMTP не настроен. Заполните EMAIL_* переменные в backend/.env и BACKEND_SECRETS_FILE."},
                 status=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
 

@@ -19,7 +19,7 @@ const STEPS = [
 const PRICING = [
   { title: "Базовая разблокировка", price: "от 1 500 ₽", eta: "10-30 минут" },
   { title: "Сложный кейс", price: "от 3 500 ₽", eta: "30-90 минут" },
-  { title: "Сервисный центр PRO", price: "индивидуально", eta: "SLA и приоритет" },
+  { title: "B2B-партнёр", price: "индивидуально", eta: "SLA и приоритет" },
 ];
 
 const WORK_EXAMPLES = [
@@ -75,9 +75,11 @@ export default function RemoteUnlockLandingPage() {
               Удаленная разблокировка устройств
             </Typography>
 
-            <Typography sx={{ color: "rgba(206,226,252,0.87)", fontSize: { xs: 15, md: 19 }, maxWidth: 900 }}>
-              Сервис для клиентов и сервисных центров: онлайн-заявка, чат с мастером, прозрачные этапы и понятный контроль
-              процесса в одном интерфейсе.
+            <Typography
+              sx={{ color: "rgba(206,226,252,0.87)", fontSize: { xs: 15, md: 19 }, maxWidth: 900 }}
+            >
+              Сервис для клиентов и сервисных центров: онлайн-заявка, чат с мастером, прозрачные
+              этапы и понятный контроль процесса в одном интерфейсе.
             </Typography>
 
             <Stack direction={{ xs: "column", sm: "row" }} spacing={1.2}>
@@ -135,8 +137,17 @@ export default function RemoteUnlockLandingPage() {
                     bgcolor: "rgba(12,23,46,0.72)",
                   }}
                 >
-                  <Typography sx={{ color: "#e5f2ff", fontWeight: 800, fontSize: 15.5 }}>{step.title}</Typography>
-                  <Typography sx={{ color: "rgba(205,224,247,0.86)", mt: 0.7, lineHeight: 1.45, fontSize: 14.2 }}>
+                  <Typography sx={{ color: "#e5f2ff", fontWeight: 800, fontSize: 15.5 }}>
+                    {step.title}
+                  </Typography>
+                  <Typography
+                    sx={{
+                      color: "rgba(205,224,247,0.86)",
+                      mt: 0.7,
+                      lineHeight: 1.45,
+                      fontSize: 14.2,
+                    }}
+                  >
                     {step.text}
                   </Typography>
                 </Paper>
@@ -161,9 +172,15 @@ export default function RemoteUnlockLandingPage() {
                     bgcolor: "rgba(10,20,40,0.72)",
                   }}
                 >
-                  <Typography sx={{ color: "#e5f2ff", fontWeight: 800, fontSize: 15 }}>{item.title}</Typography>
-                  <Typography sx={{ color: "#9ed0ff", fontWeight: 800, mt: 0.4 }}>{item.price}</Typography>
-                  <Typography sx={{ color: "rgba(205,224,247,0.86)", mt: 0.4, fontSize: 13.6 }}>{item.eta}</Typography>
+                  <Typography sx={{ color: "#e5f2ff", fontWeight: 800, fontSize: 15 }}>
+                    {item.title}
+                  </Typography>
+                  <Typography sx={{ color: "#9ed0ff", fontWeight: 800, mt: 0.4 }}>
+                    {item.price}
+                  </Typography>
+                  <Typography sx={{ color: "rgba(205,224,247,0.86)", mt: 0.4, fontSize: 13.6 }}>
+                    {item.eta}
+                  </Typography>
                 </Paper>
               ))}
             </Box>
@@ -184,7 +201,9 @@ export default function RemoteUnlockLandingPage() {
                   bgcolor: "rgba(10,20,40,0.72)",
                 }}
               >
-                <Typography sx={{ color: "#e5f2ff", fontWeight: 800, mb: 0.9 }}>Примеры работ</Typography>
+                <Typography sx={{ color: "#e5f2ff", fontWeight: 800, mb: 0.9 }}>
+                  Примеры работ
+                </Typography>
                 <Stack spacing={0.75}>
                   {WORK_EXAMPLES.map((item) => (
                     <Box
@@ -196,8 +215,12 @@ export default function RemoteUnlockLandingPage() {
                         bgcolor: "rgba(11,22,44,0.66)",
                       }}
                     >
-                      <Typography sx={{ color: "#e0efff", fontWeight: 700, fontSize: 13.5 }}>{item.title}</Typography>
-                      <Typography sx={{ color: "rgba(206,224,248,0.84)", mt: 0.35, fontSize: 13 }}>{item.text}</Typography>
+                      <Typography sx={{ color: "#e0efff", fontWeight: 700, fontSize: 13.5 }}>
+                        {item.title}
+                      </Typography>
+                      <Typography sx={{ color: "rgba(206,224,248,0.84)", mt: 0.35, fontSize: 13 }}>
+                        {item.text}
+                      </Typography>
                     </Box>
                   ))}
                 </Stack>

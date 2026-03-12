@@ -157,7 +157,11 @@ function getRouteMeta(pathname) {
   if (isPublic) {
     const isLanding = normalized === "/remote-unlock";
     return {
-      title: isLanding ? "Удаленная разблокировка устройств — FRP Client" : normalized === "/login" ? "Вход в FRP Client" : DEFAULT_TITLE,
+      title: isLanding
+        ? "Удаленная разблокировка устройств — FRP Client"
+        : normalized === "/login"
+          ? "Вход в FRP Client"
+          : DEFAULT_TITLE,
       description: isLanding
         ? "Подача заявки онлайн, чат с мастером и прозрачные статусы работы. Подключение через RuDesktop без визита в сервис."
         : DEFAULT_DESCRIPTION,

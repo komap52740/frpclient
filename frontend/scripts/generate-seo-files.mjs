@@ -4,10 +4,12 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const DEFAULT_SITE_URL = "https://client.androidmultitool.ru";
+const DEFAULT_SITE_URL = "https://frpclient.ru";
 
 export function resolveSiteUrl(rawValue = "") {
-  const normalizedBase = String(rawValue || DEFAULT_SITE_URL).trim().replace(/\/+$/, "");
+  const normalizedBase = String(rawValue || DEFAULT_SITE_URL)
+    .trim()
+    .replace(/\/+$/, "");
   return /^https?:\/\//i.test(normalizedBase) ? normalizedBase : `https://${normalizedBase}`;
 }
 

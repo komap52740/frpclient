@@ -1,208 +1,19 @@
-import axios from "axios";
-import { clearTokens, getAccessToken, setAccessToken } from "./authStorage";
-import { normalizeRuText } from "../utils/text";
+import { authApi, BANNED_EVENT_NAME } from "../features/auth/api/authApi";
+import { api, withBypassCache } from "../shared/api/httpClient";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
-export const BANNED_EVENT_NAME = "frp:user-banned";
-
-export const api = axios.create({
-  baseURL: API_BASE_URL,
-  withCredentials: true,
-});
-
-function normalizeRuPayload(value) {
-  if (typeof value === "string") {
-    return normalizeRuText(value);
-  }
-  if (Array.isArray(value)) {
-    return value.map(normalizeRuPayload);
-  }
-  if (value && typeof value === "object") {
-    const normalized = {};
-    Object.entries(value).forEach(([key, innerValue]) => {
-      normalized[key] = normalizeRuPayload(innerValue);
-    });
-    return normalized;
-  }
-  return value;
-}
-
-api.interceptors.request.use((config) => {
-  const token = getAccessToken();
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  if ((config.method || "get").toLowerCase() === "get") {
-    config.params = { ...(config.params || {}), _t: Date.now() };
-    config.headers["Cache-Control"] = "no-cache";
-    config.headers.Pragma = "no-cache";
-  }
-  return config;
-});
-
-let isRefreshing = false;
-let refreshSubscribers = [];
-
-function subscribeToRefresh(callback) {
-  refreshSubscribers.push(callback);
-}
-
-function notifyRefresh(newToken) {
-  refreshSubscribers.forEach((cb) => cb(newToken));
-  refreshSubscribers = [];
-}
-
-async function refreshAccessToken() {
-  const response = await axios.post(`${API_BASE_URL}/auth/refresh/`, {}, { withCredentials: true });
-  const newAccess = response.data.access;
-  if (!newAccess) {
-    throw new Error("Refresh endpoint did not return access token");
-  }
-  setAccessToken(newAccess);
-  return newAccess;
-}
-
-api.interceptors.response.use(
-  (response) => {
-    if (response?.data !== undefined) {
-      response.data = normalizeRuPayload(response.data);
-    }
-    return response;
-  },
-  async (error) => {
-    if (error?.response?.data !== undefined) {
-      error.response.data = normalizeRuPayload(error.response.data);
-    }
-    const originalRequest = error.config;
-    const requestUrl = originalRequest?.url || "";
-    const detailMessage = error?.response?.data?.detail;
-    if (error?.response?.status === 403 && typeof detailMessage === "string") {
-      const normalized = detailMessage.toLowerCase();
-      if (normalized.includes("заблокирован") || normalized.includes("забанен")) {
-        if (typeof window !== "undefined") {
-          window.dispatchEvent(new CustomEvent(BANNED_EVENT_NAME, { detail: { message: detailMessage } }));
-        }
-      }
-    }
-    const bypassRefresh =
-      requestUrl.includes("/auth/login/") ||
-      requestUrl.includes("/auth/register/") ||
-      requestUrl.includes("/auth/register/resend-verification/") ||
-      requestUrl.includes("/auth/telegram/") ||
-      requestUrl.includes("/auth/oauth/") ||
-      requestUrl.includes("/auth/logout/") ||
-      requestUrl.includes("/auth/bootstrap-admin/") ||
-      requestUrl.includes("/auth/bootstrap-status/") ||
-      requestUrl.includes("/auth/refresh/");
-
-    if (!error.response || error.response.status !== 401 || originalRequest._retry || bypassRefresh) {
-      return Promise.reject(error);
-    }
-
-    originalRequest._retry = true;
-
-    if (isRefreshing) {
-      return new Promise((resolve) => {
-        subscribeToRefresh((token) => {
-          originalRequest.headers.Authorization = `Bearer ${token}`;
-          resolve(api(originalRequest));
-        });
-      });
-    }
-
-    isRefreshing = true;
-    try {
-      const token = await refreshAccessToken();
-      isRefreshing = false;
-      notifyRefresh(token);
-      originalRequest.headers.Authorization = `Bearer ${token}`;
-      return api(originalRequest);
-    } catch (refreshError) {
-      isRefreshing = false;
-      clearTokens();
-      return Promise.reject(refreshError);
-    }
-  }
-);
-
-export const authApi = {
-  async bootstrapStatus() {
-    const response = await api.get("/auth/bootstrap-status/");
-    return response.data;
-  },
-  async bootstrapAdmin(payload) {
-    const response = await api.post("/auth/bootstrap-admin/", payload);
-    return response.data;
-  },
-  async passwordLogin(payload) {
-    const response = await api.post("/auth/login/", payload);
-    return response.data;
-  },
-  async register(payload) {
-    const response = await api.post("/auth/register/", payload);
-    return response.data;
-  },
-  async resendVerification(payload) {
-    const response = await api.post("/auth/register/resend-verification/", payload);
-    return response.data;
-  },
-  async telegramAuth(payload) {
-    const response = await api.post("/auth/telegram/", payload);
-    return response.data;
-  },
-  async oauthStart(provider) {
-    const response = await api.get(`/auth/oauth/${provider}/start/`);
-    return response.data;
-  },
-  async logout() {
-    const response = await api.post("/auth/logout/");
-    return response.data;
-  },
-  async getMe() {
-    const response = await api.get("/me/");
-    return response.data;
-  },
-  async updateProfile(payload) {
-    const isFormData = typeof FormData !== "undefined" && payload instanceof FormData;
-    const response = await api.patch(
-      "/me/profile/",
-      payload,
-      isFormData ? { headers: { "Content-Type": "multipart/form-data" } } : undefined
-    );
-    return response.data;
-  },
-  async wholesaleStatus() {
-    const response = await api.get("/wholesale/status/");
-    return response.data;
-  },
-  async requestWholesale(payload) {
-    const isFormData = typeof FormData !== "undefined" && payload instanceof FormData;
-    const response = await api.post(
-      "/wholesale/request/",
-      payload,
-      isFormData ? { headers: { "Content-Type": "multipart/form-data" } } : undefined
-    );
-    return response.data;
-  },
-  async dashboardSummary() {
-    const response = await api.get("/dashboard/");
-    return response.data;
-  },
-  async clientProfile(userId) {
-    const response = await api.get(`/clients/${userId}/profile/`);
-    return response.data;
-  },
-};
+export { authApi, BANNED_EVENT_NAME };
 
 export const appointmentsApi = {
   create(payload) {
-    return api.post("/appointments/", payload, { headers: { "Content-Type": "multipart/form-data" } });
+    return api.post("/appointments/", payload, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
   },
   my() {
-    return api.get("/appointments/my/");
+    return api.get("/appointments/my/", withBypassCache());
   },
   detail(id) {
-    return api.get(`/appointments/${id}/`);
+    return api.get(`/appointments/${id}/`, withBypassCache());
   },
   updateClientAccess(id, payload) {
     return api.post(`/appointments/${id}/client-access/`, payload);
@@ -211,16 +22,16 @@ export const appointmentsApi = {
     return api.post(`/appointments/${id}/repeat/`);
   },
   events(id, params = {}) {
-    return api.get(`/appointments/${id}/events/`, { params });
+    return api.get(`/appointments/${id}/events/`, withBypassCache({ params }));
   },
   clientSignal(id, payload) {
     return api.post(`/appointments/${id}/client-signal/`, payload);
   },
   newList() {
-    return api.get("/appointments/new/");
+    return api.get("/appointments/new/", withBypassCache());
   },
   activeList() {
-    return api.get("/appointments/active/");
+    return api.get("/appointments/active/", withBypassCache());
   },
   bulkAction(payload) {
     return api.post("/appointments/bulk-action/", payload);
@@ -257,7 +68,10 @@ export const appointmentsApi = {
 
 export const chatApi = {
   listMessages(appointmentId, afterId = 0) {
-    return api.get(`/appointments/${appointmentId}/messages/`, { params: { after_id: afterId } });
+    return api.get(
+      `/appointments/${appointmentId}/messages/`,
+      withBypassCache({ params: { after_id: afterId } })
+    );
   },
   sendMessage(appointmentId, formData) {
     return api.post(`/appointments/${appointmentId}/messages/`, formData, {
@@ -271,11 +85,15 @@ export const chatApi = {
     return api.post(`/appointments/${appointmentId}/read/`, { last_read_message_id });
   },
   listQuickReplies() {
-    return api.get("/chat/quick-replies/");
+    return api.get("/chat/quick-replies/", withBypassCache());
   },
   createQuickReply(payload) {
     const isFormData = typeof FormData !== "undefined" && payload instanceof FormData;
-    return api.post("/chat/quick-replies/", payload, isFormData ? { headers: { "Content-Type": "multipart/form-data" } } : undefined);
+    return api.post(
+      "/chat/quick-replies/",
+      payload,
+      isFormData ? { headers: { "Content-Type": "multipart/form-data" } } : undefined
+    );
   },
   updateQuickReply(replyId, payload) {
     const isFormData = typeof FormData !== "undefined" && payload instanceof FormData;
@@ -384,6 +202,9 @@ export const adminApi = {
   rules() {
     return api.get("/v1/admin/rules/");
   },
+  rulesSchema() {
+    return api.get("/v1/admin/rules/schema/");
+  },
   reviews(params = {}) {
     return api.get("/admin/reviews/", { params });
   },
@@ -398,12 +219,24 @@ export const adminApi = {
   },
 };
 
+export const wholesalePortalApi = {
+  summary() {
+    return api.get("/wholesale/portal/summary/", withBypassCache());
+  },
+  orders(params = {}) {
+    return api.get("/wholesale/portal/orders/", withBypassCache({ params }));
+  },
+  profile() {
+    return api.get("/wholesale/portal/profile/", withBypassCache());
+  },
+};
+
 export const notificationsApi = {
   list(params = {}) {
-    return api.get("/notifications/", { params });
+    return api.get("/notifications/", withBypassCache({ params }));
   },
   unreadCount() {
-    return api.get("/notifications/unread-count/");
+    return api.get("/notifications/unread-count/", withBypassCache());
   },
   markRead(notificationIds = []) {
     return api.post("/notifications/mark-read/", { notification_ids: notificationIds });

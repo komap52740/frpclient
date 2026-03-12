@@ -1,0 +1,13 @@
+[Unit]
+Description=FRP Client PostgreSQL backup
+Wants=docker.service network-online.target
+After=docker.service network-online.target
+
+[Service]
+Type=oneshot
+User=root
+WorkingDirectory=/var/www/FRPclient
+Environment=PROJECT_DIR=/var/www/FRPclient
+Environment=BACKUP_DIR=/var/backups/frpclient/postgres
+Environment=RETENTION_DAYS=14
+ExecStart=/bin/sh /var/www/FRPclient/ops/backup/postgres_backup.sh

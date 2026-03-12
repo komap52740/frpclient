@@ -1,0 +1,12 @@
+[Unit]
+Description=FRP Client Django housekeeping
+Wants=docker.service network-online.target
+After=docker.service network-online.target
+
+[Service]
+Type=oneshot
+User=root
+WorkingDirectory=/var/www/FRPclient
+Environment=PROJECT_DIR=/var/www/FRPclient
+Environment=COMPOSE_FILE=/var/www/FRPclient/docker-compose.prod.yml
+ExecStart=/bin/sh /var/www/FRPclient/ops/maintenance/django_housekeeping.sh

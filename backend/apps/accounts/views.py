@@ -13,6 +13,8 @@ from urllib.request import Request, urlopen
 
 from django.conf import settings
 from django.contrib.auth import authenticate
+from django.contrib.auth import login as auth_login
+from django.contrib.auth import logout as auth_logout
 from django.core.mail import send_mail
 from django.db.models import Q
 from django.db import transaction
@@ -20,39 +22,57 @@ from django.http import HttpResponseRedirect
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.utils.crypto import get_random_string
-from rest_framework import permissions, status
+from rest_framework import permissions, serializers, status
+from rest_framework.exceptions import AuthenticationFailed, PermissionDenied
 from rest_framework.response import Response
+from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
+from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken, OutstandingToken
+from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer, TokenRefreshSerializer
 from rest_framework_simplejwt.tokens import RefreshToken
-from rest_framework_simplejwt.views import TokenRefreshView
+from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
+
+from apps.common.api_limits import serialize_bounded_queryset
 
 from .models import (
     EmailVerificationToken,
+    PasswordResetToken,
     RoleChoices,
     SiteSettings,
     User,
     WholesalePriorityChoices,
     WholesaleStatusChoices,
 )
+from .auth_security import clear_failed_login, ensure_login_not_locked, register_failed_login
 from .permissions import IsAuthenticatedAndNotBanned
 from .services import recalculate_master_stats
 from apps.platform.services import create_notification, emit_event
 from apps.appointments.models import Appointment, AppointmentStatusChoices
+from apps.appointments.services import get_available_new_appointments_queryset_for_master
 from apps.chat.models import ReadState
+from apps.common.secure_media import build_user_media_url
 from .serializers import (
     BootstrapAdminSerializer,
+    ClientProfileDetailSerializer,
     MeSerializer,
-    PasswordLoginSerializer,
-    RegisterSerializer,
+    PasswordResetConfirmSerializer,
+    PasswordResetRequestSerializer,
     ProfileUpdateSerializer,
+    RegisterSerializer,
     ResendVerificationSerializer,
     TelegramAuthSerializer,
     WholesaleRequestSerializer,
+    WholesalePortalOrderSerializer,
     WholesaleStatusSerializer,
-    ClientProfileDetailSerializer,
 )
 
 logger = logging.getLogger(__name__)
+
+
+class AuthScopedAPIView(APIView):
+    throttle_classes = (ScopedRateThrottle,)
+    throttle_scope = ""
 
 
 def _oauth_cookie_name(provider: str) -> str:
@@ -533,6 +553,7 @@ def _oauth_redirect_with_error(request, message: str, provider: str = "") -> Htt
 
 
 def _oauth_success_response(request, user: User, provider: str) -> HttpResponseRedirect:
+    _establish_browser_session(request, user)
     refresh = RefreshToken.for_user(user)
     access = str(refresh.access_token)
     redirect = HttpResponseRedirect(
@@ -605,30 +626,157 @@ def _send_email_verification_message(request, user: User, verification_token: Em
     return bool(delivered)
 
 
+def _password_reset_frontend_url(request) -> str:
+    configured = (settings.PASSWORD_RESET_URL or "").strip()
+    if configured:
+        return configured
+    return _oauth_login_url(request)
+
+
+def _password_reset_link(request, token: str) -> str:
+    return f"{_password_reset_frontend_url(request)}#password_reset_token={token}"
+
+
+def _expire_active_password_reset_tokens(user: User) -> None:
+    PasswordResetToken.objects.filter(user=user, used_at__isnull=True).update(used_at=timezone.now())
+
+
+def _create_password_reset_token(user: User) -> PasswordResetToken:
+    _expire_active_password_reset_tokens(user)
+    ttl_hours = max(int(getattr(settings, "PASSWORD_RESET_TTL_HOURS", 2)), 1)
+    return PasswordResetToken.objects.create(
+        user=user,
+        token=get_random_string(64),
+        expires_at=timezone.now() + timedelta(hours=ttl_hours),
+    )
+
+
+def _send_password_reset_message(request, user: User, reset_token: PasswordResetToken) -> bool:
+    if not settings.EMAIL_HOST:
+        return False
+
+    reset_link = _password_reset_link(request, reset_token.token)
+    ttl_hours = max(int(getattr(settings, "PASSWORD_RESET_TTL_HOURS", 2)), 1)
+    subject = "Сброс пароля в FRP Client"
+    message = (
+        "Вы запросили смену пароля в FRP Client.\n\n"
+        "Перейдите по ссылке и задайте новый пароль:\n"
+        f"{reset_link}\n\n"
+        f"Ссылка действует {ttl_hours} ч.\n"
+        "Если это были не вы, просто проигнорируйте письмо."
+    )
+    delivered = send_mail(
+        subject=subject,
+        message=message,
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        recipient_list=[user.email],
+        fail_silently=False,
+    )
+    return bool(delivered)
+
+
 def admin_accounts_count() -> int:
     return User.objects.filter(role=RoleChoices.ADMIN).count() + User.objects.filter(is_superuser=True).exclude(role=RoleChoices.ADMIN).count()
 
 
-def build_auth_response(user: User) -> Response:
+def _session_backend_path() -> str:
+    backends = getattr(settings, "AUTHENTICATION_BACKENDS", None)
+    if backends:
+        return backends[0]
+    return "django.contrib.auth.backends.ModelBackend"
+
+
+def _establish_browser_session(request, user: User) -> None:
+    auth_login(request, user, backend=_session_backend_path())
+
+
+def _user_from_refresh_token(raw_refresh_token: str) -> User | None:
+    if not raw_refresh_token:
+        return None
+    try:
+        token = RefreshToken(raw_refresh_token)
+    except TokenError:
+        return None
+    user_id = token.get("user_id")
+    if not user_id:
+        return None
+    return User.objects.filter(id=user_id, is_active=True).first()
+
+
+def build_auth_response(request, user: User) -> Response:
+    _establish_browser_session(request, user)
     refresh = RefreshToken.for_user(user)
     payload = {
         "access": str(refresh.access_token),
         "user": MeSerializer(user).data,
     }
     response = Response(payload, status=status.HTTP_200_OK)
-    response.set_cookie(
-        key=settings.REFRESH_COOKIE_NAME,
-        value=str(refresh),
-        httponly=True,
-        secure=settings.REFRESH_COOKIE_SECURE,
-        samesite=settings.REFRESH_COOKIE_SAMESITE,
-        max_age=int(refresh.lifetime.total_seconds()),
-    )
+    _set_refresh_cookie(response, str(refresh), refresh.lifetime)
     return response
 
 
-class TelegramAuthView(APIView):
+def _delete_refresh_cookie(response: Response) -> None:
+    response.delete_cookie(
+        settings.REFRESH_COOKIE_NAME,
+        samesite=settings.REFRESH_COOKIE_SAMESITE,
+    )
+
+
+def _delete_session_cookie(response: Response) -> None:
+    response.delete_cookie(
+        settings.SESSION_COOKIE_NAME,
+        samesite=settings.SESSION_COOKIE_SAMESITE,
+    )
+
+
+def _set_refresh_cookie(response: Response, refresh_token: str, lifetime: timedelta | None = None) -> None:
+    max_age = int(lifetime.total_seconds()) if lifetime is not None else None
+    response.set_cookie(
+        key=settings.REFRESH_COOKIE_NAME,
+        value=refresh_token,
+        httponly=True,
+        secure=settings.REFRESH_COOKIE_SECURE,
+        samesite=settings.REFRESH_COOKIE_SAMESITE,
+        max_age=max_age,
+    )
+
+
+class CookieTokenObtainPairSerializer(TokenObtainPairSerializer):
+    default_error_messages = {
+        "no_active_account": "Неверный логин или пароль.",
+    }
+
+    def validate(self, attrs):
+        username = (attrs.get(self.username_field) or "").strip()
+        candidate = User.objects.filter(**{self.username_field: username}).first()
+        if (
+            candidate
+            and not candidate.is_active
+            and bool((candidate.email or "").strip())
+            and not candidate.is_email_verified
+        ):
+            raise PermissionDenied("Email не подтвержден. Проверьте почту и перейдите по ссылке подтверждения.")
+
+        data = super().validate(attrs)
+
+        if self.user.is_banned and self.user.role == RoleChoices.CLIENT:
+            raise PermissionDenied("Ваш аккаунт заблокирован администратором.")
+
+        data["user"] = MeSerializer(self.user, context={"request": self.context.get("request")}).data
+        return data
+
+
+class CookieTokenRefreshSerializer(TokenRefreshSerializer):
+    def validate(self, attrs):
+        try:
+            return super().validate(attrs)
+        except TokenError as exc:
+            raise InvalidToken(str(exc)) from exc
+
+
+class TelegramAuthView(AuthScopedAPIView):
     permission_classes = (permissions.AllowAny,)
+    throttle_scope = "auth_telegram"
 
     def post(self, request):
         serializer = TelegramAuthSerializer(data=request.data)
@@ -672,17 +820,19 @@ class TelegramAuthView(APIView):
                 ]
             )
 
-        return build_auth_response(user)
+        return build_auth_response(request, user)
 
 
-class PasswordLoginView(APIView):
+class PasswordLoginView(AuthScopedAPIView):
     permission_classes = (permissions.AllowAny,)
+    throttle_scope = "auth_login"
 
     def post(self, request):
         serializer = PasswordLoginSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         username = serializer.validated_data["username"]
         password = serializer.validated_data["password"]
+        ensure_login_not_locked(request, username)
         candidate = User.objects.filter(username=username).first()
         if (
             candidate
@@ -696,17 +846,45 @@ class PasswordLoginView(APIView):
             )
         user = authenticate(request=request, username=username, password=password)
         if not user:
+            register_failed_login(request, username)
             return Response({"detail": "Неверный логин или пароль."}, status=status.HTTP_401_UNAUTHORIZED)
         if user.is_banned and user.role == RoleChoices.CLIENT:
             return Response({"detail": "Ваш аккаунт заблокирован администратором."}, status=status.HTTP_403_FORBIDDEN)
 
+        clear_failed_login(request, username)
         user.last_login = timezone.now()
         user.save(update_fields=["last_login", "updated_at"])
-        return build_auth_response(user)
+        return build_auth_response(request, user)
 
 
-class RegisterView(APIView):
+class CookieTokenObtainPairView(TokenObtainPairView):
     permission_classes = (permissions.AllowAny,)
+    serializer_class = CookieTokenObtainPairSerializer
+    throttle_classes = (ScopedRateThrottle,)
+    throttle_scope = "auth_login"
+
+    def post(self, request, *args, **kwargs):
+        username = (request.data.get("username") or "").strip()
+        ensure_login_not_locked(request, username)
+        serializer = self.get_serializer(data=request.data)
+        try:
+            serializer.is_valid(raise_exception=True)
+        except AuthenticationFailed:
+            register_failed_login(request, username)
+            raise
+        response_payload = dict(serializer.validated_data)
+        refresh_token = response_payload.pop("refresh", None)
+        clear_failed_login(request, username)
+        _establish_browser_session(request, serializer.user)
+        response = Response(response_payload, status=status.HTTP_200_OK)
+        if refresh_token:
+            _set_refresh_cookie(response, refresh_token, RefreshToken(refresh_token).lifetime)
+        return response
+
+
+class RegisterView(AuthScopedAPIView):
+    permission_classes = (permissions.AllowAny,)
+    throttle_scope = "auth_register"
 
     def post(self, request):
         serializer = RegisterSerializer(data=request.data)
@@ -745,8 +923,9 @@ class RegisterView(APIView):
         )
 
 
-class RegisterResendVerificationView(APIView):
+class RegisterResendVerificationView(AuthScopedAPIView):
     permission_classes = (permissions.AllowAny,)
+    throttle_scope = "auth_register_resend"
 
     def post(self, request):
         serializer = ResendVerificationSerializer(data=request.data)
@@ -778,8 +957,9 @@ class RegisterResendVerificationView(APIView):
         )
 
 
-class EmailVerifyView(APIView):
+class EmailVerifyView(AuthScopedAPIView):
     permission_classes = (permissions.AllowAny,)
+    throttle_scope = "auth_verify_email"
 
     def get(self, request):
         token = (request.GET.get("token") or "").strip()
@@ -812,8 +992,72 @@ class EmailVerifyView(APIView):
         return _email_verify_redirect(request, verified=True)
 
 
-class OAuthStartView(APIView):
+class PasswordResetRequestView(AuthScopedAPIView):
     permission_classes = (permissions.AllowAny,)
+    throttle_scope = "auth_password_reset_request"
+
+    def post(self, request):
+        serializer = PasswordResetRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        email = serializer.validated_data["email"]
+
+        user = User.objects.filter(email__iexact=email, is_active=True, is_email_verified=True).first()
+        if not user:
+            return Response(
+                {"detail": "Если аккаунт с таким email существует, инструкция по смене пароля отправлена."},
+                status=status.HTTP_200_OK,
+            )
+
+        try:
+            reset_token = _create_password_reset_token(user)
+            delivered = _send_password_reset_message(request, user, reset_token)
+        except Exception as exc:  # pragma: no cover - network dependent
+            logger.warning("Password reset send failed for user=%s: %s", user.id, exc)
+        else:
+            if not delivered:
+                logger.warning("Password reset email delivery skipped for user=%s because email backend is not configured", user.id)
+
+        return Response(
+            {"detail": "Если аккаунт с таким email существует, инструкция по смене пароля отправлена."},
+            status=status.HTTP_200_OK,
+        )
+
+
+class PasswordResetConfirmView(AuthScopedAPIView):
+    permission_classes = (permissions.AllowAny,)
+    throttle_scope = "auth_password_reset_confirm"
+
+    def post(self, request):
+        token_value = (request.data.get("token") or "").strip()
+        reset_token = PasswordResetToken.objects.select_related("user").filter(token=token_value).first()
+        if not reset_token:
+            return Response({"detail": "Ссылка для смены пароля недействительна."}, status=status.HTTP_400_BAD_REQUEST)
+        if reset_token.used_at is not None:
+            return Response({"detail": "Ссылка для смены пароля уже использована."}, status=status.HTTP_400_BAD_REQUEST)
+        if reset_token.is_expired:
+            return Response({"detail": "Срок действия ссылки для смены пароля истек."}, status=status.HTTP_400_BAD_REQUEST)
+
+        serializer = PasswordResetConfirmSerializer(data=request.data, context={"user": reset_token.user})
+        serializer.is_valid(raise_exception=True)
+
+        user = reset_token.user
+        now = timezone.now()
+        with transaction.atomic():
+            user.set_password(serializer.validated_data["password"])
+            user.save(update_fields=["password", "updated_at"])
+            reset_token.used_at = now
+            reset_token.save(update_fields=["used_at", "updated_at"])
+            PasswordResetToken.objects.filter(user=user, used_at__isnull=True).exclude(id=reset_token.id).update(used_at=now)
+            for outstanding in OutstandingToken.objects.filter(user=user):
+                BlacklistedToken.objects.get_or_create(token=outstanding)
+        clear_failed_login(request, user.username)
+
+        return Response({"detail": "Пароль обновлен. Теперь можно войти с новым паролем."}, status=status.HTTP_200_OK)
+
+
+class OAuthStartView(AuthScopedAPIView):
+    permission_classes = (permissions.AllowAny,)
+    throttle_scope = "auth_oauth_start"
 
     def get(self, request, provider: str):
         normalized_provider = (provider or "").lower()
@@ -843,8 +1087,8 @@ class OAuthStartView(APIView):
             key=_oauth_cookie_name(normalized_provider),
             value=state,
             httponly=True,
-            secure=settings.REFRESH_COOKIE_SECURE,
-            samesite=settings.REFRESH_COOKIE_SAMESITE,
+            secure=settings.OAUTH_COOKIE_SECURE,
+            samesite=settings.OAUTH_COOKIE_SAMESITE,
             max_age=600,
         )
         if normalized_provider == "vk" and vk_pkce_verifier and vk_device_id:
@@ -852,23 +1096,24 @@ class OAuthStartView(APIView):
                 key=_oauth_pkce_verifier_cookie_name(normalized_provider),
                 value=vk_pkce_verifier,
                 httponly=True,
-                secure=settings.REFRESH_COOKIE_SECURE,
-                samesite=settings.REFRESH_COOKIE_SAMESITE,
+                secure=settings.OAUTH_COOKIE_SECURE,
+                samesite=settings.OAUTH_COOKIE_SAMESITE,
                 max_age=600,
             )
             response.set_cookie(
                 key=_oauth_device_cookie_name(normalized_provider),
                 value=vk_device_id,
                 httponly=True,
-                secure=settings.REFRESH_COOKIE_SECURE,
-                samesite=settings.REFRESH_COOKIE_SAMESITE,
+                secure=settings.OAUTH_COOKIE_SECURE,
+                samesite=settings.OAUTH_COOKIE_SAMESITE,
                 max_age=600,
             )
         return response
 
 
-class OAuthCallbackView(APIView):
+class OAuthCallbackView(AuthScopedAPIView):
     permission_classes = (permissions.AllowAny,)
+    throttle_scope = "auth_oauth_callback"
 
     def get(self, request, provider: str):
         normalized_provider = (provider or "").lower()
@@ -930,17 +1175,27 @@ class OAuthCallbackView(APIView):
         return response
 
 
-class AuthLogoutView(APIView):
+class AuthLogoutView(AuthScopedAPIView):
     permission_classes = (permissions.AllowAny,)
+    throttle_scope = "auth_logout"
 
     def post(self, request):
+        cookie_token = request.COOKIES.get(settings.REFRESH_COOKIE_NAME)
+        if cookie_token:
+            try:
+                RefreshToken(cookie_token).blacklist()
+            except Exception:  # pragma: no cover - invalid/expired tokens should still clear cookie
+                logger.info("Refresh token blacklist skipped during logout")
+        auth_logout(request)
         response = Response({"success": True}, status=status.HTTP_200_OK)
-        response.delete_cookie(settings.REFRESH_COOKIE_NAME)
+        _delete_refresh_cookie(response)
+        _delete_session_cookie(response)
         return response
 
 
-class BootstrapStatusView(APIView):
+class BootstrapStatusView(AuthScopedAPIView):
     permission_classes = (permissions.AllowAny,)
+    throttle_scope = "auth_bootstrap_status"
 
     def get(self, request):
         count = admin_accounts_count()
@@ -953,8 +1208,9 @@ class BootstrapStatusView(APIView):
         )
 
 
-class BootstrapCreateAdminView(APIView):
+class BootstrapCreateAdminView(AuthScopedAPIView):
     permission_classes = (permissions.AllowAny,)
+    throttle_scope = "auth_bootstrap_admin"
 
     def post(self, request):
         if admin_accounts_count() > 0:
@@ -973,11 +1229,14 @@ class BootstrapCreateAdminView(APIView):
         )
         user.last_login = timezone.now()
         user.save(update_fields=["last_login", "updated_at"])
-        return build_auth_response(user)
+        return build_auth_response(request, user)
 
 
 class CookieTokenRefreshView(TokenRefreshView):
     permission_classes = (permissions.AllowAny,)
+    serializer_class = CookieTokenRefreshSerializer
+    throttle_classes = (ScopedRateThrottle,)
+    throttle_scope = "auth_refresh"
 
     def post(self, request, *args, **kwargs):
         mutable_data = request.data.copy()
@@ -987,17 +1246,14 @@ class CookieTokenRefreshView(TokenRefreshView):
                 mutable_data["refresh"] = cookie_token
         serializer = self.get_serializer(data=mutable_data)
         serializer.is_valid(raise_exception=True)
-        response = Response(serializer.validated_data, status=status.HTTP_200_OK)
-        new_refresh = serializer.validated_data.get("refresh")
+        response_payload = dict(serializer.validated_data)
+        new_refresh = response_payload.pop("refresh", None)
+        session_user = _user_from_refresh_token(new_refresh or mutable_data.get("refresh", ""))
+        if session_user is not None:
+            _establish_browser_session(request, session_user)
+        response = Response(response_payload, status=status.HTTP_200_OK)
         if new_refresh:
-            response.set_cookie(
-                key=settings.REFRESH_COOKIE_NAME,
-                value=new_refresh,
-                httponly=True,
-                secure=settings.REFRESH_COOKIE_SECURE,
-                samesite=settings.REFRESH_COOKIE_SAMESITE,
-                max_age=60 * 60 * 24 * 30,
-            )
+            _set_refresh_cookie(response, new_refresh, RefreshToken(new_refresh).lifetime)
         return response
 
 
@@ -1068,9 +1324,9 @@ class ClientProfileDetailView(APIView):
 
 def serialize_wholesale_status(user: User, request=None) -> dict:
     def file_url(file_field):
-        if not file_field or not getattr(file_field, "url", None):
+        if not file_field or not getattr(file_field, "name", ""):
             return None
-        return request.build_absolute_uri(file_field.url) if request else file_field.url
+        return build_user_media_url(request, user, file_field.field.name)
 
     return WholesaleStatusSerializer(
         {
@@ -1248,6 +1504,76 @@ class WholesaleRequestView(APIView):
         return Response(serialize_wholesale_status(user, request=request), status=status.HTTP_200_OK)
 
 
+class WholesalePortalSummaryView(APIView):
+    permission_classes = (IsAuthenticatedAndNotBanned,)
+
+    def get(self, request):
+        if request.user.role != RoleChoices.CLIENT:
+            return Response({"detail": "Только для клиентов"}, status=status.HTTP_403_FORBIDDEN)
+
+        active_statuses = (
+            AppointmentStatusChoices.NEW,
+            AppointmentStatusChoices.IN_REVIEW,
+            AppointmentStatusChoices.AWAITING_PAYMENT,
+            AppointmentStatusChoices.PAYMENT_PROOF_UPLOADED,
+            AppointmentStatusChoices.PAID,
+            AppointmentStatusChoices.IN_PROGRESS,
+        )
+        queryset = get_wholesale_portal_queryset(request.user)
+        latest_order = queryset.first()
+        payload = {
+            "wholesale": serialize_wholesale_status(request.user, request=request),
+            "counts": {
+                "orders_total": queryset.count(),
+                "orders_active": queryset.filter(status__in=active_statuses).count(),
+                "orders_completed": queryset.filter(status=AppointmentStatusChoices.COMPLETED).count(),
+                "orders_problematic": queryset.filter(sla_breached=True).count(),
+                "awaiting_payment": queryset.filter(status=AppointmentStatusChoices.AWAITING_PAYMENT).count(),
+                "unread_total": calculate_unread_total(queryset, request.user),
+            },
+            "latest_order": WholesalePortalOrderSerializer(latest_order, context={"request": request}).data if latest_order else None,
+        }
+        return Response(payload, status=status.HTTP_200_OK)
+
+
+class WholesalePortalOrdersView(APIView):
+    permission_classes = (IsAuthenticatedAndNotBanned,)
+
+    def get(self, request):
+        if request.user.role != RoleChoices.CLIENT:
+            return Response({"detail": "Только для клиентов"}, status=status.HTTP_403_FORBIDDEN)
+
+        queryset = get_wholesale_portal_queryset(request.user)
+        status_filter = (request.query_params.get("status") or "").strip()
+        if status_filter in AppointmentStatusChoices.values:
+            queryset = queryset.filter(status=status_filter)
+        return serialize_bounded_queryset(
+            request,
+            queryset,
+            WholesalePortalOrderSerializer,
+            serializer_context={"request": request},
+            default_limit=settings.DEFAULT_API_LIST_LIMIT,
+            max_limit=settings.MAX_API_LIST_LIMIT,
+            response_status=status.HTTP_200_OK,
+        )
+
+
+class WholesalePortalProfileView(APIView):
+    permission_classes = (IsAuthenticatedAndNotBanned,)
+
+    def get(self, request):
+        if request.user.role != RoleChoices.CLIENT:
+            return Response({"detail": "Только для клиентов"}, status=status.HTTP_403_FORBIDDEN)
+
+        return Response(
+            {
+                "user": MeSerializer(request.user, context={"request": request}).data,
+                "wholesale": serialize_wholesale_status(request.user, request=request),
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
 def calculate_unread_total(appointments_queryset, user: User) -> int:
     appointment_ids = list(appointments_queryset.values_list("id", flat=True))
     if not appointment_ids:
@@ -1261,6 +1587,14 @@ def calculate_unread_total(appointments_queryset, user: User) -> int:
         last_read_id = last_read_map.get(appointment.id, 0)
         unread_total += appointment.messages.filter(id__gt=last_read_id, is_deleted=False).exclude(sender=user).count()
     return unread_total
+
+
+def get_wholesale_portal_queryset(user: User):
+    return (
+        Appointment.objects.filter(client=user, is_wholesale_request=True)
+        .select_related("assigned_master")
+        .order_by("-updated_at")
+    )
 
 
 class DashboardSummaryView(APIView):
@@ -1294,11 +1628,7 @@ class DashboardSummaryView(APIView):
 
         if user.role == RoleChoices.MASTER:
             master_stats = recalculate_master_stats(user)
-            can_take_new = user.is_master_active
-            new_available_queryset = Appointment.objects.filter(
-                status=AppointmentStatusChoices.NEW,
-                assigned_master__isnull=True,
-            ) if can_take_new else Appointment.objects.none()
+            new_available_queryset = get_available_new_appointments_queryset_for_master(user)
             own_queryset = Appointment.objects.filter(assigned_master=user)
             own_active_queryset = own_queryset.filter(status__in=active_statuses)
             payload = {

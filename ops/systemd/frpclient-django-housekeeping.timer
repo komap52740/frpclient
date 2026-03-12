@@ -1,0 +1,11 @@
+[Unit]
+Description=Run FRP Client Django housekeeping daily
+
+[Timer]
+OnCalendar=*-*-* 04:05:00
+Persistent=true
+RandomizedDelaySec=5m
+Unit=frpclient-django-housekeeping.service
+
+[Install]
+WantedBy=timers.target

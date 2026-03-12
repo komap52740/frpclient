@@ -16,6 +16,7 @@ from apps.appointments.models import Appointment, AppointmentEvent, AppointmentE
 from apps.chat.models import Message
 from apps.platform.models import Notification
 from apps.reviews.models import Review, ReviewTypeChoices
+from upload_helpers import make_test_heic_upload, make_test_image_upload
 
 
 @pytest.fixture
@@ -90,7 +91,7 @@ def test_take_appointment_locking(client_user, master_user, master_user_2):
 
 
 @pytest.mark.django_db
-def test_take_appointment_for_active_master_without_quality_gate(client_user):
+def test_take_appointment_requires_quality_approval(client_user):
     master_pending = User.objects.create_user(
         username="master_pending_quality",
         password="x",
@@ -108,9 +109,9 @@ def test_take_appointment_for_active_master_without_quality_gate(client_user):
     )
 
     response = auth_as(master_pending).post(f"/api/appointments/{appointment.id}/take/")
-    assert response.status_code == 200
+    assert response.status_code == 403
     appointment.refresh_from_db()
-    assert appointment.assigned_master_id == master_pending.id
+    assert appointment.assigned_master_id is None
 
 
 @pytest.mark.django_db
@@ -136,6 +137,32 @@ def test_take_appointment_allows_non_senior_levels(client_user):
     assert response.status_code == 200
     appointment.refresh_from_db()
     assert appointment.assigned_master_id == master_trainee.id
+
+
+@pytest.mark.django_db
+def test_trainee_cannot_take_wholesale_appointment(client_user):
+    master_trainee = User.objects.create_user(
+        username="master_trainee_wholesale",
+        password="x",
+        role=RoleChoices.MASTER,
+        is_master_active=True,
+        master_quality_approved=True,
+        master_level=MasterLevelChoices.TRAINEE,
+    )
+    appointment = Appointment.objects.create(
+        client=client_user,
+        brand="Samsung",
+        model="A32",
+        lock_type="PIN",
+        has_pc=True,
+        description="desc",
+        is_wholesale_request=True,
+    )
+
+    response = auth_as(master_trainee).post(f"/api/appointments/{appointment.id}/take/")
+    assert response.status_code == 403
+    appointment.refresh_from_db()
+    assert appointment.assigned_master_id is None
 
 
 @pytest.mark.django_db
@@ -197,7 +224,7 @@ def test_master_cannot_delete_appointment_via_admin_endpoint(master_user, client
 
 
 @pytest.mark.django_db
-def test_notify_new_appointment_targets_active_masters_with_telegram(client_user):
+def test_notify_new_appointment_targets_only_quality_approved_masters(client_user):
     master_allowed = User.objects.create_user(
         username="master_allowed",
         password="x",
@@ -236,10 +263,49 @@ def test_notify_new_appointment_targets_active_masters_with_telegram(client_user
     with patch("apps.accounts.notifications.send_telegram_message", return_value=True) as telegram_mock:
         sent = notify_masters_about_new_appointment(appointment)
 
-    assert sent == 3
-    assert telegram_mock.call_count == 3
+    assert sent == 2
+    assert telegram_mock.call_count == 2
     recipient_ids = {call.args[0] for call in telegram_mock.call_args_list}
-    assert recipient_ids == {master_allowed.telegram_id, 22222222, 33333333}
+    assert recipient_ids == {master_allowed.telegram_id, 33333333}
+
+
+@pytest.mark.django_db
+def test_notify_wholesale_appointment_excludes_trainee_masters(client_user):
+    master_allowed = User.objects.create_user(
+        username="master_allowed_wholesale",
+        password="x",
+        role=RoleChoices.MASTER,
+        is_master_active=True,
+        master_quality_approved=True,
+        master_level=MasterLevelChoices.SENIOR,
+        telegram_id=44444444,
+    )
+    User.objects.create_user(
+        username="master_trainee_wholesale_notify",
+        password="x",
+        role=RoleChoices.MASTER,
+        is_master_active=True,
+        master_quality_approved=True,
+        master_level=MasterLevelChoices.TRAINEE,
+        telegram_id=55555555,
+    )
+    appointment = Appointment.objects.create(
+        client=client_user,
+        brand="Xiaomi",
+        model="Redmi Note",
+        lock_type="PIN",
+        has_pc=True,
+        description="desc",
+        is_wholesale_request=True,
+    )
+
+    with patch("apps.accounts.notifications.send_telegram_message", return_value=True) as telegram_mock:
+        sent = notify_masters_about_new_appointment(appointment)
+
+    assert sent == 1
+    assert telegram_mock.call_count == 1
+    recipient_ids = {call.args[0] for call in telegram_mock.call_args_list}
+    assert recipient_ids == {master_allowed.telegram_id}
 
 
 @pytest.mark.django_db
@@ -305,7 +371,7 @@ def test_upload_proof_only_awaiting_payment(client_user, master_user):
         status=AppointmentStatusChoices.IN_REVIEW,
     )
 
-    proof = SimpleUploadedFile("proof.jpg", b"filecontent", content_type="image/jpeg")
+    proof = make_test_image_upload("proof.jpg")
     bad = auth_as(client_user).post(
         f"/api/appointments/{appointment.id}/upload-payment-proof/",
         {"payment_proof": proof},
@@ -316,7 +382,7 @@ def test_upload_proof_only_awaiting_payment(client_user, master_user):
     appointment.status = AppointmentStatusChoices.AWAITING_PAYMENT
     appointment.save(update_fields=["status", "updated_at"])
 
-    proof2 = SimpleUploadedFile("proof2.jpg", b"filecontent", content_type="image/jpeg")
+    proof2 = make_test_image_upload("proof2.jpg")
     ok = auth_as(client_user).post(
         f"/api/appointments/{appointment.id}/upload-payment-proof/",
         {"payment_proof": proof2},
@@ -338,7 +404,7 @@ def test_upload_proof_accepts_heic_from_mobile_camera(client_user, master_user):
         status=AppointmentStatusChoices.AWAITING_PAYMENT,
     )
 
-    proof = SimpleUploadedFile("IMG_0001.HEIC", b"heic-bytes", content_type="image/heic")
+    proof = make_test_heic_upload("IMG_0001.HEIC")
     response = auth_as(client_user).post(
         f"/api/appointments/{appointment.id}/upload-payment-proof/",
         {"payment_proof": proof},
@@ -364,7 +430,7 @@ def test_upload_proof_accepts_heic_without_extension(client_user, master_user):
         status=AppointmentStatusChoices.AWAITING_PAYMENT,
     )
 
-    proof = SimpleUploadedFile("camera_upload", b"heic-bytes", content_type="image/heic")
+    proof = make_test_heic_upload("camera_upload")
     response = auth_as(client_user).post(
         f"/api/appointments/{appointment.id}/upload-payment-proof/",
         {"payment_proof": proof},
@@ -617,7 +683,8 @@ def test_api_health_endpoint(api_client):
     response = api_client.get("/api/health/")
     assert response.status_code == 200
     assert response.data["status"] == "ok"
-    assert response.data["database"]["connected"] is True
+    assert "database" not in response.data
+    assert "redis" not in response.data
 
 
 @pytest.mark.django_db
@@ -1422,5 +1489,40 @@ def test_auto_wholesale_priority_from_client_stats(client_user):
     client_user.refresh_from_db()
     assert client_user.wholesale_priority in {WholesalePriorityChoices.PRIORITY, WholesalePriorityChoices.CRITICAL}
     assert (client_user.wholesale_priority_note or "").startswith("AUTO:")
+
+
+@pytest.mark.django_db
+def test_master_new_queue_hides_wholesale_from_trainee(client_user):
+    trainee = User.objects.create_user(
+        username="master_new_queue_trainee",
+        password="x",
+        role=RoleChoices.MASTER,
+        is_master_active=True,
+        master_quality_approved=True,
+        master_level=MasterLevelChoices.TRAINEE,
+    )
+    regular = Appointment.objects.create(
+        client=client_user,
+        brand="Samsung",
+        model="A10",
+        lock_type="PIN",
+        has_pc=True,
+        description="regular",
+    )
+    wholesale = Appointment.objects.create(
+        client=client_user,
+        brand="Samsung",
+        model="A11",
+        lock_type="PIN",
+        has_pc=True,
+        description="wholesale",
+        is_wholesale_request=True,
+    )
+
+    response = auth_as(trainee).get("/api/appointments/new/")
+    assert response.status_code == 200
+    ids = {item["id"] for item in response.data}
+    assert regular.id in ids
+    assert wholesale.id not in ids
 
 

@@ -1,0 +1,9 @@
+[Unit]
+Description=FRP Client certbot dry-run renewal check
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+ExecStart=/bin/sh /var/www/FRPclient/ops/monitoring/certbot_dry_run.sh

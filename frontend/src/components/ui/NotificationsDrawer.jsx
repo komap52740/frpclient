@@ -10,6 +10,7 @@ import {
   IconButton,
   List,
   ListItem,
+  ListItemButton,
   ListItemText,
   Stack,
   Typography,
@@ -19,29 +20,11 @@ import useMediaQuery from "@mui/material/useMediaQuery";
 import dayjs from "dayjs";
 import "dayjs/locale/ru";
 
+import { rewriteLegacyB2BNotification } from "../../shared/lib/b2bLabels";
+import { accessibleFocusRingSx } from "../../shared/ui/focusStyles";
 import { normalizeRuText } from "../../utils/text";
 
 dayjs.locale("ru");
-
-function sanitizeWholesaleText(title, message) {
-  const titleText = normalizeRuText(title || "");
-  const messageText = normalizeRuText(message || "");
-  const combined = `${titleText} ${messageText}`.toLowerCase();
-
-  if (!combined.includes("оптов") || !combined.includes("скид")) {
-    return { title: titleText, message: messageText };
-  }
-  if (combined.includes("отклон")) {
-    return {
-      title: "Решение по оптовому статусу",
-      message: "Оптовый статус отклонен. Уточните детали в чате с поддержкой.",
-    };
-  }
-  return {
-    title: "Решение по оптовому статусу",
-    message: "Оптовый статус одобрен. Ваш аккаунт отмечен как оптовый сервис.",
-  };
-}
 
 export default function NotificationsDrawer({
   open,
@@ -65,6 +48,9 @@ export default function NotificationsDrawer({
       open={open}
       onClose={onClose}
       PaperProps={{
+        id: "notifications-drawer",
+        role: "dialog",
+        "aria-labelledby": "notifications-drawer-title",
         sx: {
           width: { xs: "100vw", sm: 410 },
           maxWidth: 410,
@@ -102,7 +88,9 @@ export default function NotificationsDrawer({
             justifyContent="space-between"
             sx={{ minWidth: 0, flex: "1 1 190px", flexWrap: "wrap", rowGap: 0.6 }}
           >
-            <Typography variant="h3">Уведомления</Typography>
+            <Typography id="notifications-drawer-title" variant="h3">
+              Уведомления
+            </Typography>
             <Chip
               size="small"
               label={unreadCount ? `Новых: ${unreadCount}` : "Без новых"}
@@ -141,7 +129,11 @@ export default function NotificationsDrawer({
           </Stack>
         </Stack>
 
-        {error ? <Alert severity="error" sx={{ mb: 1 }}>{error}</Alert> : null}
+        {error ? (
+          <Alert severity="error" sx={{ mb: 1 }}>
+            {error}
+          </Alert>
+        ) : null}
 
         {!items.length && !loading ? (
           <Stack spacing={1} alignItems="center" sx={{ py: 8, color: "text.secondary" }}>
@@ -151,43 +143,16 @@ export default function NotificationsDrawer({
         ) : (
           <List disablePadding>
             {items.map((notification, index) => {
-              const display = sanitizeWholesaleText(notification.title, notification.message);
+              const display = rewriteLegacyB2BNotification(
+                normalizeRuText(notification.title || ""),
+                normalizeRuText(notification.message || "")
+              );
+              const itemDescription = display.message || "Системное уведомление";
+
               return (
                 <Box key={notification.id}>
                   <ListItem
-                    alignItems="flex-start"
-                    onClick={() => {
-                      if (!notification.is_read) {
-                        onMarkRead(notification.id);
-                      }
-                    }}
-                    sx={{
-                      py: 1.1,
-                      px: 1,
-                      bgcolor: notification.is_read
-                        ? "transparent"
-                        : isDark
-                          ? alpha("#123356", 0.46)
-                          : alpha("#eaf4ff", 0.95),
-                      borderRadius: 2,
-                      border: "1px solid",
-                      borderColor: notification.is_read
-                        ? "transparent"
-                        : isDark
-                          ? alpha("#5aa9ff", 0.34)
-                          : alpha("#0284c7", 0.2),
-                      cursor: notification.is_read ? "default" : "pointer",
-                      transition: "all 200ms ease",
-                      "&:hover": {
-                        bgcolor: notification.is_read
-                          ? isDark
-                            ? alpha("#0f172a", 0.68)
-                            : alpha("#f7fbff", 0.98)
-                          : isDark
-                            ? alpha("#17406a", 0.5)
-                            : alpha("#e4f1ff", 0.98),
-                      },
-                    }}
+                    disablePadding
                     secondaryAction={
                       !notification.is_read ? (
                         <IconButton
@@ -196,24 +161,79 @@ export default function NotificationsDrawer({
                             event.stopPropagation();
                             onMarkRead(notification.id);
                           }}
-                          aria-label="Отметить прочитанным"
+                          aria-label="Отметить уведомление прочитанным"
+                          sx={accessibleFocusRingSx}
                         >
                           <CheckCircleOutlineRoundedIcon />
                         </IconButton>
                       ) : null
                     }
                   >
-                    <ListItemText
-                      primary={<Typography variant="body2" sx={{ fontWeight: 700 }}>{display.title}</Typography>}
-                      secondary={
-                        <Stack spacing={0.4} sx={{ mt: 0.25 }}>
-                          <Typography variant="caption">{display.message || "Системное уведомление"}</Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            {dayjs(notification.created_at).format("DD.MM.YYYY HH:mm")}
-                          </Typography>
-                        </Stack>
+                    <ListItemButton
+                      alignItems="flex-start"
+                      disabled={notification.is_read}
+                      onClick={() => {
+                        if (!notification.is_read) {
+                          onMarkRead(notification.id);
+                        }
+                      }}
+                      aria-label={
+                        notification.is_read
+                          ? `Уведомление: ${display.title}`
+                          : `Открыть и отметить прочитанным: ${display.title}`
                       }
-                    />
+                      sx={{
+                        py: 1.1,
+                        px: 1,
+                        pr: notification.is_read ? 1 : 6.5,
+                        bgcolor: notification.is_read
+                          ? "transparent"
+                          : isDark
+                            ? alpha("#123356", 0.46)
+                            : alpha("#eaf4ff", 0.95),
+                        borderRadius: 2,
+                        border: "1px solid",
+                        borderColor: notification.is_read
+                          ? "transparent"
+                          : isDark
+                            ? alpha("#5aa9ff", 0.34)
+                            : alpha("#0284c7", 0.2),
+                        cursor: notification.is_read ? "default" : "pointer",
+                        transition: "all 200ms ease",
+                        ...accessibleFocusRingSx,
+                        "&.Mui-disabled": {
+                          opacity: 1,
+                          color: "inherit",
+                          WebkitTextFillColor: "inherit",
+                        },
+                        "&:hover": {
+                          bgcolor: notification.is_read
+                            ? isDark
+                              ? alpha("#0f172a", 0.68)
+                              : alpha("#f7fbff", 0.98)
+                            : isDark
+                              ? alpha("#17406a", 0.5)
+                              : alpha("#e4f1ff", 0.98),
+                        },
+                      }}
+                    >
+                      <ListItemText
+                        secondaryTypographyProps={{ component: "div" }}
+                        primary={
+                          <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                            {display.title}
+                          </Typography>
+                        }
+                        secondary={
+                          <Stack spacing={0.4} sx={{ mt: 0.25 }}>
+                            <Typography variant="caption">{itemDescription}</Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {dayjs(notification.created_at).format("DD.MM.YYYY HH:mm")}
+                            </Typography>
+                          </Stack>
+                        }
+                      />
+                    </ListItemButton>
                   </ListItem>
                   {index < items.length - 1 ? <Divider sx={{ my: 0.6 }} /> : null}
                 </Box>

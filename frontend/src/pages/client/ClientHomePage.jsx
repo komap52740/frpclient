@@ -1,4 +1,4 @@
-﻿import BoltRoundedIcon from "@mui/icons-material/BoltRounded";
+import BoltRoundedIcon from "@mui/icons-material/BoltRounded";
 import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
 import SecurityRoundedIcon from "@mui/icons-material/SecurityRounded";
 import {
@@ -21,17 +21,20 @@ import {
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import useMediaQuery from "@mui/material/useMediaQuery";
+import { useQueryClient } from "@tanstack/react-query";
 import dayjs from "dayjs";
 import "dayjs/locale/ru";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link as RouterLink, useNavigate } from "react-router-dom";
 
-import { appointmentsApi, authApi } from "../../api/client";
 import AppointmentCard from "../../components/AppointmentCard";
 import EmptyState from "../../components/EmptyState";
 import KpiCard from "../../components/KpiCard";
 import AppointmentCardSkeleton from "../../components/ui/skeletons/AppointmentCardSkeleton";
-import useAutoRefresh from "../../hooks/useAutoRefresh";
+import { useMyAppointmentsQuery } from "../../features/appointments/list/hooks/useMyAppointmentsQuery";
+import { useDashboardSummaryQuery } from "../../features/dashboard/hooks/useDashboardSummaryQuery";
+import { useNotificationsRealtime } from "../../features/platform/notifications/hooks/useNotificationsRealtime";
+import { queryKeys } from "../../shared/api/queryKeys";
 
 dayjs.locale("ru");
 
@@ -133,14 +136,6 @@ function formatEtaMinutes(minutes) {
   return `~${Math.ceil(minutes / 60)} ч`;
 }
 
-function snapshotValue(value) {
-  try {
-    return JSON.stringify(value ?? null);
-  } catch {
-    return String(value ?? "");
-  }
-}
-
 function resolveScenario(appointment) {
   if (!appointment) {
     return {
@@ -226,67 +221,33 @@ function resolveScenario(appointment) {
 
 export default function ClientHomePage() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const isWideDesktop = useMediaQuery(theme.breakpoints.up("lg"));
   const isDark = theme.palette.mode === "dark";
-  const [summary, setSummary] = useState(null);
-  const [items, setItems] = useState([]);
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
   const [focusMode, setFocusMode] = useState("attention");
   const [checklistExpanded, setChecklistExpanded] = useState(false);
   const [checklistState, setChecklistState] = useState(() => loadChecklistState());
   const [showSecondaryBlocks, setShowSecondaryBlocks] = useState(() => !isMobile);
-  const summarySnapshotRef = useRef("");
-  const itemsSnapshotRef = useRef("");
+  const {
+    data: summary = null,
+    isPending: summaryPending,
+    error: summaryError,
+  } = useDashboardSummaryQuery();
+  const { data: items = [], isPending: itemsPending, error: itemsError } = useMyAppointmentsQuery();
+  const loading = summaryPending || itemsPending;
+  const error = summaryError || itemsError ? "Не удалось загрузить дашборд клиента" : "";
 
-  const applySummaryIfChanged = useCallback((nextSummary) => {
-    const nextSnapshot = snapshotValue(nextSummary);
-    if (nextSnapshot === summarySnapshotRef.current) {
-      return;
-    }
-    summarySnapshotRef.current = nextSnapshot;
-    setSummary(nextSummary);
-  }, []);
+  const invalidateData = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: queryKeys.auth.dashboardRoot() });
+    queryClient.invalidateQueries({ queryKey: queryKeys.appointments.myRoot() });
+  }, [queryClient]);
 
-  const applyItemsIfChanged = useCallback((nextItems) => {
-    const nextSnapshot = snapshotValue(nextItems);
-    if (nextSnapshot === itemsSnapshotRef.current) {
-      return;
-    }
-    itemsSnapshotRef.current = nextSnapshot;
-    setItems(nextItems);
-  }, []);
-
-  const loadData = useCallback(async ({ silent = false, withLoading = true } = {}) => {
-    if (withLoading) {
-      setLoading(true);
-    }
-    try {
-      const [summaryData, appointmentsResponse] = await Promise.all([
-        authApi.dashboardSummary(),
-        appointmentsApi.my(),
-      ]);
-      applySummaryIfChanged(summaryData.counts || {});
-      applyItemsIfChanged(appointmentsResponse.data || []);
-      setError("");
-    } catch {
-      if (!silent) {
-        setError("Не удалось загрузить дашборд клиента");
-      }
-    } finally {
-      if (withLoading) {
-        setLoading(false);
-      }
-    }
-  }, [applyItemsIfChanged, applySummaryIfChanged]);
-
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
-
-  useAutoRefresh(() => loadData({ silent: true, withLoading: false }), { intervalMs: 7000 });
+  useNotificationsRealtime({
+    onConnected: invalidateData,
+    onNotification: invalidateData,
+  });
 
   useEffect(() => {
     localStorage.setItem(CHECKLIST_STORAGE_KEY, JSON.stringify(checklistState));
@@ -300,7 +261,6 @@ export default function ClientHomePage() {
 
   const prioritizedAppointment = useMemo(() => pickPriorityAppointment(items), [items]);
   const scenario = useMemo(() => resolveScenario(prioritizedAppointment), [prioritizedAppointment]);
-  // Keep a stable tip to avoid layout jumps on the client home screen.
   const activeTip = scenario.tips?.[0] || "";
 
   const checklistProgress = useMemo(() => {
@@ -309,16 +269,17 @@ export default function ClientHomePage() {
   }, [checklistState]);
 
   const visibleAppointments = useMemo(() => {
-    const base = focusMode === "attention"
-      ? items.filter(
-          (item) =>
-            (item.unread_count || 0) > 0 ||
-            item.status === "AWAITING_PAYMENT" ||
-            item.status === "PAYMENT_PROOF_UPLOADED" ||
-            item.status === "IN_PROGRESS" ||
-            item.status === "IN_REVIEW"
-        )
-      : items;
+    const base =
+      focusMode === "attention"
+        ? items.filter(
+            (item) =>
+              (item.unread_count || 0) > 0 ||
+              item.status === "AWAITING_PAYMENT" ||
+              item.status === "PAYMENT_PROOF_UPLOADED" ||
+              item.status === "IN_PROGRESS" ||
+              item.status === "IN_REVIEW"
+          )
+        : items;
 
     return [...base]
       .sort((a, b) => dayjs(b.updated_at).valueOf() - dayjs(a.updated_at).valueOf())
@@ -377,12 +338,16 @@ export default function ClientHomePage() {
             background: "rgba(96, 165, 250, 0.22)",
           }}
         />
-          <Stack spacing={1} sx={{ position: "relative" }}>
-            <Typography variant="h5">Личный кабинет клиента</Typography>
-            <Typography variant="body1" sx={{ opacity: 0.95, maxWidth: 760, display: { xs: "none", sm: "block" } }}>
-              Вся работа по заявке в одном месте: прогресс, оплата, чат и история действий без лишних переходов.
-            </Typography>
-          </Stack>
+        <Stack spacing={1} sx={{ position: "relative" }}>
+          <Typography variant="h5">Личный кабинет клиента</Typography>
+          <Typography
+            variant="body1"
+            sx={{ opacity: 0.95, maxWidth: 760, display: { xs: "none", sm: "block" } }}
+          >
+            Вся работа по заявке в одном месте: прогресс, оплата, чат и история действий без лишних
+            переходов.
+          </Typography>
+        </Stack>
       </Paper>
 
       {error && <Alert severity="error">{error}</Alert>}
@@ -418,7 +383,11 @@ export default function ClientHomePage() {
               <Stack direction="row" alignItems="center" spacing={1}>
                 <BoltRoundedIcon sx={{ color: scenario.tone }} />
                 <Typography variant="h6">Центр действий</Typography>
-                <Chip size="small" label="Приоритет" sx={{ bgcolor: `${scenario.tone}22`, color: scenario.tone }} />
+                <Chip
+                  size="small"
+                  label="Приоритет"
+                  sx={{ bgcolor: `${scenario.tone}22`, color: scenario.tone }}
+                />
               </Stack>
 
               <Typography variant="h3">{scenario.title}</Typography>
@@ -537,11 +506,19 @@ export default function ClientHomePage() {
           <Grid item xs={6} sm={6} lg={3}>
             <KpiCard title="Всего заявок" value={summary?.appointments_total ?? "-"} />
           </Grid>
-        <Grid item xs={6} sm={6} lg={3}>
-          <KpiCard title="Активные" value={summary?.appointments_active ?? "-"} accent="#3a76ff" />
-        </Grid>
           <Grid item xs={6} sm={6} lg={3}>
-            <KpiCard title="Ожидают оплату" value={summary?.awaiting_payment ?? "-"} accent="#c97a00" />
+            <KpiCard
+              title="Активные"
+              value={summary?.appointments_active ?? "-"}
+              accent="#3a76ff"
+            />
+          </Grid>
+          <Grid item xs={6} sm={6} lg={3}>
+            <KpiCard
+              title="Ожидают оплату"
+              value={summary?.awaiting_payment ?? "-"}
+              accent="#c97a00"
+            />
           </Grid>
           <Grid item xs={6} sm={6} lg={3}>
             <KpiCard title="Непрочитанные" value={summary?.unread_total ?? "-"} accent="#7b2cbf" />
@@ -558,17 +535,31 @@ export default function ClientHomePage() {
           sx={{ mb: 1 }}
         >
           <Typography variant="h6">Фокус-заявки</Typography>
-          <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ width: { xs: "100%", md: "auto" } }}>
+          <Stack
+            direction={{ xs: "column", sm: "row" }}
+            spacing={1}
+            sx={{ width: { xs: "100%", md: "auto" } }}
+          >
             <Tabs
               value={focusMode}
               onChange={(_, value) => setFocusMode(value)}
               variant="fullWidth"
               sx={{
                 minHeight: 38,
-                "& .MuiTab-root": { minHeight: 38, textTransform: "none", fontWeight: 700, fontSize: 13.5 },
+                "& .MuiTab-root": {
+                  minHeight: 38,
+                  textTransform: "none",
+                  fontWeight: 700,
+                  fontSize: 13.5,
+                },
               }}
             >
-              <Tab value="attention" label={isMobile ? `Важные (${attentionCount})` : `Требуют внимания (${attentionCount})`} />
+              <Tab
+                value="attention"
+                label={
+                  isMobile ? `Важные (${attentionCount})` : `Требуют внимания (${attentionCount})`
+                }
+              />
               <Tab value="all" label={`Все (${items.length})`} />
             </Tabs>
             <Button
@@ -626,10 +617,19 @@ export default function ClientHomePage() {
           </AccordionSummary>
           <AccordionDetails>
             <Stack spacing={0.8}>
-              <Typography variant="body2">1. Мастер объясняет шаги перед подключением и согласовывает действия.</Typography>
-              <Typography variant="body2">2. Вся коммуникация фиксируется в чате и ленте событий.</Typography>
-              <Typography variant="body2">3. Оплата подтверждается чеком, статус обновляется автоматически.</Typography>
-              <Typography variant="body2" color="text.secondary">Если что-то не получается, сразу пишите в чат заявки — это самый быстрый канал помощи.</Typography>
+              <Typography variant="body2">
+                1. Мастер объясняет шаги перед подключением и согласовывает действия.
+              </Typography>
+              <Typography variant="body2">
+                2. Вся коммуникация фиксируется в чате и ленте событий.
+              </Typography>
+              <Typography variant="body2">
+                3. Оплата подтверждается чеком, статус обновляется автоматически.
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Если что-то не получается, сразу пишите в чат заявки — это самый быстрый канал
+                помощи.
+              </Typography>
             </Stack>
           </AccordionDetails>
         </Accordion>

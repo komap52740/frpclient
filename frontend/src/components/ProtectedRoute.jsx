@@ -1,7 +1,7 @@
-﻿import { Navigate, useLocation } from "react-router-dom";
-import { Box, CircularProgress, Stack, Typography } from "@mui/material";
+﻿import { Box, CircularProgress, Stack, Typography } from "@mui/material";
+import { Navigate, useLocation } from "react-router-dom";
 
-import { useAuth } from "../auth/AuthContext";
+import { useAuth } from "../features/auth/hooks/useAuth";
 
 export function ProtectedRoute({ children, roles }) {
   const { user, loading } = useAuth();

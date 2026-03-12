@@ -3,17 +3,11 @@ from __future__ import annotations
 from django.conf import settings
 
 from apps.accounts.notifications import send_telegram_message
+from apps.common.secure_media import build_message_file_url
 
 
-def _absolute_public_url(path: str) -> str:
-    base = (settings.TELEGRAM_CLIENT_BOT_FRONTEND_URL or "").rstrip("/")
-    if not base:
-        return path
-    if path.startswith("http://") or path.startswith("https://"):
-        return path
-    if path.startswith("/"):
-        return f"{base}{path}"
-    return f"{base}/{path}"
+def _app_base_url() -> str:
+    return (settings.TELEGRAM_CLIENT_BOT_FRONTEND_URL or settings.OAUTH_FRONTEND_URL or "").rstrip("/")
 
 
 def notify_client_about_chat_message(message) -> bool:
@@ -38,8 +32,10 @@ def notify_client_about_chat_message(message) -> bool:
 
     if message.text:
         parts.append(f"Текст: {message.text}")
-    if message.file and hasattr(message.file, "url"):
-        parts.append(f"Файл: {_absolute_public_url(message.file.url)}")
+    if message.file and getattr(message.file, "name", ""):
+        file_url = build_message_file_url(None, message, base_url=_app_base_url()) if _app_base_url() else None
+        if file_url:
+            parts.append(f"Файл: {file_url}")
 
     if settings.TELEGRAM_CLIENT_BOT_FRONTEND_URL:
         parts.append(f"Открыть заявку: {settings.TELEGRAM_CLIENT_BOT_FRONTEND_URL.rstrip('/')}/appointments/{appointment.id}")
@@ -67,8 +63,10 @@ def notify_master_about_client_chat_message(message) -> bool:
 
     if message.text:
         parts.append(f"Текст: {message.text}")
-    if message.file and hasattr(message.file, "url"):
-        parts.append(f"Файл: {_absolute_public_url(message.file.url)}")
+    if message.file and getattr(message.file, "name", ""):
+        file_url = build_message_file_url(None, message, base_url=_app_base_url()) if _app_base_url() else None
+        if file_url:
+            parts.append(f"Файл: {file_url}")
 
     if settings.TELEGRAM_CLIENT_BOT_FRONTEND_URL:
         parts.append(f"Открыть заявку: {settings.TELEGRAM_CLIENT_BOT_FRONTEND_URL.rstrip('/')}/appointments/{appointment.id}")

@@ -26,7 +26,11 @@ function formatLastActivity(item, compact) {
 
 function riskTone(level) {
   if (level === "critical" || level === "high") {
-    return { color: "#b42318", bg: "#fee4e2", label: level === "critical" ? "Риск: критический" : "Риск: высокий" };
+    return {
+      color: "#b42318",
+      bg: "#fee4e2",
+      label: level === "critical" ? "Риск: критический" : "Риск: высокий",
+    };
   }
   if (level === "medium") {
     return { color: "#b54708", bg: "#fffaeb", label: "Риск: средний" };
@@ -62,7 +66,7 @@ export default function AppointmentCard({
           : "linear-gradient(158deg, rgba(255,255,255,0.98) 0%, rgba(244,250,255,0.93) 100%)",
         transition: "transform 220ms ease, box-shadow 220ms ease, border-color 220ms ease",
         "&::before": {
-          content: "\"\"",
+          content: '""',
           position: "absolute",
           top: 0,
           left: 0,
@@ -86,7 +90,8 @@ export default function AppointmentCard({
                 Заявка #{item.id}
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                {normalizeRuText(item.brand)} {normalizeRuText(item.model)} • {getLockTypeLabel(item.lock_type)}
+                {normalizeRuText(item.brand)} {normalizeRuText(item.model)} •{" "}
+                {getLockTypeLabel(item.lock_type)}
               </Typography>
             </Box>
             <Chip
@@ -107,7 +112,11 @@ export default function AppointmentCard({
             <Chip
               size="small"
               icon={<ScheduleRoundedIcon />}
-              label={isMobile ? formatLastActivity(item, true) : `Обновлено: ${formatLastActivity(item, false)}`}
+              label={
+                isMobile
+                  ? formatLastActivity(item, true)
+                  : `Обновлено: ${formatLastActivity(item, false)}`
+              }
               variant="outlined"
             />
             <Badge color="primary" badgeContent={unreadCount} max={99}>
@@ -130,7 +139,7 @@ export default function AppointmentCard({
               <Chip
                 size="small"
                 icon={<StorefrontRoundedIcon fontSize="small" />}
-                label="Оптовый клиент"
+                label="B2B-клиент"
                 color="primary"
                 variant="outlined"
               />

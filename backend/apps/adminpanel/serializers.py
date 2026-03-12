@@ -11,6 +11,7 @@ from apps.accounts.models import (
 )
 from apps.accounts.serializers import ClientStatsSerializer, MasterStatsSerializer
 from apps.appointments.models import Appointment, AppointmentEvent, AppointmentEventType, PaymentMethodChoices
+from apps.common.secure_media import build_appointment_media_url, build_user_media_url
 
 
 class BanUserSerializer(serializers.Serializer):
@@ -74,23 +75,19 @@ class AdminUserSerializer(serializers.ModelSerializer):
             "master_stats",
         )
 
-    def _build_file_url(self, obj: User, field_name: str):
-        file_field = getattr(obj, field_name, None)
-        if not file_field or not getattr(file_field, "url", None):
-            return None
-        request = self.context.get("request")
-        return request.build_absolute_uri(file_field.url) if request else file_field.url
+    def _build_file_url(self, obj: User, field_name: str) -> str | None:
+        return build_user_media_url(self.context.get("request"), obj, field_name)
 
-    def get_wholesale_service_photo_1_url(self, obj: User):
+    def get_wholesale_service_photo_1_url(self, obj: User) -> str | None:
         return self._build_file_url(obj, "wholesale_service_photo_1")
 
-    def get_wholesale_service_photo_2_url(self, obj: User):
+    def get_wholesale_service_photo_2_url(self, obj: User) -> str | None:
         return self._build_file_url(obj, "wholesale_service_photo_2")
 
-    def get_profile_photo_url(self, obj: User):
+    def get_profile_photo_url(self, obj: User) -> str | None:
         return self._build_file_url(obj, "profile_photo")
 
-    def get_wholesale_verified_by_username(self, obj: User):
+    def get_wholesale_verified_by_username(self, obj: User) -> str:
         verifier = getattr(obj, "wholesale_verified_by", None)
         return getattr(verifier, "username", "") if verifier else ""
 
@@ -138,12 +135,16 @@ class AdminSystemActionSerializer(serializers.Serializer):
     ACTION_MIGRATE = "migrate"
     ACTION_COLLECTSTATIC = "collectstatic"
     ACTION_CLEARSESSIONS = "clearsessions"
+    ACTION_FLUSH_EXPIRED_TOKENS = "flushexpiredtokens"
+    ACTION_COMPUTE_DAILY_METRICS = "compute_daily_metrics"
     ACTION_CHECK = "check"
 
     ACTION_CHOICES = (
         (ACTION_MIGRATE, "Применить миграции"),
         (ACTION_COLLECTSTATIC, "Собрать статические файлы"),
         (ACTION_CLEARSESSIONS, "Очистить просроченные сессии"),
+        (ACTION_FLUSH_EXPIRED_TOKENS, "Очистить просроченные токены"),
+        (ACTION_COMPUTE_DAILY_METRICS, "Пересчитать метрики"),
         (ACTION_CHECK, "Проверка конфигурации Django"),
     )
 
@@ -208,10 +209,7 @@ class AdminPaymentRegistryRowSerializer(serializers.ModelSerializer):
         )
 
     def get_payment_proof_url(self, obj: Appointment) -> str | None:
-        if not obj.payment_proof or not getattr(obj.payment_proof, "url", None):
-            return None
-        request = self.context.get("request")
-        return request.build_absolute_uri(obj.payment_proof.url) if request else obj.payment_proof.url
+        return build_appointment_media_url(self.context.get("request"), obj, "payment_proof")
 
     def get_payment_method_label(self, obj: Appointment) -> str:
         if not obj.payment_method:

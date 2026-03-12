@@ -1,7 +1,11 @@
 ﻿from __future__ import annotations
 
+from django.conf import settings
 from django.utils import timezone
 from rest_framework import serializers
+
+from apps.common.secure_media import build_message_file_url, build_quick_reply_media_url
+from apps.common.upload_security import chat_file_upload_policy, quick_reply_media_upload_policy, sanitize_upload
 
 from .models import MasterQuickReply, Message
 
@@ -32,20 +36,19 @@ class MessageSerializer(serializers.ModelSerializer):
             "deleted_at",
             "created_at",
         )
+        extra_kwargs = {
+            "file": {"write_only": True},
+        }
 
     def get_file_url(self, obj: Message) -> str | None:
         if obj.is_deleted:
             return None
-        request = self.context.get("request")
-        if obj.file and hasattr(obj.file, "url"):
-            return request.build_absolute_uri(obj.file.url) if request else obj.file.url
-        return None
+        return build_message_file_url(self.context.get("request"), obj)
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
         if instance.is_deleted:
             data["text"] = None
-            data["file"] = None
             data["file_url"] = None
         return data
 
@@ -54,6 +57,9 @@ class MessageCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Message
         fields = ("text", "file")
+
+    def validate_file(self, value):
+        return sanitize_upload(value, chat_file_upload_policy(settings.CHAT_FILE_MAX_UPLOAD_MB * 1024 * 1024))
 
     def validate(self, attrs):
         text = attrs.get("text", "").strip()
@@ -87,6 +93,9 @@ class MasterQuickReplySerializer(serializers.ModelSerializer):
             "updated_at",
         )
         read_only_fields = ("id", "created_at", "updated_at")
+        extra_kwargs = {
+            "media_file": {"write_only": True},
+        }
 
     def validate_command(self, value: str) -> str:
         command = (value or "").strip()
@@ -103,6 +112,12 @@ class MasterQuickReplySerializer(serializers.ModelSerializer):
 
     def validate_text(self, value: str) -> str:
         return (value or "").strip()
+
+    def validate_media_file(self, value):
+        return sanitize_upload(
+            value,
+            quick_reply_media_upload_policy(settings.QUICK_REPLY_MEDIA_MAX_UPLOAD_MB * 1024 * 1024),
+        )
 
     def validate(self, attrs):
         remove_media = bool(attrs.get("remove_media"))
@@ -129,10 +144,7 @@ class MasterQuickReplySerializer(serializers.ModelSerializer):
         return super().update(instance, validated_data)
 
     def get_media_url(self, obj: MasterQuickReply) -> str | None:
-        request = self.context.get("request")
-        if obj.media_file and hasattr(obj.media_file, "url"):
-            return request.build_absolute_uri(obj.media_file.url) if request else obj.media_file.url
-        return None
+        return build_quick_reply_media_url(self.context.get("request"), obj)
 
     def get_media_kind(self, obj: MasterQuickReply) -> str:
         if not obj.media_file:

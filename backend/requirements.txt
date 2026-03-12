@@ -1,11 +1,24 @@
-﻿Django>=5.1,<6.0
+# Keep broad version ranges here; CI and reproducible installs must also apply
+# backend/requirements.lock.txt as a constraints file.
+Django>=5.1,<6.0
 djangorestframework>=3.15
 djangorestframework-simplejwt>=5.3
+drf-spectacular>=0.28,<0.29
 django-filter>=24.0
 django-cors-headers>=4.4
+channels>=4.1,<5.0
+channels-redis>=4.2,<5.0
+daphne>=4.1,<5.0
 psycopg[binary]>=3.2
 Pillow>=10.0
+cryptography>=44,<47
+boto3>=1.37,<2.0
+django-otp>=1.6,<2.0
+sentry-sdk>=2.54,<3.0
+structlog>=25.5,<26.0
 gunicorn>=22.0
 whitenoise>=6.7
 pytest>=8.2
+pytest-asyncio>=0.24
 pytest-django>=4.8
+websockets>=13,<16

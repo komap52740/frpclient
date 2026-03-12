@@ -30,8 +30,8 @@ def test_register_endpoint_creates_unverified_user_and_token(monkeypatch, settin
         {
             "username": "new_user",
             "email": "oauth_register@example.com",
-            "password": "password123",
-            "password_confirm": "password123",
+            "password": "safe-pass-12345",
+            "password_confirm": "safe-pass-12345",
         },
         format="json",
     )
@@ -60,7 +60,7 @@ def test_google_oauth_start_requires_configuration(settings):
 def test_google_oauth_callback_creates_client_and_redirects(monkeypatch, settings):
     settings.GOOGLE_OAUTH_CLIENT_ID = "google-client-id"
     settings.GOOGLE_OAUTH_CLIENT_SECRET = "google-client-secret"
-    settings.OAUTH_FRONTEND_URL = "https://client.androidmultitool.ru"
+    settings.OAUTH_FRONTEND_URL = "https://frpclient.ru"
 
     monkeypatch.setattr(
         account_views,
@@ -81,7 +81,7 @@ def test_google_oauth_callback_creates_client_and_redirects(monkeypatch, setting
     callback_response = client.get(f"/api/auth/oauth/google/callback/?code=fake_code&state={state}")
 
     assert callback_response.status_code == 302
-    assert callback_response["Location"].startswith("https://client.androidmultitool.ru/login#")
+    assert callback_response["Location"].startswith("https://frpclient.ru/login#")
     assert "oauth_access=" in callback_response["Location"]
     assert "oauth_provider=google" in callback_response["Location"]
     assert User.objects.filter(email="oauth_google@example.com", role=RoleChoices.CLIENT).exists()
@@ -107,7 +107,7 @@ def test_vk_oauth_callback_creates_client_and_redirects(monkeypatch, settings):
     settings.VK_OAUTH_USERINFO_URL = "https://api.vk.test/method/users.get"
     settings.VK_OAUTH_SCOPE = "email"
     settings.VK_OAUTH_API_VERSION = "5.131"
-    settings.OAUTH_FRONTEND_URL = "https://client.androidmultitool.ru"
+    settings.OAUTH_FRONTEND_URL = "https://frpclient.ru"
 
     monkeypatch.setattr(
         account_views,
@@ -129,7 +129,7 @@ def test_vk_oauth_callback_creates_client_and_redirects(monkeypatch, settings):
     callback_response = client.get(f"/api/auth/oauth/vk/callback/?code=fake_code&state={state}")
 
     assert callback_response.status_code == 302
-    assert callback_response["Location"].startswith("https://client.androidmultitool.ru/login#")
+    assert callback_response["Location"].startswith("https://frpclient.ru/login#")
     assert "oauth_access=" in callback_response["Location"]
     assert "oauth_provider=vk" in callback_response["Location"]
     assert User.objects.filter(email="oauth_vk@example.com", role=RoleChoices.CLIENT).exists()
@@ -165,7 +165,7 @@ def test_vk_id_oauth_callback_passes_pkce_data(monkeypatch, settings):
     settings.VK_OAUTH_AUTHORIZE_URL = "https://id.vk.com/authorize"
     settings.VK_OAUTH_TOKEN_URL = "https://id.vk.com/oauth2/auth"
     settings.VK_OAUTH_USERINFO_URL = "https://id.vk.com/oauth2/user_info"
-    settings.OAUTH_FRONTEND_URL = "https://client.androidmultitool.ru"
+    settings.OAUTH_FRONTEND_URL = "https://frpclient.ru"
 
     captured = {}
 

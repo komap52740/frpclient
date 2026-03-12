@@ -97,6 +97,42 @@ class RuleSerializer(serializers.ModelSerializer):
         )
 
 
+class RuleSchemaOptionSerializer(serializers.Serializer):
+    value = serializers.CharField()
+    label = serializers.CharField()
+
+
+class RuleSchemaFieldSerializer(serializers.Serializer):
+    value = serializers.CharField()
+    label = serializers.CharField()
+    type = serializers.CharField()
+    supported_operators = serializers.ListField(child=serializers.CharField(), allow_empty=False)
+    options = RuleSchemaOptionSerializer(many=True, required=False)
+
+
+class RuleSchemaActionFieldSerializer(serializers.Serializer):
+    key = serializers.CharField()
+    label = serializers.CharField()
+    type = serializers.CharField()
+    required = serializers.BooleanField(default=False)
+    options = RuleSchemaOptionSerializer(many=True, required=False)
+
+
+class RuleSchemaActionSerializer(serializers.Serializer):
+    value = serializers.CharField()
+    label = serializers.CharField()
+    fields = RuleSchemaActionFieldSerializer(many=True, required=False)
+
+
+class RuleSchemaSerializer(serializers.Serializer):
+    event_types = RuleSchemaOptionSerializer(many=True)
+    condition_fields = RuleSchemaFieldSerializer(many=True)
+    operators = RuleSchemaOptionSerializer(many=True)
+    actions = RuleSchemaActionSerializer(many=True)
+    roles = RuleSchemaOptionSerializer(many=True)
+    notification_targets = RuleSchemaOptionSerializer(many=True)
+
+
 class DailyMetricsSerializer(serializers.ModelSerializer):
     class Meta:
         model = DailyMetrics

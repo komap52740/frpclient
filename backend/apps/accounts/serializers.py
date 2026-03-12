@@ -3,10 +3,14 @@
 from collections.abc import Mapping
 
 from django.conf import settings
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.utils import timezone
 from rest_framework import serializers
 
 from apps.appointments.models import Appointment, AppointmentStatusChoices
+from apps.chat.models import Message, ReadState
+from apps.common.secure_media import build_user_media_url
 from apps.reviews.models import Review, ReviewTypeChoices
 
 from .models import (
@@ -18,6 +22,14 @@ from .models import (
     WholesaleStatusChoices,
 )
 from .telegram import verify_telegram_login
+
+
+def _validate_user_password(value: str, *, user: User | None = None) -> str:
+    try:
+        validate_password(value, user=user)
+    except DjangoValidationError as exc:
+        raise serializers.ValidationError(list(exc.messages)) from exc
+    return value
 
 
 class ClientStatsSerializer(serializers.ModelSerializer):
@@ -102,11 +114,7 @@ class MeSerializer(serializers.ModelSerializer):
         return MasterStatsSerializer(stats).data if stats else None
 
     def _build_file_url(self, obj: User, field_name: str):
-        file_field = getattr(obj, field_name, None)
-        if not file_field or not getattr(file_field, "url", None):
-            return None
-        request = self.context.get("request")
-        return request.build_absolute_uri(file_field.url) if request else file_field.url
+        return build_user_media_url(self.context.get("request"), obj, field_name)
 
     def get_wholesale_service_photo_1_url(self, obj: User):
         return self._build_file_url(obj, "wholesale_service_photo_1")
@@ -198,8 +206,15 @@ class RegisterSerializer(serializers.Serializer):
     def validate(self, attrs):
         if attrs["password"] != attrs["password_confirm"]:
             raise serializers.ValidationError({"password_confirm": "Пароли не совпадают."})
-        if len(attrs["password"]) < 8:
-            raise serializers.ValidationError({"password": "Пароль должен содержать минимум 8 символов."})
+        candidate_user = User(
+            username=attrs.get("username", ""),
+            email=attrs.get("email", ""),
+            role="client",
+        )
+        try:
+            _validate_user_password(attrs["password"], user=candidate_user)
+        except serializers.ValidationError as exc:
+            raise serializers.ValidationError({"password": exc.detail}) from exc
         return attrs
 
 
@@ -222,9 +237,34 @@ class BootstrapAdminSerializer(serializers.Serializer):
         return value
 
     def validate_password(self, value: str) -> str:
-        if len(value) < 8:
-            raise serializers.ValidationError("Пароль должен содержать минимум 8 символов.")
-        return value
+        candidate_user = User(username=self.initial_data.get("username", ""), role="admin")
+        return _validate_user_password(value, user=candidate_user)
+
+
+class PasswordResetRequestSerializer(serializers.Serializer):
+    email = serializers.EmailField(max_length=254)
+
+    def validate_email(self, value: str) -> str:
+        return (value or "").strip().lower()
+
+
+class PasswordResetConfirmSerializer(serializers.Serializer):
+    token = serializers.CharField(max_length=96)
+    password = serializers.CharField(max_length=255, trim_whitespace=False)
+    password_confirm = serializers.CharField(max_length=255, trim_whitespace=False)
+
+    def validate_token(self, value: str) -> str:
+        return (value or "").strip()
+
+    def validate(self, attrs):
+        if attrs["password"] != attrs["password_confirm"]:
+            raise serializers.ValidationError({"password_confirm": "Пароли не совпадают."})
+        try:
+            user = self.context.get("user")
+            attrs["password"] = _validate_user_password(attrs["password"], user=user)
+        except serializers.ValidationError as exc:
+            raise serializers.ValidationError({"password": exc.detail}) from exc
+        return attrs
 
 
 class WholesaleRequestSerializer(serializers.Serializer):
@@ -314,11 +354,7 @@ class ClientProfileDetailSerializer(serializers.ModelSerializer):
         )
 
     def _build_file_url(self, obj: User, field_name: str):
-        file_field = getattr(obj, field_name, None)
-        if not file_field or not getattr(file_field, "url", None):
-            return None
-        request = self.context.get("request")
-        return request.build_absolute_uri(file_field.url) if request else file_field.url
+        return build_user_media_url(self.context.get("request"), obj, field_name)
 
     def get_wholesale_service_photo_1_url(self, obj: User):
         return self._build_file_url(obj, "wholesale_service_photo_1")
@@ -388,6 +424,49 @@ class ClientProfileDetailSerializer(serializers.ModelSerializer):
             }
             for review in queryset[:20]
         ]
+
+
+class WholesalePortalOrderSerializer(serializers.ModelSerializer):
+    master_username = serializers.CharField(source="assigned_master.username", read_only=True)
+    unread_count = serializers.SerializerMethodField()
+    latest_message_text = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Appointment
+        fields = (
+            "id",
+            "brand",
+            "model",
+            "status",
+            "total_price",
+            "currency",
+            "master_username",
+            "is_wholesale_request",
+            "sla_breached",
+            "unread_count",
+            "latest_message_text",
+            "created_at",
+            "updated_at",
+        )
+
+    def get_unread_count(self, obj: Appointment) -> int:
+        request = self.context.get("request")
+        user = getattr(request, "user", None)
+        if not user or not user.is_authenticated:
+            return 0
+
+        state = ReadState.objects.filter(appointment=obj, user=user).first()
+        last_read_id = state.last_read_message_id if state else 0
+        return obj.messages.filter(id__gt=last_read_id, is_deleted=False).exclude(sender=user).count()
+
+    def get_latest_message_text(self, obj: Appointment) -> str:
+        latest = (
+            Message.objects.filter(appointment=obj, is_deleted=False)
+            .order_by("-id")
+            .values_list("text", flat=True)
+            .first()
+        )
+        return (latest or "").strip()
 
 
 class ProfileUpdateSerializer(serializers.ModelSerializer):

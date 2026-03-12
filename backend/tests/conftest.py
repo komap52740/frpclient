@@ -1,4 +1,4 @@
-﻿import os
+import os
 
-os.environ.setdefault("DB_ENGINE", "sqlite")
-os.environ.setdefault("SECRET_KEY", "test-secret")
+
+os.environ.setdefault("SECRET_KEY", "test-secret-key-not-for-production-only")

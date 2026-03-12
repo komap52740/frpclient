@@ -1,12 +1,13 @@
-﻿import { Component, lazy, Suspense } from "react";
-import { Alert, Box, Button, CircularProgress, Stack, Typography } from "@mui/material";
+﻿import { Alert, Box, Button, CircularProgress, Stack, Typography } from "@mui/material";
+import { Component, lazy, Suspense } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 
-import { useAuth } from "./auth/AuthContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import RoleHomeRedirect from "./components/RoleHomeRedirect";
 import SeoMeta from "./components/SeoMeta";
+import { useAuth } from "./features/auth/hooks/useAuth";
 import MainLayout from "./layouts/MainLayout";
+import { captureClientError } from "./shared/observability/sentry";
 
 function isChunkLoadError(error) {
   const message = String(error?.message || error || "");
@@ -57,7 +58,12 @@ const MasterNewPage = lazyWithRetry(() => import("./pages/master/MasterNewPage")
 const MasterQuickRepliesPage = lazyWithRetry(() => import("./pages/master/MasterQuickRepliesPage"));
 const MasterReviewsPage = lazyWithRetry(() => import("./pages/master/MasterReviewsPage"));
 const RoleProfilePage = lazyWithRetry(() => import("./pages/RoleProfilePage"));
-const RemoteUnlockLandingPage = lazyWithRetry(() => import("./pages/public/RemoteUnlockLandingPage"));
+const RemoteUnlockLandingPage = lazyWithRetry(
+  () => import("./pages/public/RemoteUnlockLandingPage")
+);
+const WholesaleHomePage = lazyWithRetry(() => import("./pages/wholesale/WholesaleHomePage"));
+const WholesaleOrdersPage = lazyWithRetry(() => import("./pages/wholesale/WholesaleOrdersPage"));
+const WholesaleProfilePage = lazyWithRetry(() => import("./pages/wholesale/WholesaleProfilePage"));
 
 function RouteFallback() {
   return (
@@ -91,8 +97,12 @@ class RouteErrorBoundary extends Component {
 
   componentDidCatch(error) {
     // Keep console logging for diagnostics in production.
-    // eslint-disable-next-line no-console
+
     console.error("Route render/load failed:", error);
+    captureClientError(error, {
+      tags: { surface: "route-boundary" },
+      extra: { errorMessage: String(error?.message || "") },
+    });
   }
 
   render() {
@@ -175,6 +185,38 @@ function AuthenticatedLayout() {
             element={
               <ProtectedRoute roles={["client"]}>
                 <ClientProfilePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/wholesale"
+            element={
+              <ProtectedRoute roles={["client"]}>
+                <WholesaleHomePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/wholesale/orders"
+            element={
+              <ProtectedRoute roles={["client"]}>
+                <WholesaleOrdersPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/wholesale/profile"
+            element={
+              <ProtectedRoute roles={["client"]}>
+                <WholesaleProfilePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/wholesale/branding"
+            element={
+              <ProtectedRoute roles={["client"]}>
+                <Navigate to="/wholesale/profile" replace />
               </ProtectedRoute>
             }
           />
@@ -296,11 +338,11 @@ function AuthenticatedLayout() {
           <Route path="/appointments/:id" element={<AppointmentDetailPage />} />
           <Route
             path="/clients/:clientId/profile"
-            element={(
+            element={
               <ProtectedRoute roles={["master", "admin"]}>
                 <ClientProfileDetailPage />
               </ProtectedRoute>
-            )}
+            }
           />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
@@ -310,7 +352,7 @@ function AuthenticatedLayout() {
 }
 
 export default function App() {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const isBannedClient = user?.role === "client" && user?.is_banned;
 
   return (
@@ -319,10 +361,31 @@ export default function App() {
         <SeoMeta />
         <Routes>
           <Route path="/remote-unlock" element={<RemoteUnlockLandingPage />} />
-          <Route path="/login" element={user ? <Navigate to={isBannedClient ? "/banned" : "/"} replace /> : <LoginPage />} />
+          <Route
+            path="/login"
+            element={
+              loading ? (
+                <RouteFallback />
+              ) : user ? (
+                <Navigate to={isBannedClient ? "/banned" : "/"} replace />
+              ) : (
+                <LoginPage />
+              )
+            }
+          />
           <Route
             path="/banned"
-            element={user ? (isBannedClient ? <BannedPage /> : <Navigate to="/" replace />) : <Navigate to="/login" replace />}
+            element={
+              user ? (
+                isBannedClient ? (
+                  <BannedPage />
+                ) : (
+                  <Navigate to="/" replace />
+                )
+              ) : (
+                <Navigate to="/login" replace />
+              )
+            }
           />
           <Route path="/*" element={<AuthenticatedLayout />} />
         </Routes>
@@ -330,4 +393,3 @@ export default function App() {
     </RouteErrorBoundary>
   );
 }
-

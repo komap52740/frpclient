@@ -1,0 +1,11 @@
+[Unit]
+Description=Run FRP Client media backup verification daily
+
+[Timer]
+OnCalendar=*-*-* 03:50:00
+Persistent=true
+RandomizedDelaySec=5m
+Unit=frpclient-media-verify.service
+
+[Install]
+WantedBy=timers.target

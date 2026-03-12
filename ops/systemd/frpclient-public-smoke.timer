@@ -1,0 +1,12 @@
+[Unit]
+Description=Run FRP Client public smoke monitor every 10 minutes
+
+[Timer]
+OnBootSec=3m
+OnUnitActiveSec=10m
+RandomizedDelaySec=60s
+Persistent=true
+Unit=frpclient-public-smoke.service
+
+[Install]
+WantedBy=timers.target

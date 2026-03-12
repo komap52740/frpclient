@@ -39,14 +39,22 @@ export default function StatusStepper({ status, role, compact = false, slaBreach
 
   return (
     <Stack spacing={compact ? 0.7 : 1.05} sx={{ minWidth: 0 }}>
-      <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between" sx={{ minWidth: 0 }}>
+      <Stack
+        direction="row"
+        spacing={1}
+        alignItems="center"
+        justifyContent="space-between"
+        sx={{ minWidth: 0 }}
+      >
         <Typography
           variant={compact ? "caption" : "body2"}
           sx={{ fontWeight: 760, color: ui.color, lineHeight: 1.2, minWidth: 0 }}
         >
           {ui.stepLabel}
         </Typography>
-        {isTerminalError || slaBreached ? <ErrorOutlineRoundedIcon fontSize="small" sx={{ color: ui.color }} /> : null}
+        {isTerminalError || slaBreached ? (
+          <ErrorOutlineRoundedIcon fontSize="small" sx={{ color: ui.color }} />
+        ) : null}
       </Stack>
 
       {compact ? (
@@ -109,7 +117,10 @@ export default function StatusStepper({ status, role, compact = false, slaBreach
             }}
           >
             {STATUS_PROGRESS_ORDER.map((stepStatus) => (
-              <Step key={stepStatus} completed={activeStep > (STEP_INDEX_MAP[stepStatus] ?? 0) || status === "COMPLETED"}>
+              <Step
+                key={stepStatus}
+                completed={activeStep > (STEP_INDEX_MAP[stepStatus] ?? 0) || status === "COMPLETED"}
+              >
                 <StepLabel>{STEP_TITLES[stepStatus]}</StepLabel>
               </Step>
             ))}
@@ -119,7 +130,10 @@ export default function StatusStepper({ status, role, compact = false, slaBreach
 
       {!compact ? (
         <Typography variant="caption" color="text.secondary" sx={{ minHeight: 18 }}>
-          {ui.hint || (role === "master" ? "Если шаг завис, уточните детали у клиента в чате." : "Если не получается — напишите мастеру в чат.")}
+          {ui.hint ||
+            (role === "master"
+              ? "Если шаг завис, уточните детали у клиента в чате."
+              : "Если не получается — напишите мастеру в чат.")}
         </Typography>
       ) : null}
     </Stack>

@@ -1,10 +1,10 @@
+import { CssBaseline, ThemeProvider } from "@mui/material";
 import React, { useMemo, useState } from "react";
 import ReactDOM from "react-dom/client";
-import { BrowserRouter } from "react-router-dom";
-import { CssBaseline, ThemeProvider } from "@mui/material";
 
 import App from "./App";
-import { AuthProvider } from "./auth/AuthContext";
+import { AppProviders } from "./app/providers/AppProviders";
+import { initFrontendObservability } from "./shared/observability/sentry";
 import { createAppTheme } from "./theme";
 import { ThemeModeContext } from "./theme/ThemeModeContext";
 
@@ -49,15 +49,15 @@ function Root() {
     <ThemeModeContext.Provider value={contextValue}>
       <ThemeProvider theme={theme}>
         <CssBaseline />
-        <BrowserRouter>
-          <AuthProvider>
-            <App />
-          </AuthProvider>
-        </BrowserRouter>
+        <AppProviders>
+          <App />
+        </AppProviders>
       </ThemeProvider>
     </ThemeModeContext.Provider>
   );
 }
+
+initFrontendObservability();
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>

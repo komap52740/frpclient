@@ -10,6 +10,7 @@ from .views import (
     PlatformEventListView,
     RuleDetailView,
     RuleListCreateView,
+    RuleSchemaView,
 )
 
 urlpatterns = [
@@ -19,6 +20,7 @@ urlpatterns = [
     path("admin/feature-flags/", FeatureFlagListCreateView.as_view(), name="feature-flags-list"),
     path("admin/feature-flags/<int:flag_id>/", FeatureFlagDetailView.as_view(), name="feature-flags-detail"),
     path("v1/events/", PlatformEventListView.as_view(), name="platform-events-list"),
+    path("v1/admin/rules/schema/", RuleSchemaView.as_view(), name="rules-schema"),
     path("v1/admin/rules/", RuleListCreateView.as_view(), name="rules-list"),
     path("v1/admin/rules/<int:rule_id>/", RuleDetailView.as_view(), name="rules-detail"),
     path("v1/admin/metrics/daily/", DailyMetricsListView.as_view(), name="daily-metrics-list"),

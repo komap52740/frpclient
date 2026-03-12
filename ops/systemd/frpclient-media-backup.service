@@ -1,0 +1,15 @@
+[Unit]
+Description=FRP Client media backup
+Wants=docker.service network-online.target
+After=docker.service network-online.target frpclient-postgres-backup.service
+
+[Service]
+Type=oneshot
+User=root
+WorkingDirectory=/var/www/FRPclient
+Environment=PROJECT_DIR=/var/www/FRPclient
+Environment=BACKUP_DIR=/var/backups/frpclient/media
+Environment=RETENTION_DAYS=14
+Environment=SOURCE_CONTAINER=frp-backend
+Environment=SOURCE_PATH=/app/media
+ExecStart=/bin/sh /var/www/FRPclient/ops/backup/media_backup.sh

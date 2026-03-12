@@ -1,11 +1,13 @@
 import AttachFileRoundedIcon from "@mui/icons-material/AttachFileRounded";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
-import { alpha, useTheme } from "@mui/material/styles";
 import { Box, IconButton, Stack, Typography } from "@mui/material";
+import { alpha, useTheme } from "@mui/material/styles";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import dayjs from "dayjs";
 import "dayjs/locale/ru";
+
+import { accessibleFocusRingSx } from "../../shared/ui/focusStyles";
 import { normalizeRuText } from "../../utils/text";
 
 dayjs.locale("ru");
@@ -27,6 +29,7 @@ export default function ChatThread({
       ref={containerRef}
       onScroll={onScroll}
       spacing={1}
+      data-testid="chat-thread"
       sx={{
         maxHeight: isMobile ? 420 : 460,
         width: "100%",
@@ -56,12 +59,21 @@ export default function ChatThread({
                 <InfoOutlinedIcon sx={{ fontSize: 14, color: "info.main" }} />
                 <Typography
                   variant="caption"
-                  sx={{ fontWeight: 700, color: "text.primary", overflowWrap: "anywhere", textAlign: "center" }}
+                  sx={{
+                    fontWeight: 700,
+                    color: "text.primary",
+                    overflowWrap: "anywhere",
+                    textAlign: "center",
+                  }}
                 >
                   {normalizeRuText(item.text)}
                 </Typography>
               </Stack>
-              <Typography variant="caption" color="text.secondary" sx={{ display: "block", textAlign: "center" }}>
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ display: "block", textAlign: "center" }}
+              >
                 {dayjs(item.created_at).format("DD.MM.YYYY HH:mm")}
               </Typography>
             </Box>
@@ -70,11 +82,13 @@ export default function ChatThread({
 
         const message = item;
         const own = message.sender === currentUserId;
-        const canDelete = !message.is_pending && !message.is_deleted && (own || currentUserRole === "admin");
+        const canDelete =
+          !message.is_pending && !message.is_deleted && (own || currentUserRole === "admin");
 
         return (
           <Box
             key={message.id}
+            data-testid={`chat-message-${message.id}`}
             sx={{
               alignSelf: own ? "flex-end" : "flex-start",
               maxWidth: isMobile ? "92%" : "82%",
@@ -118,7 +132,11 @@ export default function ChatThread({
 
             <Typography
               variant="body2"
-              sx={{ mt: 0.35, color: message.is_deleted ? "text.secondary" : "text.primary", overflowWrap: "anywhere" }}
+              sx={{
+                mt: 0.35,
+                color: message.is_deleted ? "text.secondary" : "text.primary",
+                overflowWrap: "anywhere",
+              }}
             >
               {message.is_deleted ? "Сообщение удалено" : normalizeRuText(message.text)}
             </Typography>
@@ -129,6 +147,7 @@ export default function ChatThread({
                 href={message.file_url}
                 target="_blank"
                 rel="noreferrer"
+                data-testid={`chat-message-file-${message.id}`}
                 sx={{
                   mt: 0.7,
                   display: "inline-flex",
@@ -154,6 +173,7 @@ export default function ChatThread({
                     : isDark
                       ? alpha("#0f172a", 0.7)
                       : alpha("#f7fbff", 0.96),
+                  ...accessibleFocusRingSx,
                 }}
               >
                 <AttachFileRoundedIcon sx={{ fontSize: 14 }} />
@@ -162,7 +182,11 @@ export default function ChatThread({
             ) : null}
 
             {message.is_pending ? (
-              <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.4 }}>
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ display: "block", mt: 0.4 }}
+              >
                 Отправляется...
               </Typography>
             ) : null}
@@ -171,10 +195,12 @@ export default function ChatThread({
               <IconButton
                 size="small"
                 onClick={() => onDeleteMessage?.(message.id)}
+                aria-label="Удалить сообщение"
                 sx={{
                   mt: 0.2,
                   color: "text.secondary",
                   "&:hover": { color: "error.main" },
+                  ...accessibleFocusRingSx,
                 }}
               >
                 <DeleteOutlineIcon fontSize="inherit" />

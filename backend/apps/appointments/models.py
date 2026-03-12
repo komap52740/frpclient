@@ -1,52 +1,32 @@
 ﻿from __future__ import annotations
 
-import os
-
-from django.core.exceptions import ValidationError
+from django.conf import settings
 from django.db import models
 
+from apps.common.crypto_fields import EncryptedTextField
 from apps.common.models import TimeStampedModel
+from apps.common.upload_security import image_upload_policy, payment_proof_upload_policy, validate_upload
 
 
 def validate_image_file(value):
     if not value:
         return
-    ext = os.path.splitext(value.name.lower())[1]
-    if ext not in {".jpg", ".jpeg", ".png"}:
-        raise ValidationError("Разрешены только .jpg/.jpeg/.png")
-    if value.size > 10 * 1024 * 1024:
-        raise ValidationError("Максимальный размер файла 10MB")
+    validate_upload(value, image_upload_policy(settings.LOCK_SCREEN_MAX_UPLOAD_MB * 1024 * 1024))
 
 
 def validate_payment_proof(value):
     if not value:
         return
-    ext = os.path.splitext((value.name or "").lower())[1]
-    allowed_extensions = {".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif", ".pdf"}
-    content_type = (getattr(value, "content_type", "") or "").lower().strip()
-    allowed_content_types = {
-        "image/jpeg",
-        "image/png",
-        "image/webp",
-        "image/heic",
-        "image/heif",
-        "image/heic-sequence",
-        "image/heif-sequence",
-        "application/pdf",
-    }
-    has_allowed_extension = ext in allowed_extensions
-    has_allowed_content_type = content_type in allowed_content_types
-    if not has_allowed_extension and not has_allowed_content_type:
-        raise ValidationError("Чек должен быть jpg/jpeg/png/webp/heic/heif/pdf")
-    if value.size > 100 * 1024 * 1024:
-        raise ValidationError("Максимальный размер файла 100MB")
+    validate_upload(value, payment_proof_upload_policy(settings.PAYMENT_PROOF_MAX_UPLOAD_MB * 1024 * 1024))
 
 
 class LockTypeChoices(models.TextChoices):
-    PIN = "PIN", "PIN"
     GOOGLE = "GOOGLE", "GOOGLE"
+    HUAWEI_ID = "HUAWEI_ID", "HUAWEI_ID"
+    MI_ACC = "MI_ACC", "MI_ACC"
     APPLE_ID = "APPLE_ID", "APPLE_ID"
     OTHER = "OTHER", "OTHER"
+    PIN = "PIN", "PIN"
 
 
 class AppointmentStatusChoices(models.TextChoices):
@@ -86,8 +66,8 @@ class Appointment(TimeStampedModel):
     has_pc = models.BooleanField(default=False)
     contact_phone = models.CharField(max_length=32, blank=True, default="")
     description = models.TextField()
-    rustdesk_id = models.CharField(max_length=64, blank=True, default="")
-    rustdesk_password = models.CharField(max_length=128, blank=True, default="")
+    rustdesk_id = EncryptedTextField(blank=True, default="")
+    rustdesk_password = EncryptedTextField(blank=True, default="")
     photo_lock_screen = models.FileField(
         upload_to="lock_screen/",
         null=True,

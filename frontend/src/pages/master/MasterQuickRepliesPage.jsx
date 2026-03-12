@@ -4,16 +4,7 @@ import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import ImageRoundedIcon from "@mui/icons-material/ImageRounded";
 import SaveRoundedIcon from "@mui/icons-material/SaveRounded";
 import VideoLibraryRoundedIcon from "@mui/icons-material/VideoLibraryRounded";
-import {
-  Alert,
-  Box,
-  Button,
-  Chip,
-  Paper,
-  Stack,
-  TextField,
-  Typography,
-} from "@mui/material";
+import { Alert, Box, Button, Chip, Paper, Stack, TextField, Typography } from "@mui/material";
 import dayjs from "dayjs";
 import "dayjs/locale/ru";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -60,7 +51,8 @@ function extractApiError(err, fallback) {
 
   if (typeof data === "string") {
     const trimmed = data.trim();
-    const looksLikeHtml = trimmed.startsWith("<!DOCTYPE") || trimmed.startsWith("<html") || trimmed.startsWith("<");
+    const looksLikeHtml =
+      trimmed.startsWith("<!DOCTYPE") || trimmed.startsWith("<html") || trimmed.startsWith("<");
     if (looksLikeHtml) {
       return statusFallback;
     }
@@ -108,8 +100,20 @@ function extractApiError(err, fallback) {
 
 function inferMediaKind(fileName = "") {
   const name = String(fileName || "").toLowerCase();
-  if (name.endsWith(".jpg") || name.endsWith(".jpeg") || name.endsWith(".png") || name.endsWith(".webp")) return "image";
-  if (name.endsWith(".mp4") || name.endsWith(".mov") || name.endsWith(".webm") || name.endsWith(".m4v")) return "video";
+  if (
+    name.endsWith(".jpg") ||
+    name.endsWith(".jpeg") ||
+    name.endsWith(".png") ||
+    name.endsWith(".webp")
+  )
+    return "image";
+  if (
+    name.endsWith(".mp4") ||
+    name.endsWith(".mov") ||
+    name.endsWith(".webm") ||
+    name.endsWith(".m4v")
+  )
+    return "video";
   return "file";
 }
 
@@ -245,7 +249,8 @@ export default function MasterQuickRepliesPage() {
         <Stack spacing={0.45}>
           <Typography variant="h5">Быстрые ответы мастера</Typography>
           <Typography variant="body2" color="text.secondary">
-            Создавайте команды вида <b>/1</b>, <b>/оплата</b>. Можно прикреплять фото или видео к шаблону.
+            Создавайте команды вида <b>/1</b>, <b>/оплата</b>. Можно прикреплять фото или видео к
+            шаблону.
           </Typography>
           <Typography variant="caption" color="text.secondary">
             Использование в чате: отправьте <b>/команда</b> и шаблон подставится автоматически.
@@ -304,7 +309,13 @@ export default function MasterQuickRepliesPage() {
               <Chip
                 color="primary"
                 variant="outlined"
-                icon={inferMediaKind(mediaFile.name) === "video" ? <VideoLibraryRoundedIcon /> : <ImageRoundedIcon />}
+                icon={
+                  inferMediaKind(mediaFile.name) === "video" ? (
+                    <VideoLibraryRoundedIcon />
+                  ) : (
+                    <ImageRoundedIcon />
+                  )
+                }
                 label={mediaFile.name}
               />
             ) : null}
@@ -313,7 +324,13 @@ export default function MasterQuickRepliesPage() {
               <Chip
                 variant={removeMedia ? "filled" : "outlined"}
                 color={removeMedia ? "warning" : "default"}
-                icon={activeEditItem.media_kind === "video" ? <VideoLibraryRoundedIcon /> : <ImageRoundedIcon />}
+                icon={
+                  activeEditItem.media_kind === "video" ? (
+                    <VideoLibraryRoundedIcon />
+                  ) : (
+                    <ImageRoundedIcon />
+                  )
+                }
                 label={removeMedia ? "Медиа будет удалено" : "Медиа прикреплено"}
                 onClick={() => setRemoveMedia((prev) => !prev)}
               />
@@ -327,14 +344,27 @@ export default function MasterQuickRepliesPage() {
                   component="video"
                   src={activeEditItem.media_url}
                   controls
-                  sx={{ width: "100%", maxHeight: 280, borderRadius: 2, border: "1px solid", borderColor: "divider" }}
+                  sx={{
+                    width: "100%",
+                    maxHeight: 280,
+                    borderRadius: 2,
+                    border: "1px solid",
+                    borderColor: "divider",
+                  }}
                 />
               ) : (
                 <Box
                   component="img"
                   src={activeEditItem.media_url}
                   alt="media"
-                  sx={{ width: "100%", maxHeight: 280, objectFit: "cover", borderRadius: 2, border: "1px solid", borderColor: "divider" }}
+                  sx={{
+                    width: "100%",
+                    maxHeight: 280,
+                    objectFit: "cover",
+                    borderRadius: 2,
+                    border: "1px solid",
+                    borderColor: "divider",
+                  }}
                 />
               )}
             </Box>
@@ -362,7 +392,9 @@ export default function MasterQuickRepliesPage() {
         <Stack spacing={1.1}>
           <Typography variant="h6">Мои шаблоны</Typography>
           {loading ? (
-            <Typography variant="body2" color="text.secondary">Загружаем...</Typography>
+            <Typography variant="body2" color="text.secondary">
+              Загружаем...
+            </Typography>
           ) : items.length ? (
             items.map((item) => (
               <Box
@@ -380,7 +412,11 @@ export default function MasterQuickRepliesPage() {
                       /{item.command} {item.title ? `— ${item.title}` : ""}
                     </Typography>
                     {item.text ? (
-                      <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: "pre-wrap" }}>
+                      <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        sx={{ whiteSpace: "pre-wrap" }}
+                      >
                         {item.text}
                       </Typography>
                     ) : (
@@ -388,11 +424,23 @@ export default function MasterQuickRepliesPage() {
                         Только медиа
                       </Typography>
                     )}
-                    <Stack direction="row" spacing={0.7} alignItems="center" flexWrap="wrap" useFlexGap>
+                    <Stack
+                      direction="row"
+                      spacing={0.7}
+                      alignItems="center"
+                      flexWrap="wrap"
+                      useFlexGap
+                    >
                       {item.media_url ? (
                         <Chip
                           size="small"
-                          icon={item.media_kind === "video" ? <VideoLibraryRoundedIcon /> : <ImageRoundedIcon />}
+                          icon={
+                            item.media_kind === "video" ? (
+                              <VideoLibraryRoundedIcon />
+                            ) : (
+                              <ImageRoundedIcon />
+                            )
+                          }
                           label={item.media_kind === "video" ? "Видео" : "Фото"}
                           variant="outlined"
                         />
@@ -403,10 +451,21 @@ export default function MasterQuickRepliesPage() {
                     </Stack>
                   </Stack>
                   <Stack direction="row" spacing={0.4}>
-                    <Button size="small" variant="outlined" startIcon={<EditRoundedIcon />} onClick={() => startEdit(item)}>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      startIcon={<EditRoundedIcon />}
+                      onClick={() => startEdit(item)}
+                    >
                       Изменить
                     </Button>
-                    <Button size="small" color="error" variant="outlined" startIcon={<DeleteOutlineRoundedIcon />} onClick={() => onDelete(item.id)}>
+                    <Button
+                      size="small"
+                      color="error"
+                      variant="outlined"
+                      startIcon={<DeleteOutlineRoundedIcon />}
+                      onClick={() => onDelete(item.id)}
+                    >
                       Удалить
                     </Button>
                   </Stack>
@@ -423,4 +482,3 @@ export default function MasterQuickRepliesPage() {
     </Stack>
   );
 }
-

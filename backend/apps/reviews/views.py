@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from django.conf import settings
 from django.db import transaction
 from rest_framework import generics, status
 from rest_framework.response import Response
@@ -10,6 +11,7 @@ from apps.accounts.permissions import IsAdminRole, IsAuthenticatedAndNotBanned
 from apps.accounts.services import recalculate_client_stats, recalculate_master_stats
 from apps.appointments.access import get_appointment_for_user
 from apps.appointments.models import AppointmentStatusChoices
+from apps.common.api_limits import BoundedListAPIView
 from apps.platform.services import emit_event
 
 from .models import BehaviorFlag, BehaviorFlagCode, Review, ReviewTypeChoices
@@ -96,11 +98,15 @@ class ReviewClientView(APIView):
         return Response(ReviewSerializer(review).data, status=status.HTTP_201_CREATED)
 
 
-class MyReviewsView(generics.ListAPIView):
+class MyReviewsView(BoundedListAPIView):
     permission_classes = (IsAuthenticatedAndNotBanned,)
     serializer_class = ReviewSerializer
+    default_list_limit = settings.DEFAULT_API_LIST_LIMIT
+    max_list_limit = settings.MAX_API_LIST_LIMIT
 
     def get_queryset(self):
+        if getattr(self, "swagger_fake_view", False):
+            return Review.objects.none()
         return (
             Review.objects.filter(target=self.request.user)
             .select_related("appointment", "author", "target")
@@ -109,9 +115,11 @@ class MyReviewsView(generics.ListAPIView):
         )
 
 
-class AdminReviewListView(generics.ListAPIView):
+class AdminReviewListView(BoundedListAPIView):
     permission_classes = (IsAuthenticatedAndNotBanned, IsAdminRole)
     serializer_class = ReviewSerializer
+    default_list_limit = settings.ADMIN_API_LIST_LIMIT
+    max_list_limit = settings.ADMIN_API_MAX_LIST_LIMIT
 
     def get_queryset(self):
         queryset = (

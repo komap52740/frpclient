@@ -1,10 +1,18 @@
+version: "2.4"
+
 services:
   postgres:
     image: postgres:16
-    container_name: frp-postgres
+    container_name: ${POSTGRES_CONTAINER_NAME:-frp-postgres}
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
     env_file:
-      - ./backend/.env
+      - ${BACKEND_ENV_FILE:-./backend/.env}
+      - ${BACKEND_SECRETS_FILE:-/etc/frpclient/backend.secrets.env}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -13,27 +21,81 @@ services:
       timeout: 5s
       retries: 10
 
+  redis:
+    image: redis:7-alpine
+    container_name: ${REDIS_CONTAINER_NAME:-frp-redis}
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
   backend:
     build:
       context: ./backend
-    container_name: frp-backend
+    container_name: ${BACKEND_CONTAINER_NAME:-frp-backend}
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
     env_file:
-      - ./backend/.env
+      - ${BACKEND_ENV_FILE:-./backend/.env}
+      - ${BACKEND_SECRETS_FILE:-/etc/frpclient/backend.secrets.env}
     volumes:
+      - ${RUNTIME_STATE_DIR:-./.deploy}:/app/runtime-state:ro
       - backend_media:/app/media
       - backend_static:/app/staticfiles
     depends_on:
       postgres:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     command: >
-      sh -c "python manage.py migrate &&
-             python manage.py collectstatic --noinput &&
-             gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 3 --timeout 120"
+      sh -c "gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 3 --timeout 120"
     expose:
       - "8000"
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz')\""]
+      interval: 20s
+      timeout: 5s
+      retries: 10
+
+  backend-ws:
+    build:
+      context: ./backend
+    container_name: ${BACKEND_WS_CONTAINER_NAME:-frp-backend-ws}
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    env_file:
+      - ${BACKEND_ENV_FILE:-./backend/.env}
+      - ${BACKEND_SECRETS_FILE:-/etc/frpclient/backend.secrets.env}
+    volumes:
+      - ${RUNTIME_STATE_DIR:-./.deploy}:/app/runtime-state:ro
+      - backend_media:/app/media
+      - backend_static:/app/staticfiles
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: >
+      sh -c "daphne -b 0.0.0.0 -p 8001 config.asgi:application"
+    expose:
+      - "8001"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/healthz')\""]
       interval: 20s
       timeout: 5s
       retries: 10
@@ -44,33 +106,39 @@ services:
       dockerfile: Dockerfile.prod
       args:
         VITE_API_BASE_URL: /api
-        VITE_TELEGRAM_BOT_USERNAME: ${VITE_TELEGRAM_BOT_USERNAME:-}
-        VITE_SITE_URL: ${VITE_SITE_URL:-https://client.androidmultitool.ru}
-    container_name: frp-frontend
+        VITE_TELEGRAM_BOT_USERNAME: ${VITE_TELEGRAM_BOT_USERNAME}
+        VITE_BRAND_SUPPORT_TG: ${VITE_BRAND_SUPPORT_TG}
+        VITE_SITE_URL: ${VITE_SITE_URL}
+        VITE_SENTRY_DSN: ${VITE_SENTRY_DSN}
+        VITE_SENTRY_ENVIRONMENT: ${VITE_SENTRY_ENVIRONMENT}
+        VITE_SENTRY_RELEASE: ${VITE_SENTRY_RELEASE}
+        VITE_SENTRY_TRACES_SAMPLE_RATE: ${VITE_SENTRY_TRACES_SAMPLE_RATE}
+    container_name: ${FRONTEND_CONTAINER_NAME:-frp-frontend}
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
     volumes:
       - backend_media:/usr/share/nginx/media:ro
     depends_on:
       backend:
         condition: service_healthy
-    ports:
-      - "${FRONTEND_PORT_BIND:-127.0.0.1:8080:80}"
-
-  telegram-bot:
-    build:
-      context: ./backend
-    container_name: frp-telegram-bot
-    restart: unless-stopped
-    profiles:
-      - bot
-    env_file:
-      - ./backend/.env
-    depends_on:
-      backend:
+      backend-ws:
         condition: service_healthy
-    command: python manage.py run_client_telegram_bot
+    ports:
+      - "${FRONTEND_PORT_BIND}"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/healthz >/dev/null"]
+      interval: 20s
+      timeout: 5s
+      retries: 10
 
 volumes:
   postgres_data:
+    name: ${POSTGRES_VOLUME_NAME:-frpclient_postgres_data}
   backend_media:
+    name: ${BACKEND_MEDIA_VOLUME_NAME:-frpclient_backend_media}
   backend_static:
+    name: ${BACKEND_STATIC_VOLUME_NAME:-frpclient_backend_static}

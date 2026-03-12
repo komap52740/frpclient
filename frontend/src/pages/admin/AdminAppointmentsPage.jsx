@@ -1,4 +1,4 @@
-﻿import SearchIcon from "@mui/icons-material/Search";
+import SearchIcon from "@mui/icons-material/Search";
 import {
   Alert,
   Button,
@@ -17,15 +17,19 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
+import { useQueryClient } from "@tanstack/react-query";
 import dayjs from "dayjs";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Link as RouterLink, useNavigate } from "react-router-dom";
 
-import { adminApi, authApi } from "../../api/client";
+import { adminApi } from "../../api/client";
 import KpiCard from "../../components/KpiCard";
 import StatusChip from "../../components/StatusChip";
 import { APPOINTMENT_STATUS_OPTIONS, getStatusLabel } from "../../constants/labels";
-import useAutoRefresh from "../../hooks/useAutoRefresh";
+import { useMasterQueueRealtime } from "../../features/appointments/master-inbox/hooks/useMasterQueueRealtime";
+import { useDashboardSummaryQuery } from "../../features/dashboard/hooks/useDashboardSummaryQuery";
+import { useAdminAppointmentsQuery } from "../../features/platform/admin-dashboard/hooks/useAdminAppointmentsQuery";
+import { cleanQueryParams, queryKeys } from "../../shared/api/queryKeys";
 
 const URGENT_STATUSES = new Set(["PAYMENT_PROOF_UPLOADED", "AWAITING_PAYMENT", "IN_PROGRESS"]);
 
@@ -48,54 +52,65 @@ function sortRows(rows = []) {
 
 export default function AdminAppointmentsPage() {
   const navigate = useNavigate();
-  const [rows, setRows] = useState([]);
-  const [summary, setSummary] = useState(null);
-  const [filters, setFilters] = useState({ status: "", master: "", client: "", date_from: "", date_to: "" });
-  const [error, setError] = useState("");
+  const queryClient = useQueryClient();
+  const [filters, setFilters] = useState({
+    status: "",
+    master: "",
+    client: "",
+    date_from: "",
+    date_to: "",
+  });
+  const [actionError, setActionError] = useState("");
   const [viewMode, setViewMode] = useState("urgent");
   const [deletingId, setDeletingId] = useState(null);
+  const queryFilters = useMemo(() => cleanQueryParams(filters), [filters]);
+  const {
+    data: rawRows = [],
+    error: rowsError,
+    refetch: refetchRows,
+  } = useAdminAppointmentsQuery(queryFilters);
+  const {
+    data: summary = null,
+    error: summaryError,
+    refetch: refetchSummary,
+  } = useDashboardSummaryQuery();
+  const rows = useMemo(() => sortRows(rawRows), [rawRows]);
+  const error =
+    actionError || (rowsError || summaryError ? "Не удалось загрузить список заявок" : "");
 
-  const load = useCallback(async ({ silent = false } = {}) => {
-    try {
-      const params = Object.fromEntries(Object.entries(filters).filter(([, v]) => v !== ""));
-      const [appointmentsResponse, summaryData] = await Promise.all([
-        adminApi.appointments(params),
-        authApi.dashboardSummary(),
-      ]);
-      setRows(sortRows(appointmentsResponse.data || []));
-      setSummary(summaryData.counts || {});
-      setError("");
-    } catch {
-      if (!silent) {
-        setError("Не удалось загрузить список заявок");
-      }
-    }
-  }, [filters]);
+  const refreshData = useCallback(async () => {
+    await Promise.all([refetchRows(), refetchSummary()]);
+  }, [refetchRows, refetchSummary]);
 
-  useEffect(() => {
-    load();
-  }, [load]);
+  const invalidateData = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: queryKeys.admin.appointmentsRoot() });
+    queryClient.invalidateQueries({ queryKey: queryKeys.auth.dashboardRoot() });
+  }, [queryClient]);
 
-  useAutoRefresh(() => load({ silent: true }), { intervalMs: 7000 });
+  useMasterQueueRealtime({
+    onConnected: invalidateData,
+    onQueueEvent: invalidateData,
+  });
 
   const urgentRows = useMemo(() => rows.filter(isUrgent), [rows]);
-  const visibleRows = useMemo(() => (viewMode === "urgent" ? urgentRows : rows), [rows, urgentRows, viewMode]);
+  const visibleRows = useMemo(
+    () => (viewMode === "urgent" ? urgentRows : rows),
+    [rows, urgentRows, viewMode]
+  );
   const focusRow = visibleRows[0] || rows[0] || null;
 
   const handleDeleteAppointment = async (row) => {
     if (!row?.id || deletingId) return;
-    const shouldDelete = window.confirm(
-      `Удалить заявку #${row.id}? Это действие нельзя отменить.`
-    );
+    const shouldDelete = window.confirm(`Удалить заявку #${row.id}? Это действие нельзя отменить.`);
     if (!shouldDelete) return;
 
     setDeletingId(row.id);
-    setError("");
+    setActionError("");
     try {
       await adminApi.deleteAppointment(row.id);
-      await load({ silent: true });
+      await refreshData();
     } catch {
-      setError("Не удалось удалить заявку. Попробуйте снова.");
+      setActionError("Не удалось удалить заявку. Попробуйте снова.");
     } finally {
       setDeletingId(null);
     }
@@ -107,11 +122,19 @@ export default function AdminAppointmentsPage() {
 
       <Paper sx={{ p: 1.4, borderRadius: 3 }}>
         <Stack spacing={1}>
-          <Stack direction={{ xs: "column", sm: "row" }} spacing={1} justifyContent="space-between" alignItems={{ xs: "flex-start", sm: "center" }}>
+          <Stack
+            direction={{ xs: "column", sm: "row" }}
+            spacing={1}
+            justifyContent="space-between"
+            alignItems={{ xs: "flex-start", sm: "center" }}
+          >
             <Tabs
               value={viewMode}
               onChange={(_, value) => setViewMode(value)}
-              sx={{ minHeight: 38, "& .MuiTab-root": { minHeight: 38, textTransform: "none", fontWeight: 700 } }}
+              sx={{
+                minHeight: 38,
+                "& .MuiTab-root": { minHeight: 38, textTransform: "none", fontWeight: 700 },
+              }}
             >
               <Tab value="urgent" label={`Срочные (${urgentRows.length})`} />
               <Tab value="all" label={`Все (${rows.length})`} />
@@ -124,14 +147,19 @@ export default function AdminAppointmentsPage() {
                 label={`SLA/оплата: ${urgentRows.length}`}
               />
               {focusRow ? (
-                <Button variant="contained" size="small" onClick={() => navigate(`/appointments/${focusRow.id}`)}>
+                <Button
+                  variant="contained"
+                  size="small"
+                  onClick={() => navigate(`/appointments/${focusRow.id}`)}
+                >
                   Открыть первую
                 </Button>
               ) : null}
             </Stack>
           </Stack>
           <Typography variant="caption" color="text.secondary">
-            Срочные: заявки с риском SLA, с непрочитанными сообщениями и с ожиданием оплаты/проверки чека.
+            Срочные: заявки с риском SLA, с непрочитанными сообщениями и с ожиданием оплаты/проверки
+            чека.
           </Typography>
         </Stack>
       </Paper>
@@ -147,7 +175,11 @@ export default function AdminAppointmentsPage() {
           <KpiCard title="Активные" value={summary?.appointments_active ?? "-"} accent="#2e8a66" />
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
-          <KpiCard title="Ждут подтверждение" value={summary?.payments_waiting_confirmation ?? "-"} accent="#bf4342" />
+          <KpiCard
+            title="Ждут подтверждение"
+            value={summary?.payments_waiting_confirmation ?? "-"}
+            accent="#bf4342"
+          />
         </Grid>
       </Grid>
 
@@ -162,14 +194,36 @@ export default function AdminAppointmentsPage() {
           >
             <MenuItem value="">Все</MenuItem>
             {APPOINTMENT_STATUS_OPTIONS.map((status) => (
-              <MenuItem key={status} value={status}>{getStatusLabel(status)}</MenuItem>
+              <MenuItem key={status} value={status}>
+                {getStatusLabel(status)}
+              </MenuItem>
             ))}
           </TextField>
-          <TextField label="ID мастера" value={filters.master} onChange={(e) => setFilters((prev) => ({ ...prev, master: e.target.value }))} />
-          <TextField label="ID клиента" value={filters.client} onChange={(e) => setFilters((prev) => ({ ...prev, client: e.target.value }))} />
-          <TextField type="date" label="С" InputLabelProps={{ shrink: true }} value={filters.date_from} onChange={(e) => setFilters((prev) => ({ ...prev, date_from: e.target.value }))} />
-          <TextField type="date" label="По" InputLabelProps={{ shrink: true }} value={filters.date_to} onChange={(e) => setFilters((prev) => ({ ...prev, date_to: e.target.value }))} />
-          <Button variant="contained" onClick={load} startIcon={<SearchIcon />}>
+          <TextField
+            label="ID мастера"
+            value={filters.master}
+            onChange={(e) => setFilters((prev) => ({ ...prev, master: e.target.value }))}
+          />
+          <TextField
+            label="ID клиента"
+            value={filters.client}
+            onChange={(e) => setFilters((prev) => ({ ...prev, client: e.target.value }))}
+          />
+          <TextField
+            type="date"
+            label="С"
+            InputLabelProps={{ shrink: true }}
+            value={filters.date_from}
+            onChange={(e) => setFilters((prev) => ({ ...prev, date_from: e.target.value }))}
+          />
+          <TextField
+            type="date"
+            label="По"
+            InputLabelProps={{ shrink: true }}
+            value={filters.date_to}
+            onChange={(e) => setFilters((prev) => ({ ...prev, date_to: e.target.value }))}
+          />
+          <Button variant="contained" onClick={refreshData} startIcon={<SearchIcon />}>
             Фильтр
           </Button>
         </Stack>
@@ -207,10 +261,21 @@ export default function AdminAppointmentsPage() {
                   <TableCell>{row.client_username || row.client}</TableCell>
                   <TableCell>{row.master_username || row.assigned_master || "-"}</TableCell>
                   <TableCell>
-                    <Stack direction="row" spacing={0.6} alignItems="center" flexWrap="wrap" useFlexGap>
+                    <Stack
+                      direction="row"
+                      spacing={0.6}
+                      alignItems="center"
+                      flexWrap="wrap"
+                      useFlexGap
+                    >
                       <StatusChip status={row.status} />
                       {(row.unread_count || 0) > 0 ? (
-                        <Chip size="small" color="primary" variant="outlined" label={`Сообщения: ${row.unread_count}`} />
+                        <Chip
+                          size="small"
+                          color="primary"
+                          variant="outlined"
+                          label={`Сообщения: ${row.unread_count}`}
+                        />
                       ) : null}
                       {row.sla_breached ? (
                         <Chip size="small" color="error" variant="filled" label="SLA риск" />

@@ -7,7 +7,7 @@ import { alpha, useTheme } from "@mui/material/styles";
 import { useEffect, useMemo, useState } from "react";
 
 import { authApi } from "../api/client";
-import { useAuth } from "../auth/AuthContext";
+import { useAuth } from "../features/auth/hooks/useAuth";
 
 function getRoleTitle(role) {
   if (role === "master") return "Профиль мастера";
@@ -155,8 +155,21 @@ export default function RoleProfilePage() {
                 fontWeight: 760,
               }}
             />
-            {user?.is_master_active ? <Chip size="small" icon={<CheckCircleRoundedIcon />} color="success" label="Активен" /> : null}
-            {user?.telegram_username ? <Chip size="small" label={`Telegram: @${user.telegram_username}`} variant="outlined" /> : null}
+            {user?.is_master_active ? (
+              <Chip
+                size="small"
+                icon={<CheckCircleRoundedIcon />}
+                color="success"
+                label="Активен"
+              />
+            ) : null}
+            {user?.telegram_username ? (
+              <Chip
+                size="small"
+                label={`Telegram: @${user.telegram_username}`}
+                variant="outlined"
+              />
+            ) : null}
           </Stack>
         </Stack>
       </Paper>
@@ -167,7 +180,8 @@ export default function RoleProfilePage() {
           borderRadius: 1.8,
           border: "1px solid",
           borderColor: "divider",
-          backgroundColor: theme.palette.mode === "dark" ? "rgba(8, 14, 24, 0.86)" : "rgba(255, 255, 255, 0.95)",
+          backgroundColor:
+            theme.palette.mode === "dark" ? "rgba(8, 14, 24, 0.86)" : "rgba(255, 255, 255, 0.95)",
         }}
       >
         <Stack spacing={1.2}>
@@ -190,7 +204,11 @@ export default function RoleProfilePage() {
           />
 
           <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
-            <Button component="label" variant="outlined" startIcon={<AddPhotoAlternateRoundedIcon />}>
+            <Button
+              component="label"
+              variant="outlined"
+              startIcon={<AddPhotoAlternateRoundedIcon />}
+            >
               {form.profile_photo ? "Заменить фото" : "Загрузить фото"}
               <input
                 hidden
@@ -219,7 +237,12 @@ export default function RoleProfilePage() {
             </Typography>
           ) : null}
 
-          <Button variant="contained" onClick={submit} disabled={loading} sx={{ alignSelf: "flex-start" }}>
+          <Button
+            variant="contained"
+            onClick={submit}
+            disabled={loading}
+            sx={{ alignSelf: "flex-start" }}
+          >
             {loading ? "Сохраняем..." : "Сохранить профиль"}
           </Button>
         </Stack>

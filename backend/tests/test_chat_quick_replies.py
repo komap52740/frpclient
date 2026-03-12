@@ -8,6 +8,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from apps.accounts.models import RoleChoices, User
 from apps.appointments.models import Appointment, AppointmentStatusChoices
 from apps.chat.models import MasterQuickReply, Message
+from upload_helpers import make_test_image_upload, make_test_mp4_upload
 
 
 def auth_as(user: User) -> APIClient:
@@ -114,7 +115,7 @@ def test_master_quick_reply_can_attach_media(master_user, client_user):
         status=AppointmentStatusChoices.IN_PROGRESS,
     )
 
-    media = SimpleUploadedFile("guide.mp4", b"fake-video", content_type="video/mp4")
+    media = make_test_mp4_upload("guide.mp4")
     create_response = auth_as(master_user).post(
         "/api/chat/quick-replies/",
         {
@@ -200,7 +201,7 @@ def test_client_file_message_without_text_is_allowed(client_user, master_user):
         status=AppointmentStatusChoices.IN_PROGRESS,
     )
 
-    test_file = SimpleUploadedFile("check.jpg", b"fake-jpeg", content_type="image/jpeg")
+    test_file = make_test_image_upload("check.jpg")
     response = auth_as(client_user).post(
         f"/api/appointments/{appointment.id}/messages/",
         {"file": test_file},

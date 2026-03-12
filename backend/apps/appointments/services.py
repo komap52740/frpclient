@@ -6,7 +6,7 @@ from django.db import transaction
 from django.utils import timezone
 from rest_framework.exceptions import PermissionDenied, ValidationError
 
-from apps.accounts.models import RoleChoices, User
+from apps.accounts.models import MasterLevelChoices, RoleChoices, User
 from apps.platform.services import emit_event
 
 from .models import (
@@ -86,6 +86,35 @@ def evaluate_completion_sla(appointment: Appointment, actor: User | None) -> Non
         mark_sla_breach(appointment, actor, reason="completion_timeout", metadata={"overtime_seconds": overtime_seconds})
 
 
+def get_available_new_appointments_queryset_for_master(master: User):
+    if (
+        master.role != RoleChoices.MASTER
+        or not master.is_master_active
+        or not master.master_quality_approved
+        or master.is_banned
+    ):
+        return Appointment.objects.none()
+
+    queryset = Appointment.objects.filter(
+        status=AppointmentStatusChoices.NEW,
+        assigned_master__isnull=True,
+    )
+    if master.master_level == MasterLevelChoices.TRAINEE:
+        queryset = queryset.filter(is_wholesale_request=False)
+    return queryset
+
+
+def assert_master_can_take_new_appointment(appointment: Appointment, master: User) -> None:
+    if master.role != RoleChoices.MASTER:
+        raise PermissionDenied("Только мастер может брать заявку")
+    if not master.is_master_active:
+        raise PermissionDenied("Мастер ещё не активирован администратором")
+    if not master.master_quality_approved:
+        raise PermissionDenied("Мастер должен пройти проверку качества перед взятием заявок")
+    if appointment.is_wholesale_request and master.master_level == MasterLevelChoices.TRAINEE:
+        raise PermissionDenied("Стажер не может брать оптовые заявки")
+
+
 def transition_status(appointment: Appointment, actor: User, to_status: str, note: str = "") -> Appointment:
     from_status = appointment.status
     appointment.status = to_status
@@ -144,14 +173,10 @@ def transition_status(appointment: Appointment, actor: User, to_status: str, not
 
 @transaction.atomic
 def take_appointment(appointment_id: int, master: User) -> Appointment:
-    if master.role != RoleChoices.MASTER:
-        raise PermissionDenied("Только мастер может брать заявку")
-    if not master.is_master_active:
-        raise PermissionDenied("Мастер ещё не активирован администратором")
-
     appointment = Appointment.objects.select_for_update().get(id=appointment_id)
     if appointment.status != AppointmentStatusChoices.NEW:
         raise ValidationError("Можно взять только NEW заявку")
+    assert_master_can_take_new_appointment(appointment, master)
 
     appointment.assigned_master = master
     appointment.save(update_fields=["assigned_master", "updated_at"])

@@ -14,7 +14,7 @@ class Command(BaseCommand):
             "--frontend-url",
             type=str,
             default=settings.TELEGRAM_CLIENT_BOT_FRONTEND_URL,
-            help="Публичный URL фронтенда для ссылок (например https://client.androidmultitool.ru).",
+            help="Публичный URL фронтенда для ссылок (например https://frpclient.ru).",
         )
         parser.add_argument(
             "--keep-pending",
@@ -25,7 +25,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         token = settings.TELEGRAM_BOT_TOKEN
         if not token:
-            raise CommandError("TELEGRAM_BOT_TOKEN не задан в backend/.env")
+            raise CommandError("TELEGRAM_BOT_TOKEN не задан в backend/.env / BACKEND_SECRETS_FILE")
 
         frontend_url = options.get("frontend_url") or ""
         keep_pending = bool(options.get("keep_pending"))
@@ -33,4 +33,3 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS("Client Telegram bot started"))
         bot = ClientTelegramBot(token=token, frontend_url=frontend_url)
         bot.run_forever(drop_pending_updates=not keep_pending)
-

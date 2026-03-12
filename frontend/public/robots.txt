@@ -8,4 +8,4 @@ Disallow: /appointments/
 Disallow: /clients/
 Disallow: /django-admin/
 
-Sitemap: https://client.androidmultitool.ru/sitemap.xml
+Sitemap: https://frpclient.ru/sitemap.xml

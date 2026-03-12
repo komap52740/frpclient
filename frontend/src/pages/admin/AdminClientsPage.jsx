@@ -21,13 +21,19 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { adminApi } from "../../api/client";
-import { useAuth } from "../../auth/AuthContext";
+import { useAuth } from "../../features/auth/hooks/useAuth";
+import { getB2BPriorityMeta, getB2BStatusMeta } from "../../shared/lib/b2bLabels";
 
 function WholesaleStatusChip({ status }) {
-  if (status === "approved") return <Chip size="small" color="success" label="Опт: одобрено" />;
-  if (status === "pending") return <Chip size="small" color="warning" variant="outlined" label="Опт: на рассмотрении" />;
-  if (status === "rejected") return <Chip size="small" color="error" variant="outlined" label="Опт: отклонено" />;
-  return <Chip size="small" variant="outlined" label="Опт: не запрошено" />;
+  const meta = getB2BStatusMeta(status);
+  return (
+    <Chip
+      size="small"
+      color={meta.chipColor}
+      variant={meta.chipVariant}
+      label={`B2B: ${meta.label}`}
+    />
+  );
 }
 
 const WHOLESALE_PRIORITY_OPTIONS = [
@@ -37,14 +43,15 @@ const WHOLESALE_PRIORITY_OPTIONS = [
 ];
 
 function WholesalePriorityChip({ value }) {
-  const item = WHOLESALE_PRIORITY_OPTIONS.find((option) => option.value === value) || WHOLESALE_PRIORITY_OPTIONS[0];
-  if (item.value === "critical") {
-    return <Chip size="small" color="error" label={`PRO: ${item.label}`} />;
-  }
-  if (item.value === "priority") {
-    return <Chip size="small" color="warning" label={`PRO: ${item.label}`} />;
-  }
-  return <Chip size="small" variant="outlined" label={`PRO: ${item.label}`} />;
+  const item = getB2BPriorityMeta(value);
+  return (
+    <Chip
+      size="small"
+      color={item.chipColor}
+      variant={item.chipVariant}
+      label={`B2B PRO: ${item.label}`}
+    />
+  );
 }
 
 function formatDateTime(value) {
@@ -149,7 +156,7 @@ export default function AdminClientsPage() {
         data?.detail ||
         (Array.isArray(data?.non_field_errors) ? data.non_field_errors[0] : null) ||
         (Array.isArray(data?.discount_percent) ? data.discount_percent[0] : null);
-      setError(detail || "Не удалось обработать оптовую заявку");
+      setError(detail || "Не удалось обработать B2B-заявку");
     } finally {
       setSavingId(0);
     }
@@ -207,7 +214,7 @@ export default function AdminClientsPage() {
   return (
     <Stack spacing={2}>
       <Stack spacing={1}>
-        <Typography variant="h5">{canPriorityManage ? "Клиенты и Service Center PRO" : "Клиенты"}</Typography>
+        <Typography variant="h5">{canPriorityManage ? "Клиенты и B2B PRO" : "Клиенты"}</Typography>
         <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
           <Chip size="small" variant="outlined" label={`Всего: ${stats.total}`} />
           <Chip
@@ -250,7 +257,7 @@ export default function AdminClientsPage() {
           <TextField
             select
             size="small"
-            label="Опт-статус"
+            label="B2B-статус"
             value={statusFilter}
             onChange={(event) => setStatusFilter(event.target.value)}
             sx={{ minWidth: { xs: "100%", md: 220 } }}
@@ -304,24 +311,48 @@ export default function AdminClientsPage() {
                   sx={{ width: "100%", pr: 1 }}
                 >
                   <Stack spacing={0.6} sx={{ minWidth: 0 }}>
-                    <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
+                    <Stack
+                      direction="row"
+                      spacing={1}
+                      alignItems="center"
+                      flexWrap="wrap"
+                      useFlexGap
+                    >
                       <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
                         {row.username}
                       </Typography>
                       <WholesaleStatusChip status={row.wholesale_status} />
-                      {serviceCenterPro ? <Chip size="small" color="success" label="Service Center PRO" /> : null}
+                      {serviceCenterPro ? (
+                        <Chip size="small" color="success" label="B2B PRO" />
+                      ) : null}
                       <WholesalePriorityChip value={row.wholesale_priority} />
                       {row.appointments_sla_breached ? (
-                        <Chip size="small" color="error" variant="outlined" label={`SLA: ${row.appointments_sla_breached}`} />
+                        <Chip
+                          size="small"
+                          color="error"
+                          variant="outlined"
+                          label={`SLA: ${row.appointments_sla_breached}`}
+                        />
                       ) : null}
-                      {row.is_banned ? <Chip size="small" color="error" variant="outlined" label="Заблокирован" /> : null}
+                      {row.is_banned ? (
+                        <Chip size="small" color="error" variant="outlined" label="Заблокирован" />
+                      ) : null}
                     </Stack>
-                    <Typography variant="caption" color="text.secondary" sx={{ maxWidth: 560 }} noWrap>
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      sx={{ maxWidth: 560 }}
+                      noWrap
+                    >
                       {company || "Без названия сервиса"}
                       {city || address ? ` • ${[city, address].filter(Boolean).join(", ")}` : ""}
                     </Typography>
                   </Stack>
-                  <Button size="small" variant="outlined" onClick={() => navigate(`/clients/${row.id}/profile`)}>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    onClick={() => navigate(`/clients/${row.id}/profile`)}
+                  >
                     Профиль
                   </Button>
                 </Stack>
@@ -329,8 +360,16 @@ export default function AdminClientsPage() {
               <AccordionDetails>
                 <Stack spacing={1.2}>
                   <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-                    <Chip size="small" variant="outlined" label={`История: ${row.appointments_total || 0}`} />
-                    <Chip size="small" variant="outlined" label={`Активные: ${row.appointments_active || 0}`} />
+                    <Chip
+                      size="small"
+                      variant="outlined"
+                      label={`История: ${row.appointments_total || 0}`}
+                    />
+                    <Chip
+                      size="small"
+                      variant="outlined"
+                      label={`Активные: ${row.appointments_active || 0}`}
+                    />
                     <Chip
                       size="small"
                       color={row.appointments_sla_breached ? "error" : "default"}
@@ -377,12 +416,20 @@ export default function AdminClientsPage() {
                   {row.wholesale_service_photo_1_url || row.wholesale_service_photo_2_url ? (
                     <Stack direction="row" spacing={1}>
                       {row.wholesale_service_photo_1_url ? (
-                        <Link href={row.wholesale_service_photo_1_url} target="_blank" rel="noreferrer">
+                        <Link
+                          href={row.wholesale_service_photo_1_url}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
                           Фото 1
                         </Link>
                       ) : null}
                       {row.wholesale_service_photo_2_url ? (
-                        <Link href={row.wholesale_service_photo_2_url} target="_blank" rel="noreferrer">
+                        <Link
+                          href={row.wholesale_service_photo_2_url}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
                           Фото 2
                         </Link>
                       ) : null}
@@ -393,7 +440,7 @@ export default function AdminClientsPage() {
                     <Paper variant="outlined" sx={{ p: 1.2, borderRadius: 1.4 }}>
                       <Stack spacing={1}>
                         <Typography variant="caption" color="text.secondary">
-                          Ручной приоритет Service Center PRO
+                          Ручной приоритет B2B PRO
                         </Typography>
                         <TextField
                           select
@@ -450,7 +497,9 @@ export default function AdminClientsPage() {
                       size="small"
                       label="Причина бана"
                       value={reasonById[row.id] || row.ban_reason || ""}
-                      onChange={(event) => setReasonById((prev) => ({ ...prev, [row.id]: event.target.value }))}
+                      onChange={(event) =>
+                        setReasonById((prev) => ({ ...prev, [row.id]: event.target.value }))
+                      }
                     />
                   ) : null}
 
@@ -472,18 +521,41 @@ export default function AdminClientsPage() {
                   {canReview ? (
                     <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
                       {row.is_banned ? (
-                        <Button size="small" color="success" variant="outlined" disabled={isSaving} onClick={() => unban(row.id)}>
+                        <Button
+                          size="small"
+                          color="success"
+                          variant="outlined"
+                          disabled={isSaving}
+                          onClick={() => unban(row.id)}
+                        >
                           Разбанить
                         </Button>
                       ) : (
-                        <Button size="small" color="error" variant="outlined" disabled={isSaving} onClick={() => ban(row.id)}>
+                        <Button
+                          size="small"
+                          color="error"
+                          variant="outlined"
+                          disabled={isSaving}
+                          onClick={() => ban(row.id)}
+                        >
                           Забанить
                         </Button>
                       )}
-                      <Button size="small" variant="contained" disabled={isSaving} onClick={() => reviewWholesale(row.id, "approve")}>
-                        Одобрить опт
+                      <Button
+                        size="small"
+                        variant="contained"
+                        disabled={isSaving}
+                        onClick={() => reviewWholesale(row.id, "approve")}
+                      >
+                        Одобрить B2B
                       </Button>
-                      <Button size="small" variant="outlined" color="warning" disabled={isSaving} onClick={() => reviewWholesale(row.id, "reject")}>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        color="warning"
+                        disabled={isSaving}
+                        onClick={() => reviewWholesale(row.id, "reject")}
+                      >
                         Отклонить
                       </Button>
                     </Stack>

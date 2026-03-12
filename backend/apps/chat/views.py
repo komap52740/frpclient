@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from django.conf import settings
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import status
@@ -11,6 +12,7 @@ from apps.accounts.permissions import IsAuthenticatedAndNotBanned
 from apps.appointments.access import get_appointment_for_user
 from apps.appointments.models import AppointmentEventType
 from apps.appointments.services import add_event, evaluate_response_sla
+from apps.common.api_limits import parse_non_negative_int_param, serialize_bounded_queryset
 from apps.platform.services import emit_event
 
 from .models import MasterQuickReply, Message, ReadState
@@ -61,10 +63,16 @@ class AppointmentMessagesView(APIView):
 
     def get(self, request, appointment_id: int):
         appointment = get_appointment_for_user(request.user, appointment_id)
-        after_id = int(request.query_params.get("after_id", "0") or 0)
-        queryset = appointment.messages.filter(id__gt=after_id).select_related("sender")
-        data = MessageSerializer(queryset, many=True, context={"request": request}).data
-        return Response(data)
+        after_id = parse_non_negative_int_param(request.query_params.get("after_id"), field_name="after_id", default=0)
+        queryset = appointment.messages.filter(id__gt=after_id).select_related("sender").order_by("id")
+        return serialize_bounded_queryset(
+            request,
+            queryset,
+            MessageSerializer,
+            serializer_context={"request": request},
+            default_limit=settings.CHAT_MESSAGES_LIST_LIMIT,
+            max_limit=settings.CHAT_MESSAGES_MAX_LIST_LIMIT,
+        )
 
     def post(self, request, appointment_id: int):
         appointment = get_appointment_for_user(request.user, appointment_id)
@@ -169,8 +177,14 @@ class MasterQuickReplyListCreateView(APIView):
             return denied
 
         queryset = MasterQuickReply.objects.filter(user=request.user).order_by("command", "id")
-        data = MasterQuickReplySerializer(queryset, many=True, context={"request": request}).data
-        return Response(data)
+        return serialize_bounded_queryset(
+            request,
+            queryset,
+            MasterQuickReplySerializer,
+            serializer_context={"request": request},
+            default_limit=settings.DEFAULT_API_LIST_LIMIT,
+            max_limit=settings.MAX_API_LIST_LIMIT,
+        )
 
     def post(self, request):
         denied = self._ensure_master(request)

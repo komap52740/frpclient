@@ -1,0 +1,14 @@
+[DEFAULT]
+bantime = 1h
+findtime = 10m
+maxretry = 5
+backend = systemd
+banaction = iptables-multiport
+
+[sshd]
+enabled = true
+backend = systemd
+mode = aggressive
+port = ssh
+logpath = %(sshd_log)s
+journalmatch = _SYSTEMD_UNIT=ssh.service + _COMM=sshd

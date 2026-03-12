@@ -1,0 +1,26 @@
+[Unit]
+Description=FRP Client runtime audit
+Wants=docker.service network-online.target fail2ban.service
+After=docker.service network-online.target fail2ban.service
+
+[Service]
+Type=oneshot
+User=root
+WorkingDirectory=/var/www/FRPclient
+Environment=PROJECT_DIR=/var/www/FRPclient
+Environment=BACKUP_DIR=/var/backups/frpclient/postgres
+Environment=MEDIA_BACKUP_DIR=/var/backups/frpclient/media
+Environment=BASE_URL=https://frpclient.ru
+Environment=MAX_BACKUP_AGE_HOURS=30
+Environment=MIN_CERT_VALID_DAYS=14
+Environment=REQUIRE_TELEGRAM_BOT=1
+Environment=REQUIRE_MEDIA_BACKUP_TIMER=1
+Environment=REQUIRE_MEDIA_VERIFY_TIMER=1
+Environment=REQUIRE_BACKUP_VERIFY_TIMER=1
+Environment=REQUIRE_OFFSITE_BACKUP_VERIFY_TIMER=1
+Environment=REQUIRE_DJANGO_HOUSEKEEPING_TIMER=1
+Environment=REQUIRE_PLATFORM_METRICS_TIMER=1
+Environment=REQUIRE_MANAGED_ACCEPTANCE_TIMER=1
+Environment=REQUIRE_CERTBOT_TIMER=1
+Environment=REQUIRE_CERTBOT_DRY_RUN_TIMER=1
+ExecStart=/bin/sh /var/www/FRPclient/ops/monitoring/runtime_audit.sh

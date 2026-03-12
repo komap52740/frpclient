@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import date, timedelta
 
 from django.core.management.base import BaseCommand, CommandError
+from django.utils import timezone
 
 from apps.platform.analytics import compute_daily_metrics_for_date
 
@@ -30,7 +31,7 @@ class Command(BaseCommand):
             return
 
         if not date_from_raw and not date_to_raw:
-            today = date.today()
+            today = timezone.localdate()
             metrics = compute_daily_metrics_for_date(today)
             self.stdout.write(self.style.SUCCESS(f"Computed daily metrics for {metrics.date}"))
             return

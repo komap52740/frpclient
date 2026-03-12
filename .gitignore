@@ -6,6 +6,15 @@ backend/staticfiles/
 backend/db.sqlite3
 frontend/dist/
 frontend/node_modules/
+frontend/playwright-report/
+frontend/test-results/
+.playwright-diag-logs/
+frontend/.playwright-e2e-*.log
+frontend/.pw-*.log
+test-results/
+.deploy/
+.playwright-runtime/
+deploy-sync*.tar
 **/__pycache__/
 *.py[cod]
 *.pyo

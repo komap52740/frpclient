@@ -2,7 +2,7 @@ import BlockRoundedIcon from "@mui/icons-material/BlockRounded";
 import { Alert, Box, Button, Paper, Stack, Typography } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 
-import { useAuth } from "../auth/AuthContext";
+import { useAuth } from "../features/auth/hooks/useAuth";
 
 export default function BannedPage() {
   const navigate = useNavigate();
@@ -46,7 +46,8 @@ export default function BannedPage() {
           ) : null}
 
           <Typography variant="body2" color="text.secondary">
-            Если считаете блокировку ошибочной, обратитесь в поддержку и укажите ваш логин: <b>{user?.username || "-"}</b>
+            Если считаете блокировку ошибочной, обратитесь в поддержку и укажите ваш логин:{" "}
+            <b>{user?.username || "-"}</b>
           </Typography>
 
           <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>

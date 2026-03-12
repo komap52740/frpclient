@@ -1,0 +1,11 @@
+[Unit]
+Description=Run FRP Client PostgreSQL backup restore verification daily
+
+[Timer]
+OnCalendar=*-*-* 04:15:00
+Persistent=true
+RandomizedDelaySec=10m
+Unit=frpclient-postgres-verify.service
+
+[Install]
+WantedBy=timers.target

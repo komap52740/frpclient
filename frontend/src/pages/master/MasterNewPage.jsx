@@ -1,173 +1,242 @@
-﻿import RefreshIcon from "@mui/icons-material/Refresh";
-import { Alert, Button, Chip, Grid, Paper, Stack, Tab, Tabs, Typography } from "@mui/material";
-import dayjs from "dayjs";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
+import { Alert, Button, Chip, Grid, Paper, Stack, Typography } from "@mui/material";
+import { useQueryClient } from "@tanstack/react-query";
+import { useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { appointmentsApi, authApi } from "../../api/client";
-import AppointmentCard from "../../components/AppointmentCard";
 import EmptyState from "../../components/EmptyState";
 import KpiCard from "../../components/KpiCard";
 import AppointmentCardSkeleton from "../../components/ui/skeletons/AppointmentCardSkeleton";
-import useAutoRefresh from "../../hooks/useAutoRefresh";
+import {
+  getUrgentItemCount,
+  useInboxFilters,
+} from "../../features/appointments/master-inbox/hooks/useInboxFilters";
+import {
+  useMasterActiveAppointmentsQuery,
+  useMasterNewAppointmentsQuery,
+  useTakeAppointmentMutation,
+} from "../../features/appointments/master-inbox/hooks/useMasterInboxQueries";
+import { useMasterQueueRealtime } from "../../features/appointments/master-inbox/hooks/useMasterQueueRealtime";
+import { MASTER_NEW_BOARD_COLUMNS } from "../../features/appointments/master-inbox/model/boardColumns";
+import InboxFilters from "../../features/appointments/master-inbox/ui/InboxFilters";
+import MasterInboxBoard from "../../features/appointments/master-inbox/ui/MasterInboxBoard";
+import { useDashboardSummaryQuery } from "../../features/dashboard/hooks/useDashboardSummaryQuery";
+import { queryKeys } from "../../shared/api/queryKeys";
 
-function sortNewItems(items) {
-  return [...items].sort((a, b) => {
-    const unreadDiff = (b.unread_count || 0) - (a.unread_count || 0);
-    if (unreadDiff !== 0) {
-      return unreadDiff;
-    }
-    const riskWeight = { critical: 3, high: 2, medium: 1, low: 0 };
-    const riskDiff = (riskWeight[b.client_risk_level] || 0) - (riskWeight[a.client_risk_level] || 0);
-    if (riskDiff !== 0) {
-      return riskDiff;
-    }
-    if (Boolean(b.is_wholesale_request) !== Boolean(a.is_wholesale_request)) {
-      return b.is_wholesale_request ? 1 : -1;
-    }
-    return dayjs(b.updated_at).valueOf() - dayjs(a.updated_at).valueOf();
-  });
-}
-
-function isPriorityItem(item) {
-  return (
-    (item.unread_count || 0) > 0 ||
-    item.client_risk_level === "critical" ||
-    item.client_risk_level === "high" ||
-    Boolean(item.is_wholesale_request)
-  );
+function resolveTakeError(error) {
+  const data = error?.response?.data;
+  if (typeof data?.detail === "string") {
+    return data.detail;
+  }
+  if (typeof data === "string") {
+    return data;
+  }
+  return "Не удалось взять заявку в работу";
 }
 
 export default function MasterNewPage() {
   const navigate = useNavigate();
-  const [items, setItems] = useState([]);
-  const [summary, setSummary] = useState(null);
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [viewMode, setViewMode] = useState("priority");
+  const queryClient = useQueryClient();
+  const filters = useInboxFilters({ defaultSortBy: "priority" });
 
-  const load = useCallback(async ({ silent = false, withLoading = true } = {}) => {
-    if (withLoading) {
-      setLoading(true);
+  const {
+    data: newItems = [],
+    isPending: newPending,
+    isFetching: newFetching,
+    error: newError,
+    refetch: refetchNewItems,
+  } = useMasterNewAppointmentsQuery();
+  const {
+    data: activeItems = [],
+    isPending: activePending,
+    isFetching: activeFetching,
+    refetch: refetchActiveItems,
+  } = useMasterActiveAppointmentsQuery();
+  const {
+    data: summary = null,
+    isPending: summaryPending,
+    isFetching: summaryFetching,
+    error: summaryError,
+    refetch: refetchSummary,
+  } = useDashboardSummaryQuery();
+
+  const takeMutation = useTakeAppointmentMutation();
+
+  const loading = newPending || activePending || summaryPending;
+  const refreshing = newFetching || activeFetching || summaryFetching || takeMutation.isPending;
+  const error = newError || summaryError ? "Не удалось загрузить очередь новых заявок" : "";
+
+  const refreshData = useCallback(async () => {
+    await Promise.all([refetchNewItems(), refetchActiveItems(), refetchSummary()]);
+  }, [refetchActiveItems, refetchNewItems, refetchSummary]);
+
+  const invalidateData = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: queryKeys.appointments.newRoot() });
+    queryClient.invalidateQueries({ queryKey: queryKeys.appointments.activeRoot() });
+    queryClient.invalidateQueries({ queryKey: queryKeys.auth.dashboardRoot() });
+  }, [queryClient]);
+
+  useMasterQueueRealtime({
+    onConnected: invalidateData,
+    onQueueEvent: invalidateData,
+  });
+
+  const inReviewItems = useMemo(
+    () => activeItems.filter((item) => item.status === "IN_REVIEW"),
+    [activeItems]
+  );
+
+  const filteredNewItems = useMemo(() => filters.applyItems(newItems), [filters, newItems]);
+  const filteredInReviewItems = useMemo(
+    () => filters.applyItems(inReviewItems),
+    [filters, inReviewItems]
+  );
+  const urgentCount = useMemo(() => getUrgentItemCount(newItems), [newItems]);
+  const wholesaleCount = useMemo(
+    () => newItems.filter((item) => item.is_wholesale_request).length,
+    [newItems]
+  );
+  const boardItems = useMemo(
+    () => ({
+      new: filteredNewItems,
+      in_review: filteredInReviewItems,
+    }),
+    [filteredInReviewItems, filteredNewItems]
+  );
+
+  const focusItem = filteredNewItems[0] || filteredInReviewItems[0] || null;
+
+  const handleMoveCard = async ({ appointmentId, fromColumnId, toColumnId }) => {
+    if (fromColumnId !== "new" || toColumnId !== "in_review") {
+      return;
     }
-    try {
-      const [appointmentsResponse, summaryData] = await Promise.all([
-        appointmentsApi.newList(),
-        authApi.dashboardSummary(),
-      ]);
-      setItems(appointmentsResponse.data || []);
-      setSummary(summaryData.counts || {});
-      setError("");
-    } catch {
-      if (!silent) {
-        setError("Не удалось загрузить новые заявки");
-      }
-    } finally {
-      if (withLoading) {
-        setLoading(false);
-      }
-    }
-  }, []);
 
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  useAutoRefresh(() => load({ silent: true, withLoading: false }), { intervalMs: 5000 });
-
-  const sortedItems = useMemo(() => sortNewItems(items), [items]);
-  const priorityItems = useMemo(() => sortedItems.filter(isPriorityItem), [sortedItems]);
-  const visibleItems = useMemo(() => {
-    if (viewMode === "priority") {
-      return priorityItems.length ? priorityItems : sortedItems;
-    }
-    return sortedItems;
-  }, [priorityItems, sortedItems, viewMode]);
-  const focusItem = priorityItems[0] || sortedItems[0] || null;
+    await takeMutation.mutateAsync(appointmentId);
+  };
 
   return (
     <Stack spacing={2}>
-      <Stack direction={{ xs: "column", sm: "row" }} spacing={1} justifyContent="space-between" alignItems={{ xs: "flex-start", sm: "center" }}>
-        <Typography variant="h5">Новые заявки</Typography>
-        <Stack direction="row" spacing={1} alignItems="center">
+      <Stack
+        direction={{ xs: "column", md: "row" }}
+        spacing={1}
+        justifyContent="space-between"
+        alignItems={{ xs: "flex-start", md: "center" }}
+      >
+        <Stack spacing={0.25}>
+          <Typography variant="h5">Новые заявки</Typography>
+          <Typography variant="body2" color="text.secondary">
+            Рабочая канбан-очередь мастера: фильтруйте поток и перетаскивайте карточку в колонку «В
+            работе сейчас», чтобы сразу взять заказ.
+          </Typography>
+        </Stack>
+        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
           <Chip
             size="small"
-            color={priorityItems.length ? "warning" : "default"}
-            label={`Фокус: ${priorityItems.length}`}
-            variant={priorityItems.length ? "filled" : "outlined"}
+            color={urgentCount ? "warning" : "default"}
+            variant={urgentCount ? "filled" : "outlined"}
+            label={`Срочных: ${urgentCount}`}
           />
-          <Button variant="outlined" startIcon={<RefreshIcon />} onClick={load} disabled={loading}>
+          <Chip
+            size="small"
+            color={wholesaleCount ? "primary" : "default"}
+            variant="outlined"
+            label={`B2B: ${wholesaleCount}`}
+          />
+          <Button
+            variant="outlined"
+            startIcon={<RefreshRoundedIcon />}
+            onClick={refreshData}
+            disabled={refreshing}
+          >
             Обновить
           </Button>
         </Stack>
       </Stack>
 
-      <Paper sx={{ p: 1.4, borderRadius: 3 }}>
-        <Stack spacing={1}>
-          <Stack
-            direction={{ xs: "column", sm: "row" }}
-            spacing={1}
-            justifyContent="space-between"
-            alignItems={{ xs: "flex-start", sm: "center" }}
-          >
-            <Tabs
-              value={viewMode}
-              onChange={(_, value) => setViewMode(value)}
-              sx={{ minHeight: 38, "& .MuiTab-root": { minHeight: 38, textTransform: "none", fontWeight: 700 } }}
-            >
-              <Tab value="priority" label={`Приоритет (${priorityItems.length})`} />
-              <Tab value="all" label={`Все (${items.length})`} />
-            </Tabs>
-            {focusItem ? (
-              <Button variant="contained" size="small" onClick={() => navigate(`/appointments/${focusItem.id}`)}>
-                Открыть главную заявку
-              </Button>
-            ) : null}
-          </Stack>
-          <Typography variant="caption" color="text.secondary">
-            В приоритете заявки с непрочитанными сообщениями, повышенным риском и оптовой пометкой.
-          </Typography>
-        </Stack>
-      </Paper>
-
       <Grid container spacing={2} sx={{ width: "100%", m: 0, minWidth: 0 }}>
         <Grid item xs={12} sm={6} md={4}>
-          <KpiCard title="Доступно новых" value={summary?.new_available ?? "-"} accent="#15616d" />
+          <KpiCard
+            title="Доступно новых"
+            value={summary?.new_available ?? newItems.length}
+            accent="#15616d"
+          />
         </Grid>
         <Grid item xs={12} sm={6} md={4}>
-          <KpiCard title="Активно в работе" value={summary?.active_total ?? "-"} accent="#2e8a66" />
+          <KpiCard
+            title="В работе мастера"
+            value={summary?.active_total ?? activeItems.length}
+            accent="#2e8a66"
+          />
         </Grid>
         <Grid item xs={12} sm={6} md={4}>
-          <KpiCard title="Ожидают оплату" value={summary?.awaiting_client_payment ?? "-"} accent="#c97a00" />
+          <KpiCard title="На ревью" value={inReviewItems.length} accent="#c97a00" />
         </Grid>
       </Grid>
 
-      <Paper sx={{ p: 2, borderRadius: 3 }}>
-        <Typography variant="body2" color="text.secondary">
-          В новых заявках действует модель «кто первый взял — тот ведет заказ».
-        </Typography>
+      <InboxFilters
+        searchQuery={filters.searchQuery}
+        setSearchQuery={filters.setSearchQuery}
+        riskLevel={filters.riskLevel}
+        setRiskLevel={filters.setRiskLevel}
+        sortBy={filters.sortBy}
+        setSortBy={filters.setSortBy}
+        urgentOnly={filters.urgentOnly}
+        setUrgentOnly={filters.setUrgentOnly}
+        wholesaleOnly={filters.wholesaleOnly}
+        setWholesaleOnly={filters.setWholesaleOnly}
+        unreadOnly={filters.unreadOnly}
+        setUnreadOnly={filters.setUnreadOnly}
+      />
+
+      <Paper sx={{ p: 1.4, borderRadius: 2 }}>
+        <Stack
+          direction={{ xs: "column", md: "row" }}
+          spacing={1}
+          justifyContent="space-between"
+          alignItems={{ xs: "flex-start", md: "center" }}
+        >
+          <Typography variant="body2" color="text.secondary">
+            {
+              "Drag & drop работает только для перехода NEW -> IN_REVIEW. Остальные статусы по-прежнему меняются внутри карточки заявки, чтобы не терять доменную логику цены и оплаты."
+            }
+          </Typography>
+          {focusItem ? (
+            <Button
+              variant="contained"
+              size="small"
+              onClick={() => navigate(`/appointments/${focusItem.id}`)}
+            >
+              Открыть фокусную заявку
+            </Button>
+          ) : null}
+        </Stack>
       </Paper>
 
-      {error && <Alert severity="error">{error}</Alert>}
+      {error ? <Alert severity="error">{error}</Alert> : null}
+      {takeMutation.isError ? (
+        <Alert severity="error">{resolveTakeError(takeMutation.error)}</Alert>
+      ) : null}
 
-      {loading && !items.length ? (
+      {loading && !newItems.length && !inReviewItems.length ? (
         <Stack spacing={1.25}>
           <AppointmentCardSkeleton />
           <AppointmentCardSkeleton />
           <AppointmentCardSkeleton />
         </Stack>
-      ) : visibleItems.length ? (
-        <Stack spacing={1.25}>
-          {visibleItems.map((item) => (
-            <AppointmentCard key={item.id} item={item} role="master" linkTo={`/appointments/${item.id}`} />
-          ))}
-        </Stack>
+      ) : filteredNewItems.length || filteredInReviewItems.length ? (
+        <MasterInboxBoard
+          columns={MASTER_NEW_BOARD_COLUMNS}
+          itemsByColumn={boardItems}
+          draggableColumnIds={["new"]}
+          onMoveCard={handleMoveCard}
+          onOpenCard={(item) => navigate(`/appointments/${item.id}`)}
+        />
       ) : (
         <EmptyState
-          title="Новых заявок пока нет"
-          description="Проверьте раздел позже или обновите список вручную."
+          title="Новых заявок по текущим фильтрам нет"
+          description="Сбросьте фильтры, подождите новую очередь или обновите экран вручную."
           actionLabel="Обновить"
-          onAction={load}
+          onAction={refreshData}
         />
       )}
     </Stack>

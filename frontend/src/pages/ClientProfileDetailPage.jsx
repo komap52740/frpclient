@@ -19,7 +19,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 import { authApi } from "../api/client";
-import { useAuth } from "../auth/AuthContext";
+import { useAuth } from "../features/auth/hooks/useAuth";
+import { getB2BStatusMeta, presentB2BValue } from "../shared/lib/b2bLabels";
 
 dayjs.locale("ru");
 
@@ -46,13 +47,6 @@ function resolveRiskColor(level) {
   if (level === "high") return "warning";
   if (level === "medium") return "info";
   return "success";
-}
-
-function resolveWholesaleStatusLabel(status) {
-  if (status === "approved") return "Оптовый сервис подтвержден";
-  if (status === "pending") return "Оптовый статус на проверке";
-  if (status === "rejected") return "Оптовый статус отклонен";
-  return "Обычный клиент";
 }
 
 function StatCard({ title, value, helper }) {
@@ -113,12 +107,15 @@ export default function ClientProfileDetailPage() {
   const behaviorReviews = profile?.master_behavior_reviews || [];
   const riskLabel = resolveRiskLabel(stats.risk_level);
   const riskColor = resolveRiskColor(stats.risk_level);
-  const wholesaleLabel = resolveWholesaleStatusLabel(profile?.wholesale_status);
+  const b2bStatusMeta = getB2BStatusMeta(profile?.wholesale_status);
   const backPath = user?.role === "admin" ? "/admin/clients" : "/master/active";
   const isMasterViewer = user?.role === "master";
 
   const servicePhotoLinks = useMemo(
-    () => [profile?.wholesale_service_photo_1_url, profile?.wholesale_service_photo_2_url].filter(Boolean),
+    () =>
+      [profile?.wholesale_service_photo_1_url, profile?.wholesale_service_photo_2_url].filter(
+        Boolean
+      ),
     [profile?.wholesale_service_photo_1_url, profile?.wholesale_service_photo_2_url]
   );
 
@@ -188,17 +185,26 @@ export default function ClientProfileDetailPage() {
             <Chip
               size="small"
               icon={<StorefrontRoundedIcon fontSize="small" />}
-              label={wholesaleLabel}
-              color={profile.wholesale_status === "approved" ? "success" : "default"}
-              variant={profile.wholesale_status === "approved" ? "filled" : "outlined"}
+              label={`B2B: ${b2bStatusMeta.label}`}
+              color={b2bStatusMeta.chipColor}
+              variant={b2bStatusMeta.chipVariant}
             />
             {profile.is_banned ? (
-              <Chip size="small" icon={<BlockRoundedIcon fontSize="small" />} color="error" label="Клиент забанен" />
+              <Chip
+                size="small"
+                icon={<BlockRoundedIcon fontSize="small" />}
+                color="error"
+                label="Клиент забанен"
+              />
             ) : (
               <Chip size="small" label="Клиент активен" color="success" variant="outlined" />
             )}
             {profile.telegram_username ? (
-              <Chip size="small" label={`Telegram: @${profile.telegram_username}`} variant="outlined" />
+              <Chip
+                size="small"
+                label={`Telegram: @${profile.telegram_username}`}
+                variant="outlined"
+              />
             ) : null}
           </Stack>
         </Stack>
@@ -251,7 +257,8 @@ export default function ClientProfileDetailPage() {
             Доля отмен: <b>{formatPercent(stats.cancellation_rate)}</b>
           </Typography>
           <Typography variant="body2">
-            Завершено: <b>{stats.completed_orders_count || 0}</b> • Отменено: <b>{stats.cancelled_orders_count || 0}</b>
+            Завершено: <b>{stats.completed_orders_count || 0}</b> • Отменено:{" "}
+            <b>{stats.cancelled_orders_count || 0}</b>
           </Typography>
           <Typography variant="caption" color="text.secondary">
             Обновлено: {formatDate(stats.risk_updated_at)}
@@ -288,7 +295,12 @@ export default function ClientProfileDetailPage() {
                     {review.behavior_flags?.length ? (
                       <Stack direction="row" spacing={0.6} flexWrap="wrap" useFlexGap>
                         {review.behavior_flags.map((flag) => (
-                          <Chip key={`${review.id}-${flag.code}`} size="small" label={flag.label || flag.code} variant="outlined" />
+                          <Chip
+                            key={`${review.id}-${flag.code}`}
+                            size="small"
+                            label={flag.label || flag.code}
+                            variant="outlined"
+                          />
                         ))}
                       </Stack>
                     ) : (
@@ -323,27 +335,27 @@ export default function ClientProfileDetailPage() {
         }}
       >
         <Stack spacing={0.8}>
-          <Typography variant="h3">Данные сервисного центра</Typography>
+          <Typography variant="h3">B2B-реквизиты</Typography>
           <Typography variant="body2">
-            Режим: <b>{profile.is_service_center ? "Сервисный центр" : "Обычный клиент"}</b>
+            Режим: <b>{profile.is_service_center ? "B2B-партнёр" : "Базовый аккаунт"}</b>
           </Typography>
           <Typography variant="body2">
-            Компания: <b>{profile.wholesale_company_name || "—"}</b>
+            Компания: <b>{presentB2BValue(profile.wholesale_company_name, "—")}</b>
           </Typography>
           <Typography variant="body2">
-            Город: <b>{profile.wholesale_city || "—"}</b>
+            Город: <b>{presentB2BValue(profile.wholesale_city, "—")}</b>
           </Typography>
           <Typography variant="body2">
-            Адрес: <b>{profile.wholesale_address || "—"}</b>
+            Адрес: <b>{presentB2BValue(profile.wholesale_address, "—")}</b>
           </Typography>
           <Typography variant="body2">
-            Запросил опт: <b>{formatDate(profile.wholesale_requested_at)}</b>
+            Запрос на B2B: <b>{formatDate(profile.wholesale_requested_at)}</b>
           </Typography>
           <Typography variant="body2">
-            Проверено админом: <b>{formatDate(profile.wholesale_reviewed_at)}</b>
+            Проверено администратором: <b>{formatDate(profile.wholesale_reviewed_at)}</b>
           </Typography>
           <Typography variant="body2">
-            Комментарий проверки: <b>{profile.wholesale_review_comment || "—"}</b>
+            Комментарий модерации: <b>{presentB2BValue(profile.wholesale_review_comment, "—")}</b>
           </Typography>
           {servicePhotoLinks.length ? (
             <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
