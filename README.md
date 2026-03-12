@@ -350,6 +350,9 @@ nginx -t && systemctl reload nginx
 
 Версионированный конфиг system nginx для прод-домена лежит в `ops/nginx/frpclient.ru.conf`.
 Отдельный vhost для админки лежит в `ops/nginx/admin.frpclient.ru.conf`.
+Для автоматического включения host после появления DNS добавлен helper:
+- `ops/nginx/admin.frpclient.ru.http.conf`
+- `ops/nginx/enable_admin_host.sh`
 
 ## Django Admin Hardening
 
@@ -373,6 +376,20 @@ cp ops/nginx/snippets/frpclient-admin-access.cloudflare-access.conf /etc/nginx/s
 ln -sf /etc/nginx/sites-available/admin.frpclient.ru.conf /etc/nginx/sites-enabled/admin.frpclient.ru.conf
 nginx -t && systemctl reload nginx
 ```
+
+Если хотите включать admin host без ручного двухшагового переключения `HTTP -> certbot -> TLS`, используйте:
+
+```bash
+sh ops/nginx/enable_admin_host.sh --check-only --access-mode tailscale
+CERTBOT_EMAIL=you@example.com sh ops/nginx/enable_admin_host.sh --access-mode tailscale
+```
+
+Скрипт:
+- проверяет, что `admin.frpclient.ru` уже резолвится;
+- ставит выбранный access snippet (`tailscale` или `cloudflare`);
+- временно включает HTTP-only vhost для ACME challenge;
+- выпускает сертификат через `certbot --webroot`;
+- переключает nginx на финальный TLS vhost.
 
 Новые backend env:
 
