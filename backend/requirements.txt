@@ -1,6 +1,6 @@
 # Keep broad version ranges here; CI and reproducible installs must also apply
 # backend/requirements.lock.txt as a constraints file.
-Django>=5.1,<6.0
+Django>=5.1,<7.0
 djangorestframework>=3.15
 djangorestframework-simplejwt>=5.3
 drf-spectacular>=0.28,<0.29
