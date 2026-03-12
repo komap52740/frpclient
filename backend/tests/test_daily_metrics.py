@@ -1,6 +1,6 @@
 ﻿from __future__ import annotations
 
-from datetime import timedelta
+from datetime import datetime, time, timedelta
 
 import pytest
 from django.utils import timezone
@@ -25,7 +25,8 @@ def test_compute_daily_metrics_and_admin_api():
     client_user = User.objects.create_user(username="metrics-client", password="x", role=RoleChoices.CLIENT)
     master_user = User.objects.create_user(username="metrics-master", password="x", role=RoleChoices.MASTER, is_master_active=True, master_quality_approved=True)
 
-    now = timezone.now()
+    today = timezone.localdate()
+    base_dt = timezone.make_aware(datetime.combine(today, time(hour=12, minute=0)))
     appointment = Appointment.objects.create(
         client=client_user,
         assigned_master=master_user,
@@ -36,15 +37,14 @@ def test_compute_daily_metrics_and_admin_api():
         description="desc",
         status=AppointmentStatusChoices.COMPLETED,
         total_price=5000,
-        taken_at=now - timedelta(minutes=50),
-        started_at=now - timedelta(minutes=30),
-        completed_at=now - timedelta(minutes=5),
-        payment_confirmed_at=now - timedelta(minutes=35),
+        taken_at=base_dt + timedelta(minutes=10),
+        started_at=base_dt + timedelta(minutes=20),
+        completed_at=base_dt + timedelta(minutes=45),
+        payment_confirmed_at=base_dt + timedelta(minutes=15),
     )
-    appointment.created_at = now - timedelta(hours=1)
+    appointment.created_at = base_dt
     appointment.save(update_fields=["created_at", "updated_at"])
 
-    today = timezone.localdate()
     metrics = compute_daily_metrics_for_date(today)
     assert metrics.date == today
     assert metrics.new_appointments >= 1
