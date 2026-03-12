@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True)
 class MediaStorageConfig:
     provider: str
     bucket_name: str

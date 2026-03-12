@@ -16,7 +16,7 @@ from typing import Protocol
 ARTIFACT_TYPES = {"postgres", "media"}
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True)
 class OffsiteConfig:
     enabled: bool
     provider: str
@@ -29,7 +29,7 @@ class OffsiteConfig:
     cli_image: str
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True)
 class StoredObjectInfo:
     key: str
     size: int
