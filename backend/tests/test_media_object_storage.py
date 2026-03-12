@@ -5,6 +5,8 @@ import sys
 import tempfile
 from pathlib import Path
 
+import pytest
+
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 MODULE_PATH = REPO_ROOT / "ops" / "backup" / "media_object_storage.py"
@@ -60,6 +62,30 @@ def test_load_media_storage_config_accepts_r2_env() -> None:
     assert config.provider == "r2"
     assert config.bucket_name == "frpclient-media"
     assert config.prefix == "prod/media"
+
+
+def test_build_s3_client_reports_missing_boto3_cleanly(monkeypatch: pytest.MonkeyPatch) -> None:
+    config = MODULE.MediaStorageConfig(
+        provider="r2",
+        bucket_name="frpclient-media",
+        region_name="auto",
+        endpoint_url="https://r2.example.invalid",
+        prefix="prod/media",
+        access_key_id="key",
+        secret_access_key="secret",
+        signature_version="s3v4",
+        addressing_style="virtual",
+    )
+
+    def fake_import_module(name: str):
+        if name == "boto3":
+            raise ModuleNotFoundError("No module named 'boto3'")
+        raise AssertionError(f"unexpected import: {name}")
+
+    monkeypatch.setattr(MODULE.importlib, "import_module", fake_import_module)
+
+    with pytest.raises(RuntimeError, match="boto3 is required for remote media storage operations"):
+        MODULE.build_s3_client(config)
 
 
 def test_export_media_tree_downloads_remote_files_into_app_media() -> None:

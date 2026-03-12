@@ -2,14 +2,12 @@
 from __future__ import annotations
 
 import argparse
+import importlib
 import mimetypes
 import os
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
-
-import boto3
-from botocore.client import Config
 
 
 @dataclass(frozen=True, slots=True)
@@ -65,13 +63,25 @@ def load_media_storage_config(*, env: dict[str, str] | None = None, require_remo
 
 
 def build_s3_client(config: MediaStorageConfig):
+    try:
+        boto3 = importlib.import_module("boto3")
+        botocore_client = importlib.import_module("botocore.client")
+    except ModuleNotFoundError as exc:
+        raise RuntimeError(
+            "boto3 is required for remote media storage operations. "
+            "Install backend requirements or keep MEDIA_STORAGE_PROVIDER=filesystem."
+        ) from exc
+
     return boto3.client(
         "s3",
         endpoint_url=config.endpoint_url or None,
         region_name=config.region_name,
         aws_access_key_id=config.access_key_id,
         aws_secret_access_key=config.secret_access_key,
-        config=Config(signature_version=config.signature_version, s3={"addressing_style": config.addressing_style}),
+        config=botocore_client.Config(
+            signature_version=config.signature_version,
+            s3={"addressing_style": config.addressing_style},
+        ),
     )
 
 
