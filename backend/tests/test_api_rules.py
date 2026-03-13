@@ -616,6 +616,9 @@ def test_bootstrap_admin_flow(api_client):
     )
     assert create_response.status_code == 200
     assert create_response.data["user"]["role"] == RoleChoices.ADMIN
+    owner = User.objects.get(username="owner")
+    assert owner.is_staff is True
+    assert owner.is_superuser is True
 
     status_after = api_client.get("/api/auth/bootstrap-status/")
     assert status_after.status_code == 200

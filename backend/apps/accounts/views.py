@@ -1226,6 +1226,7 @@ class BootstrapCreateAdminView(AuthScopedAPIView):
             last_name=data.get("last_name", ""),
             role=RoleChoices.ADMIN,
             is_staff=True,
+            is_superuser=True,
         )
         user.last_login = timezone.now()
         user.save(update_fields=["last_login", "updated_at"])
