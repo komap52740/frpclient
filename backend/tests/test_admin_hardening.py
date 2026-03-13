@@ -3,6 +3,7 @@ from __future__ import annotations
 from io import StringIO
 
 import pytest
+from django.conf import settings
 from django.core.management import call_command
 from rest_framework.test import APIClient
 
@@ -27,6 +28,10 @@ def test_django_admin_login_on_admin_host_uses_otp_form():
     assert response.status_code == 200
     assert b"otp_device" in response.content
     assert b"otp_token" in response.content
+
+
+def test_admin_host_is_added_to_csrf_trusted_origins():
+    assert "https://admin.frpclient.ru" in settings.CSRF_TRUSTED_ORIGINS
 
 
 @pytest.mark.django_db

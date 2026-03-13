@@ -29,6 +29,21 @@ def _normalize_host(value: str) -> str:
     return host
 
 
+def _normalize_origin(value: str) -> str:
+    origin = (value or "").strip()
+    if not origin:
+        return ""
+    parsed = urlparse(origin)
+    if parsed.scheme and parsed.netloc:
+        return f"{parsed.scheme}://{parsed.netloc}".rstrip("/")
+    host = _normalize_host(origin)
+    if not host:
+        return ""
+    if host in {"127.0.0.1", "localhost"}:
+        return f"http://{host}"
+    return f"https://{host}"
+
+
 def _env_bool(name: str, default: bool) -> bool:
     value = os.getenv(name)
     if value is None:
@@ -315,6 +330,9 @@ CORS_ALLOW_CREDENTIALS = True
 CSRF_TRUSTED_ORIGINS = [
     o.strip() for o in os.getenv("CSRF_TRUSTED_ORIGINS", "http://localhost:5173").split(",") if o.strip()
 ]
+_admin_origin = _normalize_origin(ADMIN_HOST)
+if _admin_origin and _admin_origin not in CSRF_TRUSTED_ORIGINS:
+    CSRF_TRUSTED_ORIGINS.append(_admin_origin)
 
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_LOGIN_BOT_USERNAME = os.getenv("TELEGRAM_LOGIN_BOT_USERNAME", "")

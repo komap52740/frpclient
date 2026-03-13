@@ -58,6 +58,15 @@ def normalize_host(value: str) -> str:
     return candidate
 
 
+def admin_origin_from_env(admin_host: str) -> str:
+    host = normalize_host(admin_host)
+    if not host:
+        return ""
+    if host in {"127.0.0.1", "localhost"}:
+        return f"http://{host}"
+    return f"https://{host}"
+
+
 def split_csv(value: str) -> list[str]:
     return [item.strip() for item in value.split(",") if item.strip()]
 
@@ -188,6 +197,10 @@ def main() -> int:
     allowed_hosts = {normalize_host(item) for item in split_csv(backend_env.get("ALLOWED_HOSTS", ""))}
     cors_origins = {normalize_origin(item) for item in split_csv(backend_env.get("CORS_ALLOWED_ORIGINS", ""))}
     csrf_origins = {normalize_origin(item) for item in split_csv(backend_env.get("CSRF_TRUSTED_ORIGINS", ""))}
+    admin_origin = admin_origin_from_env(backend_env.get("ADMIN_HOST", ""))
+    effective_csrf_origins = set(csrf_origins)
+    if admin_origin:
+        effective_csrf_origins.add(admin_origin)
 
     preflight.require(backend_env.get("DEBUG") == "0", "DEBUG=0 in backend env")
     secret_key = backend_env.get("SECRET_KEY", "")
@@ -195,7 +208,12 @@ def main() -> int:
     preflight.require("*" not in allowed_hosts, "ALLOWED_HOSTS does not contain wildcard")
     preflight.require(domain in allowed_hosts, f"ALLOWED_HOSTS contains {domain}")
     preflight.require(base_url in cors_origins, f"CORS_ALLOWED_ORIGINS contains {base_url}")
-    preflight.require(base_url in csrf_origins, f"CSRF_TRUSTED_ORIGINS contains {base_url}")
+    preflight.require(base_url in effective_csrf_origins, f"CSRF_TRUSTED_ORIGINS contains {base_url}")
+    if admin_origin:
+        preflight.require(
+            admin_origin in effective_csrf_origins,
+            f"effective CSRF trusted origins contain admin host {admin_origin}",
+        )
     preflight.require(bool(backend_env.get("REDIS_URL", "").strip()), "REDIS_URL is configured")
     preflight.require(normalize_origin(backend_env.get("OAUTH_FRONTEND_URL", "")) == base_url, "OAUTH_FRONTEND_URL matches base URL")
     media_storage_provider = (backend_env.get("MEDIA_STORAGE_PROVIDER", "filesystem") or "filesystem").strip().lower()

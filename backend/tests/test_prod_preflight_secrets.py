@@ -53,6 +53,7 @@ def _write_backend_base_env(path: Path, *, leaked_secret_key: str = "") -> None:
                 f"SECRET_KEY={leaked_secret_key}",
                 "DEBUG=0",
                 "ALLOWED_HOSTS=frpclient.ru,127.0.0.1,localhost",
+                "ADMIN_HOST=admin.frpclient.ru",
                 "POSTGRES_DB=frpclient",
                 "POSTGRES_USER=frpuser",
                 "POSTGRES_PASSWORD=",
