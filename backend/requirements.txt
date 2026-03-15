@@ -21,4 +21,4 @@ whitenoise>=6.7
 pytest>=8.2
 pytest-asyncio>=0.24
 pytest-django>=4.8
-websockets>=13,<16
+websockets>=13,<17
