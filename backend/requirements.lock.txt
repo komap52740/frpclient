@@ -10,7 +10,7 @@ certifi==2026.2.25
 cffi==2.0.0
 channels==4.3.2
 channels_redis==4.3.0
-botocore==1.42.67
+botocore==1.42.68
 colorama==0.4.6
 constantly==23.10.4
 cryptography==46.0.5
