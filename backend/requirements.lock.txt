@@ -5,7 +5,7 @@ attrs==25.4.0
 autobahn==25.12.2
 Automat==25.4.16
 boto3==1.42.67
-cbor2==5.8.0
+cbor2==5.9.0
 certifi==2026.2.25
 cffi==2.0.0
 channels==4.3.2
